@@ -227,8 +227,6 @@ export default function Home() {
   };
 
   const handleSend = async () => {
-    if (!chatInput || !chatInput.trim()) return;
-
     const newResponses = models.map((model, index) => ({ model, text: '' }));
     setResponses(newResponses);
 
