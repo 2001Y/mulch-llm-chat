@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import OpenAI from "openai"
 
-const redirectUri = 'https://3000.2001y.dev';
+const isProduction = process.env.NODE_ENV === 'production';
+const redirectUri = isProduction ? 'https://mulch-llm-chat.vercel.app' : 'https://3000.2001y.dev';
 
 export default function Home() {
   const [models, setModels] = useState([]);
