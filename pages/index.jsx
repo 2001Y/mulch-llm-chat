@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import OpenAI from 'openai';
 
+// Environment variables
 const isProduction = process.env.NODE_ENV === 'production';
 const redirectUri = isProduction ? 'https://mulch-llm-chat.vercel.app' : 'https://3000.2001y.dev';
 
+// Custom Hooks
 const useLocalStorage = (key, initialValue) => {
   const [storedValue, setStoredValue] = useState(() => {
     try {
@@ -89,6 +91,7 @@ const useIphoneSafariDetection = () => {
   }, []);
 };
 
+// Components
 const Responses = ({ responses, selectedResponse, handleRegenerate }) => (
   <div className="responses-container">
     {responses.map((response, index) => (
@@ -103,21 +106,15 @@ const Responses = ({ responses, selectedResponse, handleRegenerate }) => (
   </div>
 );
 
-const InputSection = ({ models, setModels, chatInput, setChatInput, handleSend }) => {
+const InputSection = ({ models, chatInput, setChatInput, handleSend, openModal }) => {
   const [isComposing, setIsComposing] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const handleModelInput = (event) => {
-    const modelsArray = event.target.value.split(',').map(model => model.trim());
-    setModels(modelsArray);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('models', JSON.stringify(modelsArray));
-    }
-  };
 
   const handleKeyDown = (event) => {
-    if (event.key === 'Enter' && event.metaKey && !isComposing) {
+    if (event.key === 'Enter' && !isComposing && !event.shiftKey) {
+      event.preventDefault();
       handleSend();
+    } else if (event.key === 'Enter' && event.shiftKey) {
+      // Allow newline insertion
     }
   };
 
@@ -132,25 +129,21 @@ const InputSection = ({ models, setModels, chatInput, setChatInput, handleSend }
 
   const handleInput = (e) => {
     const text = e.currentTarget.textContent;
-    setChatInput(text === '\u200B' ? '' : text); // Zero-width space check
+    if (text === '\u200B' || text.trim() === '') {
+      e.currentTarget.innerHTML = ''; // Clear the content
+      setChatInput('');
+    } else {
+      setChatInput(text);
+    }
   };
 
   return (
     <section className="input-section">
       <div className="input-container">
-        <button onClick={() => setIsModalOpen(true)} className="open-modal-button">
+        <button onClick={openModal} className="open-modal-button">
           {models.map(model => model.split('/')[1]).join(', ') || 'Open Model Input'}
         </button>
       </div>
-      {isModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Input Models</h2>
-            <textarea type="text" value={models.join(',')} onChange={handleModelInput} className="model-input" />
-            <button onClick={() => setIsModalOpen(false)} className="close-modal-button">Save</button>
-          </div>
-        </div>
-      )}
       <div className="input-container">
         <div
           contentEditable="true"
@@ -159,7 +152,8 @@ const InputSection = ({ models, setModels, chatInput, setChatInput, handleSend }
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
           className="chat-input"
-          style={{ whiteSpace: 'pre-wrap' }} // 改行を保持するためのスタイル
+          data-placeholder="Type your message here..."
+          style={{ whiteSpace: 'pre-wrap' }}
         />
         <button onClick={handleSend} className="send-button">Send</button>
       </div>
@@ -167,6 +161,30 @@ const InputSection = ({ models, setModels, chatInput, setChatInput, handleSend }
   );
 };
 
+
+const ModelInputModal = ({ models, setModels, isModalOpen, closeModal }) => {
+  const handleModelInput = (event) => {
+    const modelsArray = event.target.value.split(',').map(model => model.trim());
+    setModels(modelsArray);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('models', JSON.stringify(modelsArray));
+    }
+  };
+
+  return (
+    <div className={`modal-overlay ${isModalOpen ? 'visible' : 'hidden'}`} onClick={closeModal}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h2>Input Models</h2>
+        <textarea type="text" value={models.join(',')} onChange={handleModelInput} className="model-input" />
+      </div>
+      <div className="save">
+        Save
+      </div>
+    </div>
+  );
+};
+
+// Main Component
 export default function Home() {
   const [models, setModels] = useLocalStorage('models', ['perplexity/llama-3-sonar-large-32k-online', 'openai/gpt-4o', 'openai/gpt-3.5-turbo']);
   const [chatInput, setChatInput] = useState('');
@@ -174,6 +192,7 @@ export default function Home() {
   const [selectedResponse, setSelectedResponse] = useState(null);
   const [accessToken, setAccessToken] = useAccessToken();
   const openai = useOpenAI(accessToken);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useIphoneSafariDetection();
 
@@ -233,6 +252,9 @@ export default function Home() {
     window.location.href = openRouterAuthUrl;
   };
 
+  const openModal = () => setIsModalOpen(true);
+  const closeModal = () => setIsModalOpen(false);
+
   return (
     <>
       <Head>
@@ -243,7 +265,7 @@ export default function Home() {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="theme-color" content="#000000" />
-        <title>MULCH AI CHAT</title>
+        <title>Multi AI Chat | OpenRouter Chat Client</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin />
         <link href="https://fonts.googleapis.com/css2?family=Glegoo:wght@400;700&display=swap" rel="stylesheet"></link>
@@ -253,10 +275,15 @@ export default function Home() {
       ) : (
         <>
           <header>
-            <h1>MULCH AI CHAT</h1>
+            <div className="logo"></div>
+            <h1>
+              Multi AI Chat<br />
+              <small>OpenRouter Chat Client</small>
+            </h1>
           </header>
           <Responses responses={responses} selectedResponse={selectedResponse} handleRegenerate={handleRegenerate} />
-          <InputSection models={models} setModels={setModels} chatInput={chatInput} setChatInput={setChatInput} handleSend={handleSend} />
+          <InputSection models={models} chatInput={chatInput} setChatInput={setChatInput} handleSend={handleSend} openModal={openModal} />
+          <ModelInputModal models={models} setModels={setModels} isModalOpen={isModalOpen} closeModal={closeModal} />
         </>
       )}
     </>
