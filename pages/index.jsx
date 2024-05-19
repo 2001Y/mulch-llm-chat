@@ -186,7 +186,7 @@ const ModelInputModal = ({ models, setModels, isModalOpen, closeModal }) => {
 
 // Main Component
 export default function Home() {
-  const [models, setModels] = useLocalStorage('models', ['perplexity/llama-3-sonar-large-32k-online', 'openai/gpt-4o', 'openai/gpt-3.5-turbo']);
+  const [models, setModels] = useLocalStorage('models', ['openai/gpt-4o', 'anthropic/claude-3-opus:beta', 'google/gemini-pro-1.5', 'cohere/command-r-plus', 'perplexity/llama-3-sonar-large-32k-online']);
   const [chatInput, setChatInput] = useState('');
   const [responses, setResponses] = useState([]);
   const [selectedResponse, setSelectedResponse] = useState(null);
