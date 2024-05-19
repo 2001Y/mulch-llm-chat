@@ -1,25 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import Head from 'next/head';
 import OpenAI from 'openai';
 
 const isProduction = process.env.NODE_ENV === 'production';
 const redirectUri = isProduction ? 'https://mulch-llm-chat.vercel.app' : 'https://3000.2001y.dev';
 
-export default function Home() {
-  const [models, setModels] = useState(['perplexity/llama-3-sonar-large-32k-online', 'openai/gpt-4o', 'openai/gpt-3.5-turbo']);
-  const [chatInput, setChatInput] = useState('');
-  const [responses, setResponses] = useState([]);
-  const [selectedResponse, setSelectedResponse] = useState(null);
-  const [accessToken, setAccessToken] = useState('');
-  const [isComposing, setIsComposing] = useState(false);
-  const [openai, setOpenai] = useState(null);
+const useLocalStorage = (key, initialValue) => {
+  const [storedValue, setStoredValue] = useState(() => {
+    try {
+      const item = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      console.error(error);
+      return initialValue;
+    }
+  });
 
-  useEffect(() => {
-    const savedModels = localStorage.getItem('models');
-    if (savedModels) setModels(savedModels.split(','));
+  const setValue = (value) => {
+    try {
+      setStoredValue(value);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(key, JSON.stringify(value));
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
-    const savedAccessToken = localStorage.getItem('accessToken');
-    if (savedAccessToken) setAccessToken(savedAccessToken);
-  }, []);
+  return [storedValue, setValue];
+};
+
+const useAccessToken = () => {
+  const [accessToken, setAccessToken] = useLocalStorage('accessToken', '');
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -27,12 +39,6 @@ export default function Home() {
 
     if (code && !accessToken) {
       fetchAccessToken(code);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (accessToken) {
-      initializeOpenAI(accessToken);
     }
   }, [accessToken]);
 
@@ -44,9 +50,7 @@ export default function Home() {
       });
       const data = await response.json();
       setAccessToken(data.key);
-      localStorage.setItem('accessToken', data.key);
 
-      // codeパラメータを削除
       const url = new URL(window.location);
       url.searchParams.delete('code');
       window.history.replaceState({}, document.title, url.toString());
@@ -55,32 +59,64 @@ export default function Home() {
     }
   };
 
-  const initializeOpenAI = (token) => {
-    const openaiInstance = new OpenAI({
-      apiKey: token,
-      baseURL: 'https://openrouter.ai/api/v1',
-      dangerouslyAllowBrowser: true,
-    });
-    setOpenai(openaiInstance);
-  };
+  return [accessToken, setAccessToken];
+};
 
-  const handleLogin = () => {
-    const openRouterAuthUrl = `https://openrouter.ai/auth?callback_url=${redirectUri}`;
-    window.location.href = openRouterAuthUrl;
-  };
+const useOpenAI = (accessToken) => {
+  const [openai, setOpenai] = useState(null);
+
+  useEffect(() => {
+    if (accessToken) {
+      const openaiInstance = new OpenAI({
+        apiKey: accessToken,
+        baseURL: 'https://openrouter.ai/api/v1',
+        dangerouslyAllowBrowser: true,
+      });
+      setOpenai(openaiInstance);
+    }
+  }, [accessToken]);
+
+  return openai;
+};
+
+const useIphoneSafariDetection = () => {
+  useEffect(() => {
+    const isIphone = /iPhone/i.test(navigator.userAgent);
+    const isSafari = /Apple/.test(navigator.vendor) && !/CriOS|FxiOS/.test(navigator.userAgent);
+    if (isIphone && isSafari) {
+      document.documentElement.setAttribute('data-device', 'iphone');
+    }
+  }, []);
+};
+
+const Responses = ({ responses, selectedResponse, handleRegenerate }) => (
+  <div className="responses-container">
+    {responses.map((response, index) => (
+      <div key={index} className={`response ${index === selectedResponse ? 'selected' : ''}`}>
+        <div className="meta">
+          <small>{response.model}</small>
+          <button onClick={() => handleRegenerate(index)} className="regenerate-button">ReGenerate</button>
+        </div>
+        <p>{response.text}</p>
+      </div>
+    ))}
+  </div>
+);
+
+const InputSection = ({ models, setModels, chatInput, setChatInput, handleSend }) => {
+  const [isComposing, setIsComposing] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleModelInput = (event) => {
     const modelsArray = event.target.value.split(',').map(model => model.trim());
     setModels(modelsArray);
-    localStorage.setItem('models', modelsArray.join(','));
-  };
-
-  const handleChatInput = (event) => {
-    setChatInput(event.target.value);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('models', JSON.stringify(modelsArray));
+    }
   };
 
   const handleKeyDown = (event) => {
-    if (event.key === 'Enter' && !isComposing) {
+    if (event.key === 'Enter' && event.metaKey && !isComposing) {
       handleSend();
     }
   };
@@ -94,7 +130,54 @@ export default function Home() {
     setChatInput(event.target.value);
   };
 
-  const fetchChatResponse = async (model, index) => {
+  const handleInput = (e) => {
+    const text = e.currentTarget.textContent;
+    setChatInput(text === '\u200B' ? '' : text); // Zero-width space check
+  };
+
+  return (
+    <section className="input-section">
+      <div className="input-container">
+        <button onClick={() => setIsModalOpen(true)} className="open-modal-button">
+          {models.map(model => model.split('/')[1]).join(', ') || 'Open Model Input'}
+        </button>
+      </div>
+      {isModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Input Models</h2>
+            <textarea type="text" value={models.join(',')} onChange={handleModelInput} className="model-input" />
+            <button onClick={() => setIsModalOpen(false)} className="close-modal-button">Save</button>
+          </div>
+        </div>
+      )}
+      <div className="input-container">
+        <div
+          contentEditable="true"
+          onInput={handleInput}
+          onKeyDown={handleKeyDown}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
+          className="chat-input"
+          style={{ whiteSpace: 'pre-wrap' }} // 改行を保持するためのスタイル
+        />
+        <button onClick={handleSend} className="send-button">Send</button>
+      </div>
+    </section>
+  );
+};
+
+export default function Home() {
+  const [models, setModels] = useLocalStorage('models', ['perplexity/llama-3-sonar-large-32k-online', 'openai/gpt-4o', 'openai/gpt-3.5-turbo']);
+  const [chatInput, setChatInput] = useState('');
+  const [responses, setResponses] = useState([]);
+  const [selectedResponse, setSelectedResponse] = useState(null);
+  const [accessToken, setAccessToken] = useAccessToken();
+  const openai = useOpenAI(accessToken);
+
+  useIphoneSafariDetection();
+
+  const fetchChatResponse = useCallback(async (model, index) => {
     try {
       const stream = await openai.chat.completions.create({
         model,
@@ -114,7 +197,7 @@ export default function Home() {
       console.error('Error fetching response from model:', model, error);
       updateResponse(index, 'Error');
     }
-  };
+  }, [chatInput, openai]);
 
   const updateResponse = (index, text) => {
     setResponses(prevResponses => {
@@ -125,7 +208,7 @@ export default function Home() {
   };
 
   const handleSend = async () => {
-    if (!chatInput.trim()) return;
+    if (!chatInput || !chatInput.trim()) return;
 
     const newResponses = models.map((model, index) => ({ model, text: '' }));
     setResponses(newResponses);
@@ -145,45 +228,35 @@ export default function Home() {
     }
   };
 
+  const handleLogin = () => {
+    const openRouterAuthUrl = `https://openrouter.ai/auth?callback_url=${redirectUri}`;
+    window.location.href = openRouterAuthUrl;
+  };
+
   return (
     <>
+      <Head>
+        <meta charSet="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0 , viewport-fit=cover" />
+        <link rel="icon" href="https://via.placeholder.com/192" />
+        <link rel="apple-touch-icon" href="https://via.placeholder.com/192" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="theme-color" content="#000000" />
+        <title>MULCH AI CHAT</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin />
+        <link href="https://fonts.googleapis.com/css2?family=Glegoo:wght@400;700&display=swap" rel="stylesheet"></link>
+      </Head>
       {!accessToken ? (
-        <button onClick={handleLogin}>Login to OpenRouter</button>
+        <button onClick={handleLogin} className="loginButton">Login to OpenRouter</button>
       ) : (
         <>
           <header>
             <h1>MULCH AI CHAT</h1>
           </header>
-          <div className="responses-container">
-            {responses.map((response, index) => (
-              <div key={index} className={`response ${index === selectedResponse ? 'selected' : ''}`}>
-                <div className="meta">
-                  <small>{response.model}</small>
-                  <button onClick={() => handleRegenerate(index)} className="regenerate-button">ReGenerate</button>
-                </div>
-                <p>{response.text}</p>
-              </div>
-            ))}
-          </div>
-
-          <section className="input-section">
-            <div className="input-container">
-              Models
-              <input type="text" value={models.join(',')} onChange={handleModelInput} className="model-input" />
-            </div>
-            <div className="input-container">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={handleChatInput}
-                onKeyDown={handleKeyDown}
-                onCompositionStart={handleCompositionStart}
-                onCompositionEnd={handleCompositionEnd}
-                className="chat-input"
-              />
-              <button onClick={handleSend} className="send-button">Send</button>
-            </div>
-          </section>
+          <Responses responses={responses} selectedResponse={selectedResponse} handleRegenerate={handleRegenerate} />
+          <InputSection models={models} setModels={setModels} chatInput={chatInput} setChatInput={setChatInput} handleSend={handleSend} />
         </>
       )}
     </>
