@@ -1,3 +1,6 @@
+@import '~highlight.js/styles/github-dark.css';
+/* 他のテーマも利用可能 */
+
 // SCSS変数宣言
 $body-padding: max(1em, 2vmax);
 $height_header: 4.5em;
@@ -148,6 +151,11 @@ header {
   flex-direction: column;
   gap: .5em;
 
+  @media (display-mode: standalone) and (env(safe-area-inset-bottom) > 0) {
+    flex-direction: column-reverse;
+    padding-bottom: calc(env(safe-area-inset-bottom) px);
+  }
+
   &::after {
     content: '';
     position: absolute;
@@ -213,7 +221,7 @@ header {
         aspect-ratio: 1/1;
         padding: 0 1em;
         background: mix(#fff, #15d186, 10%);
-        border-radius: $border-radius;
+        border-radius: calc($border-radius - .5em);
       }
     }
   }
@@ -225,22 +233,28 @@ header {
   height: 100svh;
   max-height: 100svh;
   padding-top: calc($height_header*1.5 + env(safe-area-inset-top));
-  padding-bottom: calc(8em + env(safe-area-inset-bottom)*1.5);
-  display: flex;
-  flex-direction: column;
+  // margin-bottom: calc(8em + env(safe-area-inset-bottom)*1.5);
+  // display: flex;
+  // flex-direction: column;
   overflow-y: auto;
   overscroll-behavior-block: contain;
+  scroll-behavior: smooth;
 
   .message-block {
     width: 100%;
 
     &:last-of-type {
-      flex: 1;
       display: flex;
       flex-direction: column;
+      min-height: calc(100svh - $height_header*1.5);
+      // height: calc(100svh - $height_header*1.5);
+      // max-height: calc(100svh - $height_header*1.5);
 
       .scroll_area {
         flex: 1;
+        padding-bottom: calc(8em + env(safe-area-inset-bottom)*1.5);
+        min-height: fit-content;
+        overflow-y: hidden;
       }
     }
 
@@ -263,9 +277,10 @@ header {
     min-width: 22em;
     background: rgba(250, 250, 250, .1);
     padding: 1em;
+    border-radius: calc($border-radius / 5);
     display: flex;
     flex-direction: column;
-    gap: .7em;
+    gap: .5em;
 
     p {
       white-space: normal;
@@ -347,7 +362,7 @@ header {
   $color-bg: #686868;
   $color-bg-light: #8f8f8f;
   $color-border: #696969;
-  $color-code-bg: #383838;
+  $color-code-bg: #060606;
   $border-radius: 5px;
 
   line-height: $line-height-base;

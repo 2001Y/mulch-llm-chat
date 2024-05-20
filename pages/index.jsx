@@ -155,7 +155,7 @@ const Responses = ({ messages }) => {
   );
 };
 
-const InputSection = ({ models, chatInput, setChatInput, handleSend, openModal }) => {
+const InputSection = ({ models, setChatInput, handleSend, openModal }) => {
   const [isComposing, setIsComposing] = useState(false);
 
   const handleKeyDown = (event) => {
@@ -186,11 +186,17 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, openModal }
     }
   };
 
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain');
+    document.execCommand('insertHTML', false, text);
+  };
+
   return (
     <section className="input-section">
       <div className="input-container">
         <button onClick={openModal} className="open-modal-button">
-          {models.map(model => model.split('/')[1]).join(', ') || 'Open Model Input'}
+          model: {models.map(model => model.split('/')[1]).join(', ') || 'Open Model Input'}
         </button>
       </div>
       <div className="input-container chat-input-area">
@@ -200,6 +206,7 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, openModal }
           onKeyDown={handleKeyDown}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
+          onPaste={handlePaste}
           className="chat-input"
           data-placeholder="Type your message here..."
           style={{ whiteSpace: 'pre-wrap' }}
@@ -209,6 +216,7 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, openModal }
     </section>
   );
 };
+
 
 const ModelInputModal = ({ models, setModels, isModalOpen, closeModal }) => {
   const handleModelInput = (event) => {
@@ -234,7 +242,7 @@ const ModelInputModal = ({ models, setModels, isModalOpen, closeModal }) => {
 
 // Main Component
 export default function Home() {
-  const [models, setModels] = useLocalStorage('models', ['openai/gpt-4o', 'anthropic/claude-3-opus:beta', 'google/gemini-pro-1.5', 'cohere/command-r-plus', 'perplexity/llama-3-sonar-large-32k-online']);
+  const [models, setModels] = useLocalStorage('models', ['openai/gpt-4o', 'anthropic/claude-3-opus:beta', 'google/gemini-pro-1.5', 'cohere/command-r-plus']);
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState([]);
   const [accessToken, setAccessToken] = useAccessToken();
@@ -301,6 +309,7 @@ export default function Home() {
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
         <meta name="theme-color" content="#000000" />
+        <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="https://via.placeholder.com/192" />
         <link rel="apple-touch-icon" href="https://via.placeholder.com/192" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -323,7 +332,7 @@ export default function Home() {
             </h1>
           </header>
           <Responses messages={messages} />
-          <InputSection models={models} chatInput={chatInput} setChatInput={setChatInput} handleSend={handleSend} openModal={openModal} />
+          <InputSection models={models} setChatInput={setChatInput} handleSend={handleSend} openModal={openModal} />
           <ModelInputModal models={models} setModels={setModels} isModalOpen={isModalOpen} closeModal={closeModal} />
         </>
       )}
