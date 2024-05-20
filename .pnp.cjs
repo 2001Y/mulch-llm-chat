@@ -31,6 +31,9 @@ const RAW_RUNTIME_STATE =
           ["@types/react-dom", "npm:18.3.0"],\
           ["eslint", "npm:8.57.0"],\
           ["eslint-config-next", "virtual:a8468f2fb88e4780e7c09130b4b840b5e741cbf94750cef421d4a4004ea7b167846a137202e68458dc790d366028fd3e8ff91ce43dc21e7591a979053a6a9dab#npm:14.2.3"],\
+          ["highlight.js", "npm:11.9.0"],\
+          ["marked", "npm:12.0.2"],\
+          ["marked-highlight", "virtual:a8468f2fb88e4780e7c09130b4b840b5e741cbf94750cef421d4a4004ea7b167846a137202e68458dc790d366028fd3e8ff91ce43dc21e7591a979053a6a9dab#npm:2.1.1"],\
           ["next", "virtual:a8468f2fb88e4780e7c09130b4b840b5e741cbf94750cef421d4a4004ea7b167846a137202e68458dc790d366028fd3e8ff91ce43dc21e7591a979053a6a9dab#npm:14.2.3"],\
           ["openai", "npm:4.46.1"],\
           ["react", "npm:18.3.1"],\
@@ -2345,6 +2348,15 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }]\
     ]],\
+    ["highlight.js", [\
+      ["npm:11.9.0", {\
+        "packageLocation": "../../.yarn/berry/cache/highlight.js-npm-11.9.0-ec99f7b12f-10c0.zip/node_modules/highlight.js/",\
+        "packageDependencies": [\
+          ["highlight.js", "npm:11.9.0"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
     ["http-cache-semantics", [\
       ["npm:4.1.1", {\
         "packageLocation": "../../.yarn/berry/cache/http-cache-semantics-npm-4.1.1-1120131375-10c0.zip/node_modules/http-cache-semantics/",\
@@ -2997,6 +3009,37 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }]\
     ]],\
+    ["marked", [\
+      ["npm:12.0.2", {\
+        "packageLocation": "../../.yarn/berry/cache/marked-npm-12.0.2-ceac515c22-10c0.zip/node_modules/marked/",\
+        "packageDependencies": [\
+          ["marked", "npm:12.0.2"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["marked-highlight", [\
+      ["npm:2.1.1", {\
+        "packageLocation": "../../.yarn/berry/cache/marked-highlight-npm-2.1.1-c15bd0ae8b-10c0.zip/node_modules/marked-highlight/",\
+        "packageDependencies": [\
+          ["marked-highlight", "npm:2.1.1"]\
+        ],\
+        "linkType": "SOFT"\
+      }],\
+      ["virtual:a8468f2fb88e4780e7c09130b4b840b5e741cbf94750cef421d4a4004ea7b167846a137202e68458dc790d366028fd3e8ff91ce43dc21e7591a979053a6a9dab#npm:2.1.1", {\
+        "packageLocation": "./.yarn/__virtual__/marked-highlight-virtual-3538200e43/3/.yarn/berry/cache/marked-highlight-npm-2.1.1-c15bd0ae8b-10c0.zip/node_modules/marked-highlight/",\
+        "packageDependencies": [\
+          ["marked-highlight", "virtual:a8468f2fb88e4780e7c09130b4b840b5e741cbf94750cef421d4a4004ea7b167846a137202e68458dc790d366028fd3e8ff91ce43dc21e7591a979053a6a9dab#npm:2.1.1"],\
+          ["@types/marked", null],\
+          ["marked", "npm:12.0.2"]\
+        ],\
+        "packagePeers": [\
+          "@types/marked",\
+          "marked"\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
     ["merge2", [\
       ["npm:1.4.1", {\
         "packageLocation": "../../.yarn/berry/cache/merge2-npm-1.4.1-a2507bd06c-10c0.zip/node_modules/merge2/",\
@@ -3194,6 +3237,9 @@ const RAW_RUNTIME_STATE =
           ["@types/react-dom", "npm:18.3.0"],\
           ["eslint", "npm:8.57.0"],\
           ["eslint-config-next", "virtual:a8468f2fb88e4780e7c09130b4b840b5e741cbf94750cef421d4a4004ea7b167846a137202e68458dc790d366028fd3e8ff91ce43dc21e7591a979053a6a9dab#npm:14.2.3"],\
+          ["highlight.js", "npm:11.9.0"],\
+          ["marked", "npm:12.0.2"],\
+          ["marked-highlight", "virtual:a8468f2fb88e4780e7c09130b4b840b5e741cbf94750cef421d4a4004ea7b167846a137202e68458dc790d366028fd3e8ff91ce43dc21e7591a979053a6a9dab#npm:2.1.1"],\
           ["next", "virtual:a8468f2fb88e4780e7c09130b4b840b5e741cbf94750cef421d4a4004ea7b167846a137202e68458dc790d366028fd3e8ff91ce43dc21e7591a979053a6a9dab#npm:14.2.3"],\
           ["openai", "npm:4.46.1"],\
           ["react", "npm:18.3.1"],\
