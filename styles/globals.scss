@@ -151,9 +151,13 @@ header {
   flex-direction: column;
   gap: .5em;
 
-  @media (display-mode: standalone) and (env(safe-area-inset-bottom) > 0) {
-    flex-direction: column-reverse;
-    padding-bottom: calc(env(safe-area-inset-bottom) px);
+
+  @media (display-mode: standalone) {
+    @supports (-webkit-touch-callout: none) {
+      // Mobile Safariのみ
+      flex-direction: column-reverse;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
   }
 
   &::after {
