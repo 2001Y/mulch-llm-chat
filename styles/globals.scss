@@ -25,7 +25,6 @@ $shadow: 0 0 .5em rgba(0, 0, 0, 1); // 影の定義
   outline: none;
 }
 
-html,
 body {
   max-width: 100vw;
   height: 100svh;
@@ -88,6 +87,7 @@ header {
   position: fixed;
   top: env(safe-area-inset-top);
   left: 0;
+  z-index: 1;
 
   &::after {
     content: '';
@@ -152,9 +152,8 @@ header {
   gap: .5em;
 
 
-  @media (display-mode: standalone) {
-    @supports (-webkit-touch-callout: none) {
-      // Mobile Safariのみ
+  @media (display-mode: standalone) and (pointer: coarse) {
+    @supports (padding: env(safe-area-inset-bottom)) {
       flex-direction: column-reverse;
       padding-bottom: env(safe-area-inset-bottom);
     }
@@ -175,7 +174,7 @@ header {
 
   .input-container {
     display: flex;
-    align-items: center;
+    // align-items: center;
     gap: 1em;
 
     $modal-button_height: 2em;
@@ -200,12 +199,12 @@ header {
     }
 
     &.chat-input-area {
-      min-height: 3.5em;
+      // min-height: $minHeight;
       max-height: calc(100svh - $height_header - $modal-button_height - $body-padding - env(safe-area-inset-top));
       overflow-y: auto;
       max-width: 100%;
       padding: 0 1.5em;
-      padding-right: .5em;
+      padding-right: 0;
       background: mix(#fff, #000, 10%);
       border-radius: $border-radius;
       box-shadow: $shadow; // 影を追加
@@ -222,10 +221,12 @@ header {
       }
 
       .send-button {
+        height: 10vmin;
+        max-height: 40px;
         aspect-ratio: 1/1;
-        padding: 0 1em;
+        margin: .5em;
         background: mix(#fff, #15d186, 10%);
-        border-radius: calc($border-radius - .5em);
+        border-radius: calc($border-radius - .25em);
       }
     }
   }
@@ -236,13 +237,14 @@ header {
   min-height: 100svh;
   height: 100svh;
   max-height: 100svh;
-  padding-top: calc($height_header*1.5 + env(safe-area-inset-top));
+  padding-top: calc($height_header * 1.5 + env(safe-area-inset-top));
   // margin-bottom: calc(8em + env(safe-area-inset-bottom)*1.5);
   // display: flex;
   // flex-direction: column;
   overflow-y: auto;
   overscroll-behavior-block: contain;
   scroll-behavior: smooth;
+  ;
 
   .message-block {
     width: 100%;
@@ -505,3 +507,51 @@ header {
     margin: 1rem 0;
   }
 }
+
+
+// body {
+//   height: var(--actual-100dvh) !important;
+//   min-height: var(--actual-100dvh) !important;
+//   max-height: var(--actual-100dvh) !important;
+//   overflow: hidden;
+//   transition: height .25s;
+// }
+
+body {
+  .responses-container {
+    will-change: transform;
+    transition: transform .3s;
+  }
+
+  &[data-software-keyboard="true"] {
+    // height: var(--actual-100dvh) !important;
+    // min-height: var(--actual-100dvh) !important;
+    // max-height: var(--actual-100dvh) !important;
+
+    .responses-container {
+      transform: translateY(calc(var(--keyboardHeight) - $height_header * 1.5));
+      // min-height: var(--actual-100dvh) !important;
+      // height: var(--actual-100dvh) !important;
+      // max-height: var(--actual-100dvh) !important;
+    }
+
+    .input-section {
+      padding-bottom: $body-padding;
+    }
+  }
+}
+
+
+// .message-block {
+//   &:last-of-type {
+//     min-height: calc(var(--actual-100dvh) - $height_header*1.5) !important;
+//   }
+// }
+// .modal-overlay {
+//   height: var(--actual-100dvh) !important;
+// }
+
+// .input-section {
+//   bottom: auto !important;
+//   top: calc(var(--actual-100dvh) - 8em) !important
+// }

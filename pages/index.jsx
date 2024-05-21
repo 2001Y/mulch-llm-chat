@@ -1,16 +1,15 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import Head from "next/head";
 import Image from "next/image";
+import { useRouter } from "next/router";
 import OpenAI from "openai";
-import { marked } from "marked"; // Import marked
+import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
-import hljs from "highlight.js"; // Import highlight.js
+import hljs from "highlight.js";
 
-// Environment variables
 const isProduction = process.env.NODE_ENV === "production";
 const redirectUri = isProduction ? "https://mulch-llm-chat.vercel.app" : "https://3000.2001y.dev";
 
-// Configure marked with markedHighlight
 marked.use(
   markedHighlight({
     langPrefix: "hljs language-",
@@ -21,23 +20,26 @@ marked.use(
   })
 );
 
-// Custom Hooks
 const useLocalStorage = (key, initialValue) => {
-  const [storedValue, setStoredValue] = useState(initialValue);
-
-  useEffect(() => {
-    try {
-      const item = localStorage.getItem(key);
-      setStoredValue(item ? JSON.parse(item) : initialValue);
-    } catch (error) {
-      console.error('Error reading from localStorage:', error);
+  const [storedValue, setStoredValue] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const item = localStorage.getItem(key);
+        return item ? JSON.parse(item) : initialValue;
+      } catch (error) {
+        console.error('Error reading from localStorage:', error);
+        return initialValue;
+      }
     }
-  }, [key, initialValue]);
+    return initialValue;
+  });
 
   const setValue = (value) => {
     try {
       setStoredValue(value);
-      localStorage.setItem(key, JSON.stringify(value));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(key, JSON.stringify(value));
+      }
     } catch (error) {
       console.error('Error writing to localStorage:', error);
     }
@@ -79,7 +81,7 @@ const useAccessToken = () => {
         fetchAccessToken(code);
       }
     }
-  }, [accessToken, setAccessToken]);
+  }, [accessToken]);
 
   return [accessToken, setAccessToken];
 };
@@ -101,7 +103,6 @@ const useOpenAI = (accessToken) => {
   return openai;
 };
 
-// Components
 const Responses = ({ messages }) => {
   const containerRef = useRef(null);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
@@ -127,7 +128,7 @@ const Responses = ({ messages }) => {
     if (isAutoScroll && containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [messages, isAutoScroll]);
+  }, [messages]);
 
   return (
     <div className="responses-container" ref={containerRef} translate="no">
@@ -144,7 +145,7 @@ const Responses = ({ messages }) => {
                 </div>
                 <div
                   className="markdown-content"
-                  dangerouslySetInnerHTML={{ __html: marked(response.text) }} // Render Markdown
+                  dangerouslySetInnerHTML={{ __html: marked(response.text) }}
                 />
               </div>
             ))}
@@ -155,8 +156,15 @@ const Responses = ({ messages }) => {
   );
 };
 
-const InputSection = ({ models, setChatInput, handleSend, openModal }) => {
+const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop, openModal, isGenerating }) => {
   const [isComposing, setIsComposing] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
 
   const handleKeyDown = (event) => {
     if (event.key === 'Enter' && !isComposing && !event.shiftKey) {
@@ -178,7 +186,6 @@ const InputSection = ({ models, setChatInput, handleSend, openModal }) => {
 
   const handleInput = (e) => {
     const text = e.currentTarget.textContent;
-    // placeholder のための空白文字を削除
     if (text === '\u200B' || text.trim() === '') {
       e.currentTarget.innerHTML = '';
     } else {
@@ -186,10 +193,16 @@ const InputSection = ({ models, setChatInput, handleSend, openModal }) => {
     }
   };
 
+  useEffect(() => {
+    if (chatInput === '' && inputRef.current) {
+      inputRef.current.innerHTML = '';
+    }
+  }, [chatInput]);
+
   const handlePaste = (e) => {
     e.preventDefault();
     const text = e.clipboardData.getData('text/plain');
-    document.execCommand('insertHTML', false, text);
+    document.execCommand('insertText', false, text);
   };
 
   return (
@@ -201,6 +214,7 @@ const InputSection = ({ models, setChatInput, handleSend, openModal }) => {
       </div>
       <div className="input-container chat-input-area">
         <div
+          ref={inputRef}
           contentEditable="true"
           onInput={handleInput}
           onKeyDown={handleKeyDown}
@@ -208,15 +222,16 @@ const InputSection = ({ models, setChatInput, handleSend, openModal }) => {
           onCompositionEnd={handleCompositionEnd}
           onPaste={handlePaste}
           className="chat-input"
-          data-placeholder="Type your message here..."
+          data-placeholder="Type your message here…"
           style={{ whiteSpace: 'pre-wrap' }}
         />
-        <button onClick={handleSend} className="send-button">↑</button>
+        <button onClick={isGenerating ? handleStop : handleSend} className="send-button">
+          {isGenerating ? '⏹' : '↑'}
+        </button>
       </div>
     </section>
   );
 };
-
 
 const ModelInputModal = ({ models, setModels, isModalOpen, closeModal }) => {
   const handleModelInput = (event) => {
@@ -240,7 +255,6 @@ const ModelInputModal = ({ models, setModels, isModalOpen, closeModal }) => {
   );
 };
 
-// Main Component
 export default function Home() {
   const [models, setModels] = useLocalStorage('models', ['openai/gpt-4o', 'anthropic/claude-3-opus:beta', 'google/gemini-pro-1.5', 'cohere/command-r-plus']);
   const [chatInput, setChatInput] = useState('');
@@ -249,26 +263,41 @@ export default function Home() {
   const openai = useOpenAI(accessToken);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [abortControllers, setAbortControllers] = useState([]);
 
-  const fetchChatResponse = useCallback(async (model, messageIndex, responseIndex) => {
+  const router = useRouter();
+  useEffect(() => {
+    if (!accessToken) {
+      router.replace('/login');
+    }
+  }, [accessToken]);
+
+  const fetchChatResponse = useCallback(async (model, messageIndex, responseIndex, abortController) => {
     try {
       const stream = await openai.chat.completions.create({
         model,
         messages: [{ role: 'user', content: chatInput }],
         stream: true,
+        signal: abortController.signal,
       });
-
       let result = '';
       for await (const part of stream) {
+        if (abortController.signal.aborted) {
+          throw new DOMException('Aborted', 'AbortError');
+        }
         const content = part.choices[0]?.delta?.content || '';
         result += content;
         updateMessage(messageIndex, responseIndex, result);
       }
-      setIsAutoScroll(false); // Stop auto-scroll when any response is fully generated
-      return result;
+      setIsAutoScroll(false);
     } catch (error) {
-      console.error('Error fetching response from model:', model, error);
-      updateMessage(messageIndex, responseIndex, `Error: ${error.message}`);
+      if (error.name !== 'AbortError') {
+        console.error('Error fetching response from model:', model, error);
+        updateMessage(messageIndex, responseIndex, `Error: ${error.message}`);
+      }
+    } finally {
+      setIsGenerating(false);
     }
   }, [chatInput, openai]);
 
@@ -281,6 +310,12 @@ export default function Home() {
   };
 
   const handleSend = async () => {
+    if (isGenerating) return;
+
+    setIsGenerating(true);
+    const newAbortControllers = models.map(() => new AbortController());
+    setAbortControllers(newAbortControllers);
+
     setMessages(prevMessages => {
       const newMessage = {
         user: chatInput,
@@ -288,20 +323,53 @@ export default function Home() {
       };
       const newMessages = [...prevMessages, newMessage];
       newMessage.llm.forEach((response, index) => {
-        fetchChatResponse(response.model, newMessages.length - 1, index);
+        fetchChatResponse(response.model, newMessages.length - 1, index, newAbortControllers[index]);
       });
-      setIsAutoScroll(true); // Enable auto-scroll when a new message is sent
+      setIsAutoScroll(true);
       return newMessages;
     });
+    setChatInput('');
   };
 
-  const handleLogin = () => {
-    const openRouterAuthUrl = `https://openrouter.ai/auth?callback_url=${redirectUri}`;
-    window.location.href = openRouterAuthUrl;
+  const handleStop = () => {
+    console.log('Stopping generation');
+    abortControllers.forEach(controller => {
+      try {
+        controller.abort();
+      } catch (error) {
+        console.error('Error while aborting:', error);
+      }
+    });
+    setIsGenerating(false);
   };
 
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
+
+  useEffect(() => {
+    let previousHeight = visualViewport.height;
+
+    const handleResize = () => {
+      const currentHeight = visualViewport.height;
+      document.body.style.setProperty('--actual-100dvh', `${currentHeight}px`);
+      const heightDifference = previousHeight - currentHeight;
+      if (heightDifference > 0) {
+        document.body.style.setProperty('--keyboardHeight', `${heightDifference}px`);
+        document.body.dataset.softwareKeyboard = 'true';
+      } else {
+        document.body.style.setProperty('--keyboardHeight', `0px`);
+        document.body.dataset.softwareKeyboard = 'false';
+      }
+      previousHeight = currentHeight;
+    };
+
+    visualViewport.addEventListener('resize', handleResize);
+    handleResize();
+
+    return () => {
+      visualViewport.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   return (
     <>
@@ -320,22 +388,16 @@ export default function Home() {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=Glegoo:wght@400;700&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet" />
       </Head>
-      {!accessToken ? (
-        <button onClick={handleLogin} className="loginButton">Login to OpenRouter</button>
-      ) : (
-        <>
-          <header>
-            <Image src="/logo.png" width="40" height="40" alt="Logo" className="logo" />
-            <h1>
-              Multi AI Chat<br />
-              <span>OpenRouter Chat Client</span>
-            </h1>
-          </header>
-          <Responses messages={messages} />
-          <InputSection models={models} setChatInput={setChatInput} handleSend={handleSend} openModal={openModal} />
-          <ModelInputModal models={models} setModels={setModels} isModalOpen={isModalOpen} closeModal={closeModal} />
-        </>
-      )}
+      <header>
+        <Image src="/logo.png" width="40" height="40" alt="Logo" className="logo" />
+        <h1>
+          Multi AI Chat<br />
+          <span>OpenRouter Chat Client</span>
+        </h1>
+      </header>
+      <Responses messages={messages} />
+      <InputSection models={models} chatInput={chatInput} setChatInput={setChatInput} handleSend={handleSend} handleStop={handleStop} openModal={openModal} isGenerating={isGenerating} />
+      <ModelInputModal models={models} setModels={setModels} isModalOpen={isModalOpen} closeModal={closeModal} />
     </>
   );
 }
