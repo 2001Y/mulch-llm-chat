@@ -103,7 +103,7 @@ const useOpenAI = (accessToken) => {
   return openai;
 };
 
-const Responses = ({ messages }) => {
+const Responses = ({ messages, updateMessage }) => {
   const containerRef = useRef(null);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
 
@@ -130,12 +130,16 @@ const Responses = ({ messages }) => {
     }
   }, [messages]);
 
+  const handleEdit = (messageIndex, responseIndex, newText) => {
+    updateMessage(messageIndex, responseIndex, newText);
+  };
+
   return (
     <div className="responses-container" ref={containerRef} translate="no">
       {messages.map((message, index) => (
         <div key={index} className="message-block">
           <div className="user">
-            <p>{message.user}</p>
+            <p contentEditable onBlur={(e) => handleEdit(index, null, e.target.textContent)}>{message.user}</p>
           </div>
           <div className="scroll_area">
             {message.llm.map((response, idx) => (
@@ -145,7 +149,9 @@ const Responses = ({ messages }) => {
                 </div>
                 <div
                   className="markdown-content"
-                  dangerouslySetInnerHTML={{ __html: marked(response.text) }}
+                  contentEditable
+                  onBlur={(e) => handleEdit(index, idx, e.target.innerHTML)}
+                  dangerouslySetInnerHTML={{ __html: response.text }}
                 />
               </div>
             ))}
@@ -158,6 +164,8 @@ const Responses = ({ messages }) => {
 
 const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop, openModal, isGenerating }) => {
   const [isComposing, setIsComposing] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestionIndex, setSuggestionIndex] = useState(0);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -167,11 +175,27 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
   }, []);
 
   const handleKeyDown = (event) => {
-    if (event.key === 'Enter' && !isComposing && !event.shiftKey) {
-      event.preventDefault();
-      handleSend();
-    } else if (event.key === 'Enter' && event.shiftKey) {
-      // Allow newline insertion
+    if (document.body.dataset.softwareKeyboard === 'false') {
+      if (event.key === 'Enter' && !isComposing && !event.shiftKey) {
+        event.preventDefault();
+        if (showSuggestions) {
+          selectSuggestion(suggestionIndex);
+        } else {
+          handleSend();
+        }
+      } else if (event.key === 'Enter' && event.shiftKey) {
+        // Allow newline insertion
+      } else if (event.key === 'ArrowDown') {
+        if (showSuggestions) {
+          event.preventDefault();
+          setSuggestionIndex((prevIndex) => Math.min(prevIndex + 1, models.length - 1));
+        }
+      } else if (event.key === 'ArrowUp') {
+        if (showSuggestions) {
+          event.preventDefault();
+          setSuggestionIndex((prevIndex) => Math.max(prevIndex - 1, 0));
+        }
+      }
     }
   };
 
@@ -190,7 +214,35 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
       e.currentTarget.innerHTML = '';
     } else {
       setChatInput(text);
+      if (/@/.test(text) && (text.match(/@/).index === 0 || text[text.match(/@/).index - 1] === ' ')) {
+        setShowSuggestions(true);
+      } else {
+        setShowSuggestions(false);
+      }
     }
+  };
+
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain');
+    document.execCommand('insertText', false, text);
+  };
+
+  const selectSuggestion = (index) => {
+    const selectedModel = models[index];
+    const inputElement = inputRef.current;
+    const text = inputElement.innerText.replace(/@\S*/, `@${selectedModel.split('/')[1]} `);
+    inputElement.innerText = text;
+
+    const range = document.createRange();
+    const selection = window.getSelection();
+    range.setStart(inputElement.childNodes[0], text.length);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    setShowSuggestions(false);
+    setSuggestionIndex(0);
   };
 
   useEffect(() => {
@@ -198,12 +250,6 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
       inputRef.current.innerHTML = '';
     }
   }, [chatInput]);
-
-  const handlePaste = (e) => {
-    e.preventDefault();
-    const text = e.clipboardData.getData('text/plain');
-    document.execCommand('insertText', false, text);
-  };
 
   return (
     <section className="input-section">
@@ -225,6 +271,15 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
           data-placeholder="Type your message here…"
           style={{ whiteSpace: 'pre-wrap' }}
         />
+        {showSuggestions && (
+          <ul className="suggestions-list">
+            {models.map((model, index) => (
+              <li key={model} className={index === suggestionIndex ? 'active' : ''}>
+                {model.split('/')[1]}
+              </li>
+            ))}
+          </ul>
+        )}
         <button onClick={isGenerating ? handleStop : handleSend} className="send-button">
           {isGenerating ? '⏹' : '↑'}
         </button>
@@ -273,34 +328,6 @@ export default function Home() {
     }
   }, [accessToken]);
 
-  const fetchChatResponse = useCallback(async (model, messageIndex, responseIndex, abortController) => {
-    try {
-      const stream = await openai.chat.completions.create({
-        model,
-        messages: [{ role: 'user', content: chatInput }],
-        stream: true,
-        signal: abortController.signal,
-      });
-      let result = '';
-      for await (const part of stream) {
-        if (abortController.signal.aborted) {
-          throw new DOMException('Aborted', 'AbortError');
-        }
-        const content = part.choices[0]?.delta?.content || '';
-        result += content;
-        updateMessage(messageIndex, responseIndex, result);
-      }
-      setIsAutoScroll(false);
-    } catch (error) {
-      if (error.name !== 'AbortError') {
-        console.error('Error fetching response from model:', model, error);
-        updateMessage(messageIndex, responseIndex, `Error: ${error.message}`);
-      }
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [chatInput, openai]);
-
   const updateMessage = (messageIndex, responseIndex, text) => {
     setMessages(prevMessages => {
       const newMessages = [...prevMessages];
@@ -309,26 +336,74 @@ export default function Home() {
     });
   };
 
+  const fetchChatResponse = useCallback(async (model, messageIndex, responseIndex, abortController, inputText) => {
+    try {
+      const pastMessages = messages.flatMap(msg => [
+        { role: 'user', content: msg.user },
+        ...msg.llm.map(llm => ({ role: 'assistant', content: llm.text }))
+      ]);
+
+      const stream = await openai.chat.completions.create({
+        model,
+        messages: [
+          ...pastMessages,
+          { role: 'user', content: inputText }
+        ],
+        stream: true,
+        signal: abortController.signal,
+      });
+
+      let result = '';
+      for await (const part of stream) {
+        if (abortController.signal.aborted) {
+          throw new DOMException('Aborted', 'AbortError');
+        }
+        const content = part.choices[0]?.delta?.content || '';
+        result += content;
+        updateMessage(messageIndex, responseIndex, marked(result));
+      }
+      setIsAutoScroll(false);
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.error('Error fetching response from model:', model, error);
+        updateMessage(messageIndex, responseIndex, `Error: ${error.message}`);
+        console.log(messages);
+      }
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [messages, openai]);
+
   const handleSend = async () => {
     if (isGenerating) return;
 
+    let selectedModels = models;
+    let inputText = chatInput;
+
+    const mentionMatch = chatInput.match(/@(\S+)\s(.*)/);
+
+    if (mentionMatch) {
+      const modelName = mentionMatch[1];
+      inputText = mentionMatch[2];
+      selectedModels = models.filter(model => model.includes(modelName));
+    }
+
     setIsGenerating(true);
-    const newAbortControllers = models.map(() => new AbortController());
+    const newAbortControllers = selectedModels.map(() => new AbortController());
     setAbortControllers(newAbortControllers);
 
     setMessages(prevMessages => {
       const newMessage = {
         user: chatInput,
-        llm: models.map((model) => ({ role: 'model', model, text: '' }))
+        llm: selectedModels.map((model) => ({ role: 'assistant', model, text: '' }))
       };
       const newMessages = [...prevMessages, newMessage];
       newMessage.llm.forEach((response, index) => {
-        fetchChatResponse(response.model, newMessages.length - 1, index, newAbortControllers[index]);
+        fetchChatResponse(response.model, newMessages.length - 1, index, newAbortControllers[index], inputText);
       });
       setIsAutoScroll(true);
       return newMessages;
     });
-    setChatInput('');
   };
 
   const handleStop = () => {
@@ -366,8 +441,17 @@ export default function Home() {
     visualViewport.addEventListener('resize', handleResize);
     handleResize();
 
+    const preventTouchMove = (event) => {
+      if (!event.target.closest('.responses-container') && !event.target.closest('.chat-input-area')) {
+        event.preventDefault();
+      }
+    };
+
+    document.addEventListener('touchmove', preventTouchMove, { passive: false });
+
     return () => {
       visualViewport.removeEventListener('resize', handleResize);
+      document.removeEventListener('touchmove', preventTouchMove);
     };
   }, []);
 
@@ -385,7 +469,7 @@ export default function Home() {
         <meta name="apple-mobile-web-app-title" content="Multi AI Chat"></meta>
         <title>Multi AI Chat | OpenRouter Chat Client</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin />
         <link href="https://fonts.googleapis.com/css2?family=Glegoo:wght@400;700&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet" />
       </Head>
       <header>
@@ -395,7 +479,7 @@ export default function Home() {
           <span>OpenRouter Chat Client</span>
         </h1>
       </header>
-      <Responses messages={messages} />
+      <Responses messages={messages} updateMessage={updateMessage} />
       <InputSection models={models} chatInput={chatInput} setChatInput={setChatInput} handleSend={handleSend} handleStop={handleStop} openModal={openModal} isGenerating={isGenerating} />
       <ModelInputModal models={models} setModels={setModels} isModalOpen={isModalOpen} closeModal={closeModal} />
     </>

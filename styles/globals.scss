@@ -8,6 +8,7 @@ $border-radius: 15px;
 $bg_body: #000;
 $padding: $body-padding; // Define $padding as $body-padding
 $shadow: 0 0 .5em rgba(0, 0, 0, 1); // 影の定義
+$modal-button_height: 2em;
 
 @media (prefers-color-scheme: dark) {
   $bg_body: #000;
@@ -84,6 +85,7 @@ header {
   width: 100%;
   height: $height_header;
   padding: 0 $body-padding;
+  position: absolute;
   position: fixed;
   top: env(safe-area-inset-top);
   left: 0;
@@ -143,6 +145,7 @@ header {
   max-width: 50em;
   padding: 0 $padding;
   padding-bottom: calc(env(safe-area-inset-bottom) + $body-padding);
+  position: absolute;
   position: fixed;
   bottom: 0;
   left: 50%;
@@ -150,7 +153,6 @@ header {
   display: flex;
   flex-direction: column;
   gap: .5em;
-
 
   @media (display-mode: standalone) and (pointer: coarse) {
     @supports (padding: env(safe-area-inset-bottom)) {
@@ -165,6 +167,7 @@ header {
     bottom: 0;
     left: 0;
     height: 150%;
+    transition: height .3s;
     width: 100vw;
     margin: 0 calc(50% - 50vw);
     background: linear-gradient(to top, $bg_body, transparent);
@@ -174,10 +177,8 @@ header {
 
   .input-container {
     display: flex;
-    // align-items: center;
+    align-items: flex-end;
     gap: 1em;
-
-    $modal-button_height: 2em;
 
     .open-modal-button {
       height: $modal-button_height;
@@ -199,15 +200,15 @@ header {
     }
 
     &.chat-input-area {
-      // min-height: $minHeight;
-      max-height: calc(100svh - $height_header - $modal-button_height - $body-padding - env(safe-area-inset-top));
-      overflow-y: auto;
+      max-height: calc(100svh - $height_header - $modal-button_height - $body-padding * 3 - env(safe-area-inset-top));
       max-width: 100%;
       padding: 0 1.5em;
       padding-right: 0;
       background: mix(#fff, #000, 10%);
       border-radius: $border-radius;
       box-shadow: $shadow; // 影を追加
+      overflow-y: auto;
+      overscroll-behavior-block: none;
 
       .chat-input {
         flex: 1;
@@ -230,6 +231,31 @@ header {
       }
     }
   }
+
+  .suggestions-list {
+    position: absolute;
+    bottom: 3em; // Adjust as necessary
+    left: 1.5em; // Align with chat input padding
+    background: mix(#fff, #000, 10%);
+    border-radius: $border-radius;
+    box-shadow: $shadow;
+    max-height: 10em; // Adjust as necessary
+    overflow-y: auto;
+    z-index: 2;
+    list-style: none;
+    padding: 0.5em;
+    margin: 0;
+    width: calc(100% - 3em); // Adjust as necessary to match input width
+
+    li {
+      padding: 0.5em;
+      cursor: pointer;
+
+      &.active {
+        background-color: mix(#fff, #000, 20%);
+      }
+    }
+  }
 }
 
 .responses-container {
@@ -238,13 +264,9 @@ header {
   height: 100svh;
   max-height: 100svh;
   padding-top: calc($height_header * 1.5 + env(safe-area-inset-top));
-  // margin-bottom: calc(8em + env(safe-area-inset-bottom)*1.5);
-  // display: flex;
-  // flex-direction: column;
   overflow-y: auto;
-  overscroll-behavior-block: contain;
+  overscroll-behavior-block: none;
   scroll-behavior: smooth;
-  ;
 
   .message-block {
     width: 100%;
@@ -253,14 +275,13 @@ header {
       display: flex;
       flex-direction: column;
       min-height: calc(100svh - $height_header*1.5);
-      // height: calc(100svh - $height_header*1.5);
-      // max-height: calc(100svh - $height_header*1.5);
 
       .scroll_area {
         flex: 1;
         padding-bottom: calc(8em + env(safe-area-inset-bottom)*1.5);
         min-height: fit-content;
         overflow-y: hidden;
+        overscroll-behavior-block: contain;
       }
     }
 
@@ -407,7 +428,6 @@ header {
 
     &:nth-child(6) {
       font-size: 0.875rem;
-      color: $color-secondary;
     }
   }
 
@@ -452,6 +472,7 @@ header {
     padding: 0.5rem;
     border-radius: $border-radius;
     overflow-x: auto;
+    overscroll-behavior-block: contain;
     font-family: "JetBrains Mono", monospace;
     font-optical-sizing: auto;
     font-size: 0.9em;
@@ -509,14 +530,6 @@ header {
 }
 
 
-// body {
-//   height: var(--actual-100dvh) !important;
-//   min-height: var(--actual-100dvh) !important;
-//   max-height: var(--actual-100dvh) !important;
-//   overflow: hidden;
-//   transition: height .25s;
-// }
-
 body {
   .responses-container {
     will-change: transform;
@@ -524,15 +537,12 @@ body {
   }
 
   &[data-software-keyboard="true"] {
-    // height: var(--actual-100dvh) !important;
-    // min-height: var(--actual-100dvh) !important;
-    // max-height: var(--actual-100dvh) !important;
-
     .responses-container {
       transform: translateY(calc(var(--keyboardHeight) - $height_header * 1.5));
-      // min-height: var(--actual-100dvh) !important;
-      // height: var(--actual-100dvh) !important;
-      // max-height: var(--actual-100dvh) !important;
+    }
+
+    .chat-input-area {
+      max-height: calc(var(--actual-100dvh) - $modal-button_height - $body-padding*2 - env(safe-area-inset-top)) !important;
     }
 
     .input-section {
@@ -541,17 +551,10 @@ body {
   }
 }
 
+.response.reply {
+  background-color: rgba(100, 100, 250, 0.1); // リプライメッセージの背景色
+}
 
-// .message-block {
-//   &:last-of-type {
-//     min-height: calc(var(--actual-100dvh) - $height_header*1.5) !important;
-//   }
-// }
-// .modal-overlay {
-//   height: var(--actual-100dvh) !important;
-// }
-
-// .input-section {
-//   bottom: auto !important;
-//   top: calc(var(--actual-100dvh) - 8em) !important
-// }
+.response.mention {
+  background-color: rgba(250, 250, 100, 0.1); // メンションメッセージの背景色
+}
