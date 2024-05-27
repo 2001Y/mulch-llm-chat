@@ -108,12 +108,6 @@ const Responses = ({ messages, updateMessage }) => {
   const [isAutoScroll, setIsAutoScroll] = useState(true);
 
   const handleScroll = () => {
-    if (containerRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-      if (scrollTop + clientHeight < scrollHeight - 10) {
-        setIsAutoScroll(false);
-      }
-    }
   };
 
   useEffect(() => {
@@ -162,10 +156,11 @@ const Responses = ({ messages, updateMessage }) => {
   );
 };
 
-const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop, openModal, isGenerating }) => {
+const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop, openModal, isGenerating, selectedModels, setSelectedModels }) => {
   const [isComposing, setIsComposing] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
+  const [filteredModels, setFilteredModels] = useState(models);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -176,25 +171,26 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
 
   const handleKeyDown = (event) => {
     if (document.body.dataset.softwareKeyboard === 'false') {
-      if (event.key === 'Enter' && !isComposing && !event.shiftKey) {
+      if (event.key === 'Enter' && !isComposing) {
         event.preventDefault();
         if (showSuggestions) {
           selectSuggestion(suggestionIndex);
         } else {
-          handleSend();
+          handleSend(event);
+          inputRef.current.innerHTML = '';
         }
-      } else if (event.key === 'Enter' && event.shiftKey) {
-        // Allow newline insertion
       } else if (event.key === 'ArrowDown') {
         if (showSuggestions) {
           event.preventDefault();
-          setSuggestionIndex((prevIndex) => Math.min(prevIndex + 1, models.length - 1));
+          setSuggestionIndex((prevIndex) => Math.min(prevIndex + 1, filteredModels.length - 1));
         }
       } else if (event.key === 'ArrowUp') {
         if (showSuggestions) {
           event.preventDefault();
           setSuggestionIndex((prevIndex) => Math.max(prevIndex - 1, 0));
         }
+      } else if (event.key === 'Escape') {
+        setShowSuggestions(false);
       }
     }
   };
@@ -214,10 +210,17 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
       e.currentTarget.innerHTML = '';
     } else {
       setChatInput(text);
-      if (/@/.test(text) && (text.match(/@/).index === 0 || text[text.match(/@/).index - 1] === ' ')) {
-        setShowSuggestions(true);
-      } else {
-        setShowSuggestions(false);
+      const mentionMatch = text.match(/@(\S*)/);
+      if (mentionMatch) {
+        const searchText = mentionMatch[1].toLowerCase();
+        if (searchText.includes(' ') || searchText.length > 15) {
+          setShowSuggestions(false);
+        } else {
+          const matchedModels = models.filter(model => model.toLowerCase().includes(searchText));
+          setFilteredModels(matchedModels);
+          setShowSuggestions(true);
+          setSelectedModels(matchedModels);
+        }
       }
     }
   };
@@ -229,17 +232,19 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
   };
 
   const selectSuggestion = (index) => {
-    const selectedModel = models[index];
+    const selectedModel = filteredModels[index];
     const inputElement = inputRef.current;
     const text = inputElement.innerText.replace(/@\S*/, `@${selectedModel.split('/')[1]} `);
     inputElement.innerText = text;
 
     const range = document.createRange();
     const selection = window.getSelection();
-    range.setStart(inputElement.childNodes[0], text.length);
-    range.collapse(true);
-    selection.removeAllRanges();
-    selection.addRange(range);
+    if (inputElement.childNodes.length > 0) {
+      range.setStart(inputElement.childNodes[0], text.length);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
 
     setShowSuggestions(false);
     setSuggestionIndex(0);
@@ -251,12 +256,49 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
     }
   }, [chatInput]);
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (inputRef.current && !inputRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+
+  const handleModelChange = (model) => {
+    setSelectedModels((prevSelectedModels) => {
+      if (prevSelectedModels.includes(model)) {
+        return prevSelectedModels.filter((m) => m !== model);
+      } else {
+        return [...prevSelectedModels, model];
+      }
+    });
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
   return (
     <section className="input-section">
-      <div className="input-container">
-        <button onClick={openModal} className="open-modal-button">
-          model: {models.map(model => model.split('/')[1]).join(', ') || 'Open Model Input'}
-        </button>
+      <div className="input-container model-select-area">
+        {models.map((model, index) => (
+          <div className="model-radio" key={model}>
+            <input
+              type="checkbox"
+              id={`model-${index}`}
+              value={model}
+              checked={selectedModels.includes(model)}
+              onChange={() => handleModelChange(model)}
+            />
+            <label htmlFor={`model-${index}`}>
+              {model.split('/')[1]}
+            </label>
+          </div>
+        ))}
       </div>
       <div className="input-container chat-input-area">
         <div
@@ -273,9 +315,21 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
         />
         {showSuggestions && (
           <ul className="suggestions-list">
-            {models.map((model, index) => (
-              <li key={model} className={index === suggestionIndex ? 'active' : ''}>
-                {model.split('/')[1]}
+            {filteredModels.map((model, index) => (
+              <li
+                key={model}
+                className={index === suggestionIndex ? 'active' : ''}
+                onClick={() => selectSuggestion(index)}
+              >
+                <input
+                  type="radio"
+                  id={`suggestion-${index}`}
+                  name="model-suggestion"
+                  value={model}
+                  checked={index === suggestionIndex}
+                  onChange={() => selectSuggestion(index)}
+                />
+                <label htmlFor={`suggestion-${index}`}>{model.split('/')[1]}</label>
               </li>
             ))}
           </ul>
@@ -288,27 +342,6 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
   );
 };
 
-const ModelInputModal = ({ models, setModels, isModalOpen, closeModal }) => {
-  const handleModelInput = (event) => {
-    const modelsArray = event.target.value.split(',').map(model => model.trim());
-    setModels(modelsArray);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('models', JSON.stringify(modelsArray));
-    }
-  };
-
-  return (
-    <div className={`modal-overlay ${isModalOpen ? 'visible' : 'hidden'}`} onClick={closeModal}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>Input Models</h2>
-        <textarea type="text" value={models.join(',')} onChange={handleModelInput} className="model-input" />
-      </div>
-      <div className="save">
-        Save
-      </div>
-    </div>
-  );
-};
 
 export default function Home() {
   const [models, setModels] = useLocalStorage('models', ['openai/gpt-4o', 'anthropic/claude-3-opus:beta', 'google/gemini-pro-1.5', 'cohere/command-r-plus']);
@@ -320,6 +353,7 @@ export default function Home() {
   const [isAutoScroll, setIsAutoScroll] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [abortControllers, setAbortControllers] = useState([]);
+  const [selectedModels, setSelectedModels] = useState(models);
 
   const router = useRouter();
   useEffect(() => {
@@ -374,28 +408,21 @@ export default function Home() {
     }
   }, [messages, openai]);
 
-  const handleSend = async () => {
+  const handleSend = async (event) => {
     if (isGenerating) return;
 
-    let selectedModels = models;
     let inputText = chatInput;
-
-    const mentionMatch = chatInput.match(/@(\S+)\s(.*)/);
-
-    if (mentionMatch) {
-      const modelName = mentionMatch[1];
-      inputText = mentionMatch[2];
-      selectedModels = models.filter(model => model.includes(modelName));
-    }
+    const isPrimaryOnly = event.key === 'Enter' && !event.shiftKey && !event.metaKey && !event.ctrlKey;
+    const modelsToUse = isPrimaryOnly ? [selectedModels[0]] : selectedModels;
 
     setIsGenerating(true);
-    const newAbortControllers = selectedModels.map(() => new AbortController());
+    const newAbortControllers = modelsToUse.map(() => new AbortController());
     setAbortControllers(newAbortControllers);
 
     setMessages(prevMessages => {
       const newMessage = {
         user: chatInput,
-        llm: selectedModels.map((model) => ({ role: 'assistant', model, text: '' }))
+        llm: modelsToUse.map((model) => ({ role: 'assistant', model, text: '' }))
       };
       const newMessages = [...prevMessages, newMessage];
       newMessage.llm.forEach((response, index) => {
@@ -421,6 +448,40 @@ export default function Home() {
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
 
+  const ModelInputModal = ({ models, setModels, isModalOpen, closeModal }) => {
+    const [newModel, setNewModel] = useState('');
+
+    const handleAddModel = () => {
+      if (newModel && !models.includes(newModel)) {
+        setModels([...models, newModel]);
+        setNewModel('');
+      }
+    };
+
+    return (
+      isModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <span className="close" onClick={closeModal}>&times;</span>
+            <h2>Settings</h2>
+            <ul>
+              {models.map((model, index) => (
+                <li key={index}>{model}</li>
+              ))}
+            </ul>
+            <input
+              type="text"
+              value={newModel}
+              onChange={(e) => setNewModel(e.target.value)}
+              placeholder="Add new model"
+            />
+            <button onClick={handleAddModel}>Add Model</button>
+          </div>
+        </div>
+      )
+    );
+  };
+
   useEffect(() => {
     let previousHeight = visualViewport.height;
 
@@ -442,7 +503,7 @@ export default function Home() {
     handleResize();
 
     const preventTouchMove = (event) => {
-      if (!event.target.closest('.responses-container') && !event.target.closest('.chat-input-area')) {
+      if (!event.target.closest('.model-select-area') && !event.target.closest('.responses-container') && !event.target.closest('.chat-input-area')) {
         event.preventDefault();
       }
     };
@@ -478,9 +539,10 @@ export default function Home() {
           Multi AI Chat<br />
           <span>OpenRouter Chat Client</span>
         </h1>
-      </header>
+        <div onClick={() => setIsModalOpen(!isModalOpen)} >⚙️</div>
+      </header >
       <Responses messages={messages} updateMessage={updateMessage} />
-      <InputSection models={models} chatInput={chatInput} setChatInput={setChatInput} handleSend={handleSend} handleStop={handleStop} openModal={openModal} isGenerating={isGenerating} />
+      <InputSection models={models} chatInput={chatInput} setChatInput={setChatInput} handleSend={handleSend} handleStop={handleStop} openModal={openModal} isGenerating={isGenerating} selectedModels={selectedModels} setSelectedModels={setSelectedModels} />
       <ModelInputModal models={models} setModels={setModels} isModalOpen={isModalOpen} closeModal={closeModal} />
     </>
   );

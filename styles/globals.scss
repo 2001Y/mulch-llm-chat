@@ -1,13 +1,12 @@
 @import '~highlight.js/styles/github-dark.css';
-/* 他のテーマも利用可能 */
 
 // SCSS変数宣言
 $body-padding: max(1em, 2vmax);
 $height_header: 4.5em;
 $border-radius: 15px;
 $bg_body: #000;
-$padding: $body-padding; // Define $padding as $body-padding
-$shadow: 0 0 .5em rgba(0, 0, 0, 1); // 影の定義
+$padding: $body-padding;
+$shadow: 0 0 .5em rgba(0, 0, 0, 1);
 $modal-button_height: 2em;
 
 @media (prefers-color-scheme: dark) {
@@ -33,9 +32,6 @@ body {
   max-height: 100svh;
   overflow: hidden;
   font-size: 14px;
-}
-
-body {
   font-family: sans-serif;
   color: #fff;
   background: $bg_body;
@@ -85,7 +81,6 @@ header {
   width: 100%;
   height: $height_header;
   padding: 0 $body-padding;
-  position: absolute;
   position: fixed;
   top: env(safe-area-inset-top);
   left: 0;
@@ -104,7 +99,7 @@ header {
   }
 
   .logo {
-    box-shadow: $shadow, $shadow, $shadow, $shadow, $shadow, $shadow, $shadow, $shadow, $shadow;
+    box-shadow: $shadow;
   }
 
   h1 {
@@ -112,7 +107,7 @@ header {
     line-height: .75em;
     font-family: "Glegoo", serif;
     font-weight: 700;
-    text-shadow: $shadow, $shadow, $shadow, $shadow, $shadow, $shadow, $shadow, $shadow, $shadow;
+    text-shadow: $shadow;
 
     span {
       font-size: .5em;
@@ -145,7 +140,6 @@ header {
   max-width: 50em;
   padding: 0 $padding;
   padding-bottom: calc(env(safe-area-inset-bottom) + $body-padding);
-  position: absolute;
   position: fixed;
   bottom: 0;
   left: 50%;
@@ -153,13 +147,6 @@ header {
   display: flex;
   flex-direction: column;
   gap: .5em;
-
-  @media (display-mode: standalone) and (pointer: coarse) {
-    @supports (padding: env(safe-area-inset-bottom)) {
-      flex-direction: column-reverse;
-      padding-bottom: env(safe-area-inset-bottom);
-    }
-  }
 
   &::after {
     content: '';
@@ -192,10 +179,57 @@ header {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      box-shadow: $shadow; // 影を追加
+      box-shadow: $shadow;
 
       &::after {
         content: '△';
+      }
+    }
+
+    &.model-select-area {
+      display: flex;
+      overflow-x: auto;
+      gap: .5em;
+      width: 100vw;
+      margin: 0 calc(50% - 50vw);
+      padding: 0 calc(50vw - 50%);
+
+      .model-radio {
+        min-width: fit-content;
+
+        label {
+          min-width: fit-content;
+          display: flex;
+          align-items: center;
+          padding: .6em;
+          background: mix(#fff, #000, 10%);
+          border-radius: $border-radius;
+          box-shadow: $shadow;
+          cursor: pointer;
+
+          &::before {
+            content: "";
+            display: block;
+            min-height: 1.5em;
+            aspect-ratio: 1/1;
+            border-radius: 50%;
+            background: mix(#fff, #000, 20%);
+            margin-right: 0.5em;
+          }
+        }
+
+        input:checked+label {
+          &::before {
+            content: "✔︎";
+            margin-right: 0.5em;
+            display: grid;
+            place-items: center;
+          }
+        }
+
+        input {
+          display: none;
+        }
       }
     }
 
@@ -206,7 +240,7 @@ header {
       padding-right: 0;
       background: mix(#fff, #000, 10%);
       border-radius: $border-radius;
-      box-shadow: $shadow; // 影を追加
+      box-shadow: $shadow;
       overflow-y: auto;
       overscroll-behavior-block: none;
 
@@ -234,18 +268,18 @@ header {
 
   .suggestions-list {
     position: absolute;
-    bottom: 3em; // Adjust as necessary
-    left: 1.5em; // Align with chat input padding
+    bottom: 10em;
+    left: 1.5em;
     background: mix(#fff, #000, 10%);
     border-radius: $border-radius;
     box-shadow: $shadow;
-    max-height: 10em; // Adjust as necessary
+    max-height: 10em;
     overflow-y: auto;
     z-index: 2;
     list-style: none;
     padding: 0.5em;
     margin: 0;
-    width: calc(100% - 3em); // Adjust as necessary to match input width
+    width: calc(100% - 3em);
 
     li {
       padding: 0.5em;
@@ -253,6 +287,16 @@ header {
 
       &.active {
         background-color: mix(#fff, #000, 20%);
+      }
+
+      input {
+        display: none;
+      }
+
+      label {
+        display: block;
+        width: 100%;
+        height: 100%;
       }
     }
   }
@@ -300,7 +344,7 @@ header {
   }
 
   .response {
-    width: 80vw;
+    width: 100vw;
     min-width: 22em;
     background: rgba(250, 250, 250, .1);
     padding: 1em;
@@ -337,21 +381,15 @@ header {
   gap: 2em;
   align-items: center;
   transition: opacity .3s;
-  opacity: 0;
   pointer-events: none;
-
-  &.visible {
-    opacity: 1;
-    pointer-events: auto;
-    cursor: pointer;
-  }
 
   .save {
     font-family: "Glegoo", serif;
     color: mix(#fff, #000, 70%);
   }
 
-  .modal {
+  .modal-content {
+    pointer-events: auto;
     background: mix(#fff, #000, 10%);
     padding: 2em;
     max-width: 35em;
@@ -475,41 +513,28 @@ header {
     overscroll-behavior-block: contain;
     font-family: "JetBrains Mono", monospace;
     font-optical-sizing: auto;
-    font-size: 0.9em;
-    line-height: 1.3;
-    margin: 0.5rem 0;
-
-    code {
-      white-space: unset;
-    }
+    white-space: pre;
+    word-wrap: break-word;
   }
 
   a {
     color: $color-link;
     text-decoration: none;
 
-    @include hover {
+    &:hover {
       text-decoration: underline;
-      color: mix($color-link, #000, 20%);
     }
-  }
-
-  img {
-    max-width: 100%;
-    height: auto;
-    display: block;
-    margin: 0.5rem 0;
   }
 
   table {
     width: 100%;
     border-collapse: collapse;
-    margin: 0.5rem 0;
+    margin: 1rem 0;
 
     th,
     td {
+      padding: 0.5rem;
       border: 1px solid $color-border;
-      padding: 0.25rem;
     }
 
     th {
@@ -517,44 +542,8 @@ header {
       font-weight: bold;
     }
 
-    tr:nth-child(even) {
+    td {
       background-color: $color-bg-light;
     }
   }
-
-  hr {
-    border: 0;
-    border-top: 1px solid $color-border;
-    margin: 1rem 0;
-  }
-}
-
-
-body {
-  .responses-container {
-    will-change: transform;
-    transition: transform .3s;
-  }
-
-  &[data-software-keyboard="true"] {
-    .responses-container {
-      transform: translateY(calc(var(--keyboardHeight) - $height_header * 1.5));
-    }
-
-    .chat-input-area {
-      max-height: calc(var(--actual-100dvh) - $modal-button_height - $body-padding*2 - env(safe-area-inset-top)) !important;
-    }
-
-    .input-section {
-      padding-bottom: $body-padding;
-    }
-  }
-}
-
-.response.reply {
-  background-color: rgba(100, 100, 250, 0.1); // リプライメッセージの背景色
-}
-
-.response.mention {
-  background-color: rgba(250, 250, 100, 0.1); // メンションメッセージの背景色
 }
