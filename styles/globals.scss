@@ -17,12 +17,14 @@ $modal-button_height: 2em;
 *,
 *::before,
 *::after {
+  font: unset;
   color: unset;
+  background: unset;
+  padding: unset;
+  margin: unset;
+  border: unset;
+  outline: unset;
   box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-  border: none;
-  outline: none;
 }
 
 body {
@@ -234,25 +236,20 @@ header {
     }
 
     &.chat-input-area {
-      max-height: calc(100svh - $height_header - $modal-button_height - $body-padding * 3 - env(safe-area-inset-top));
+      $maxHeight: calc(100svh - $height_header - $modal-button_height - $body-padding * 3 - env(safe-area-inset-top));
+      max-height: $maxHeight;
       max-width: 100%;
       padding: 0 1.5em;
       padding-right: 0;
       background: mix(#fff, #000, 10%);
       border-radius: $border-radius;
       box-shadow: $shadow;
-      overflow-y: auto;
-      overscroll-behavior-block: none;
 
       .chat-input {
-        flex: 1;
+        margin: auto;
         padding: 1em 0;
-
-        &:empty:before {
-          content: attr(data-placeholder);
-          color: mix(#fff, #000, 30%);
-          pointer-events: none;
-        }
+        max-height: calc($maxHeight - 2em);
+        resize: none;
       }
 
       .send-button {
@@ -546,4 +543,12 @@ header {
       background-color: $color-bg-light;
     }
   }
+}
+
+textarea[fieldSizing="content"] {
+  field-sizing: content;
+  width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior-block: none;
 }

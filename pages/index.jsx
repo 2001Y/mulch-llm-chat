@@ -172,12 +172,16 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
   const handleKeyDown = (event) => {
     if (document.body.dataset.softwareKeyboard === 'false') {
       if (event.key === 'Enter' && !isComposing) {
+        if (event.shiftKey) {
+          // Shift+Enterで改行を許可
+          return;
+        }
         event.preventDefault();
         if (showSuggestions) {
           selectSuggestion(suggestionIndex);
         } else {
           handleSend(event);
-          inputRef.current.innerHTML = '';
+          setChatInput('');
         }
       } else if (event.key === 'ArrowDown') {
         if (showSuggestions) {
@@ -195,64 +199,51 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
     }
   };
 
+
   const handleCompositionStart = () => {
     setIsComposing(true);
   };
 
   const handleCompositionEnd = (event) => {
     setIsComposing(false);
-    setChatInput(event.target.textContent);
+    setChatInput(event.target.value);
   };
 
-  const handleInput = (e) => {
-    const text = e.currentTarget.textContent;
-    if (text === '\u200B' || text.trim() === '') {
-      e.currentTarget.innerHTML = '';
-    } else {
-      setChatInput(text);
-      const mentionMatch = text.match(/@(\S*)/);
-      if (mentionMatch) {
-        const searchText = mentionMatch[1].toLowerCase();
-        if (searchText.includes(' ') || searchText.length > 15) {
-          setShowSuggestions(false);
-        } else {
-          const matchedModels = models.filter(model => model.toLowerCase().includes(searchText));
-          setFilteredModels(matchedModels);
-          setShowSuggestions(true);
-          setSelectedModels(matchedModels);
-        }
+  const onChange = (e) => {
+    const text = e.target.value;
+    setChatInput(text);
+    // 複数の「@」に対応するため、最後の「@」以降の文字列をマッチさせる正規表現
+    const mentionMatch = text.match(/@[^@]*$/);
+    if (mentionMatch && mentionMatch[0]) {
+      const searchText = mentionMatch[0].slice(1).toLowerCase();
+      console.log(searchText);
+      console.log(searchText.includes(' '));
+      if (searchText.includes(' ') || searchText.length > 15) {
+        setShowSuggestions(false);
+      } else {
+        const matchedModels = models.filter(model => model.toLowerCase().includes(searchText));
+        setFilteredModels(matchedModels);
+        setShowSuggestions(true);
+        setSelectedModels(matchedModels);
       }
     }
-  };
-
-  const handlePaste = (e) => {
-    e.preventDefault();
-    const text = e.clipboardData.getData('text/plain');
-    document.execCommand('insertText', false, text);
   };
 
   const selectSuggestion = (index) => {
     const selectedModel = filteredModels[index];
     const inputElement = inputRef.current;
-    const text = inputElement.innerText.replace(/@\S*/, `@${selectedModel.split('/')[1]} `);
-    inputElement.innerText = text;
-
-    const range = document.createRange();
-    const selection = window.getSelection();
-    if (inputElement.childNodes.length > 0) {
-      range.setStart(inputElement.childNodes[0], text.length);
-      range.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(range);
-    }
+    // 入力フィールドの値から最後の「@」に続く文字列を選択されたモデル名に置き換える
+    const text = inputElement.value.replace(/@[^@]*$/, `@${selectedModel.split('/')[1]} `);
+    inputElement.value = text;
 
     setShowSuggestions(false);
     setSuggestionIndex(0);
+    setChatInput(text);
   };
 
   useEffect(() => {
     if (chatInput === '' && inputRef.current) {
-      inputRef.current.innerHTML = '';
+      inputRef.current.value = '';
     }
   }, [chatInput]);
 
@@ -282,6 +273,22 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
     }
   };
 
+  // Polyfill for unsupported browsers
+  useEffect(() => {
+    if (!CSS.supports('field-sizing: content')) {
+      const textarea = inputRef.current;
+      const adjustHeight = () => {
+        textarea.style.height = 'auto';
+        textarea.style.height = `${textarea.scrollHeight}px`;
+      };
+      textarea.addEventListener('input', adjustHeight);
+      adjustHeight();
+      return () => {
+        textarea.removeEventListener('input', adjustHeight);
+      };
+    }
+  }, []);
+
   return (
     <section className="input-section">
       <div className="input-container model-select-area">
@@ -301,17 +308,16 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
         ))}
       </div>
       <div className="input-container chat-input-area">
-        <div
+        <textarea
           ref={inputRef}
-          contentEditable="true"
-          onInput={handleInput}
+          value={chatInput}
+          onChange={onChange}
           onKeyDown={handleKeyDown}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
-          onPaste={handlePaste}
           className="chat-input"
-          data-placeholder="Type your message here…"
-          style={{ whiteSpace: 'pre-wrap' }}
+          placeholder="Type your message here…"
+          fieldSizing="content"
         />
         {showSuggestions && (
           <ul className="suggestions-list">
@@ -341,7 +347,6 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
     </section>
   );
 };
-
 
 export default function Home() {
   const [models, setModels] = useLocalStorage('models', ['openai/gpt-4o', 'anthropic/claude-3-opus:beta', 'google/gemini-pro-1.5', 'cohere/command-r-plus']);
@@ -535,8 +540,7 @@ export default function Home() {
       </Head>
       <header>
         <Image src="/logo.png" width="40" height="40" alt="Logo" className="logo" />
-        <h1>
-          Multi AI Chat<br />
+        <h1> Multi AI Chat<br />
           <span>OpenRouter Chat Client</span>
         </h1>
         <div onClick={() => setIsModalOpen(!isModalOpen)} >⚙️</div>
