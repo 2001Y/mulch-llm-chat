@@ -50,7 +50,6 @@ const useLocalStorage = (key, initialValue) => {
 
 const useAccessToken = () => {
   const [accessToken, setAccessToken] = useLocalStorage('accessToken', '');
-  const [demoAccessToken, setDemoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO_API_KEY || '');
 
   useEffect(() => {
     const fetchAccessToken = async (code) => {
@@ -84,7 +83,7 @@ const useAccessToken = () => {
     }
   }, [accessToken]);
 
-  return [accessToken || demoAccessToken, setAccessToken];
+  return [accessToken, setAccessToken];
 };
 
 const useOpenAI = (accessToken) => {
@@ -212,15 +211,15 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
   const handleKeyDown = (event) => {
     if (document.body.dataset.softwareKeyboard === 'false') {
       if (event.key === 'Enter' && !isComposing) {
-        if (event.shiftKey) {
-          // Shift+Enterで改行を許可
-          return;
-        }
-        event.preventDefault();
-        if (showSuggestions) {
-          selectSuggestion(suggestionIndex);
-        } else {
-          handleSend(event);
+        if (event.metaKey || event.ctrlKey) {
+          // コマンド/コントロール+エンターで単体送信
+          event.preventDefault();
+          handleSend(event, true);
+          setChatInput('');
+        } else if (!event.shiftKey) {
+          // 通常のエンターで複数送信
+          event.preventDefault();
+          handleSend(event, false);
           setChatInput('');
         }
       } else if (event.key === 'ArrowDown') {
@@ -395,7 +394,8 @@ export default function Home() {
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState([]);
   const [accessToken, setAccessToken] = useAccessToken();
-  const openai = useOpenAI(accessToken);
+  const [demoAccessToken, setDemoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO_API_KEY || '');
+  const openai = useOpenAI(accessToken || demoAccessToken);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
   const [forceScroll, setForceScroll] = useState(false);
@@ -406,13 +406,15 @@ export default function Home() {
   const router = useRouter();
   useEffect(() => {
     if (!accessToken) {
-      setModels(models);
-      setSelectedModels(models);
+      console.log('No Login')
+      if (demoAccessToken) {
+        setModels(demoModels);
+        setSelectedModels(demoModels);
+      } else {
+        router.replace('/login');
+      }
     }
-    if (!accessToken && !process.env.NEXT_PUBLIC_DEMO_API_KEY) {
-      router.replace('/login');
-    }
-  }, [accessToken]);
+  }, [accessToken, demoAccessToken]);
 
   const updateMessage = (messageIndex, responseIndex, text) => {
     setMessages(prevMessages => {
@@ -469,15 +471,14 @@ export default function Home() {
     }
   }, [messages, openai]);
 
-  const handleSend = async (event) => {
+  const handleSend = async (event, isPrimaryOnly = false) => {
     if (isGenerating) return;
 
     let inputText = chatInput;
-    const isPrimaryOnly = event.key === 'Enter' && !event.shiftKey && !event.metaKey && !event.ctrlKey;
     const modelsToUse = isPrimaryOnly ? [selectedModels[0]] : selectedModels;
 
     setIsGenerating(true);
-    setForceScroll(true); // メッセージ送信時に強制スクロールを有効にする
+    setForceScroll(true);
     const newAbortControllers = modelsToUse.map(() => new AbortController());
     setAbortControllers(newAbortControllers);
 
@@ -619,7 +620,12 @@ export default function Home() {
         selectedModels={selectedModels}
         setSelectedModels={setSelectedModels}
       />
-      <ModelInputModal models={models} setModels={setModels} isModalOpen={isModalOpen} closeModal={closeModal} />
+      <ModelInputModal
+        models={accessToken ? models : demoModels}
+        setModels={accessToken ? setModels : setDemoModels}
+        isModalOpen={isModalOpen}
+        closeModal={closeModal}
+      />
     </>
   );
 }
