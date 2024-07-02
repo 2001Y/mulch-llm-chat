@@ -584,6 +584,14 @@ export default function Home() {
     };
   }, []);
 
+  const handleLogout = () => {
+    setAccessToken('');
+    setModels(demoModels);
+    setSelectedModels(demoModels);
+    // メッセージ履歴をクリア
+    setMessages([]);
+  };
+
   return (
     <>
       <Head>
@@ -602,11 +610,25 @@ export default function Home() {
         <link href="https://fonts.googleapis.com/css2?family=Glegoo:wght@400;700&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet" />
       </Head>
       <header>
-        <Image src="/logo.png" width="40" height="40" alt="Logo" className="logo" />
-        <h1> Multi AI Chat<br />
-          <span>OpenRouter Chat Client</span>
-        </h1>
-        <div onClick={() => setIsModalOpen(!isModalOpen)} >⚙️</div>
+        <div className="logo">
+          <Image src="/logo.png" width="40" height="40" alt="Logo" className="logo-img" />
+          <h1>Multi AI Chat<br />
+            <small>OpenRouter Chat Client</small>
+          </h1>
+        </div>
+        <div className="header-side">
+          {accessToken ? (
+            <button onClick={handleLogout}>
+              Logout
+            </button>
+          ) : (
+            <button onClick={() => router.push('/login')} className="login">
+              Login with OpenRouter
+            </button>
+          )}
+          <div onClick={() => setIsModalOpen(!isModalOpen)} >⚙️</div>
+        </div>
+        {!accessToken && <div className="free-version">Free Version</div>}
       </header >
       <Responses messages={messages} updateMessage={updateMessage} forceScroll={forceScroll} />
       <InputSection
