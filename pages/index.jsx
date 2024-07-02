@@ -407,6 +407,7 @@ export default function Home() {
   useEffect(() => {
     if (!accessToken) {
       setModels(models);
+      setSelectedModels(models);
     }
     if (!accessToken && !process.env.NEXT_PUBLIC_DEMO_API_KEY) {
       router.replace('/login');
