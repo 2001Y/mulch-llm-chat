@@ -300,6 +300,7 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
   }, []);
 
   const handleModelChange = (model) => {
+    const wasInputFocused = document.activeElement === inputRef.current;
     setSelectedModels((prevSelectedModels) => {
       if (prevSelectedModels.includes(model)) {
         return prevSelectedModels.filter((m) => m !== model);
@@ -307,8 +308,8 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
         return [...prevSelectedModels, model];
       }
     });
-    if (inputRef.current) {
-      inputRef.current.focus();
+    if (wasInputFocused && inputRef.current) {
+      setTimeout(() => inputRef.current.focus(), 0);
     }
   };
 
