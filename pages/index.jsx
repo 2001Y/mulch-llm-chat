@@ -103,11 +103,31 @@ const useOpenAI = (accessToken) => {
   return openai;
 };
 
-const Responses = ({ messages, updateMessage }) => {
+const Responses = ({ messages = [], updateMessage, forceScroll }) => {
   const containerRef = useRef(null);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
+  const [lastManualScrollTop, setLastManualScrollTop] = useState(0);
+  const [lastAutoScrollTop, setLastAutoScrollTop] = useState(0);
+  const isAutoScrollingRef = useRef(false);
 
   const handleScroll = () => {
+    const container = containerRef.current;
+    if (container && !isAutoScrollingRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const isScrolledToBottom = scrollHeight - scrollTop - clientHeight < 1;
+
+      // ユーザーが上にスクロールした場合、自動スクロールを無効にする
+      if (scrollTop < lastManualScrollTop && !isScrolledToBottom) {
+        setIsAutoScroll(false);
+      }
+
+      // 最下部までスクロールした場合、自動スクロールを有効にする
+      if (isScrolledToBottom) {
+        setIsAutoScroll(true);
+      }
+
+      setLastManualScrollTop(scrollTop);
+    }
   };
 
   useEffect(() => {
@@ -116,27 +136,46 @@ const Responses = ({ messages, updateMessage }) => {
       container.addEventListener('scroll', handleScroll);
       return () => container.removeEventListener('scroll', handleScroll);
     }
-  }, []);
+  }, [lastManualScrollTop]);
 
   useEffect(() => {
-    if (isAutoScroll && containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
-    }
-  }, [messages]);
+    if ((isAutoScroll || forceScroll) && containerRef.current) {
+      const container = containerRef.current;
+      const { scrollHeight, clientHeight } = container;
+      const newScrollTop = scrollHeight - clientHeight;
 
-  const handleEdit = (messageIndex, responseIndex, newText) => {
-    updateMessage(messageIndex, responseIndex, newText);
+      isAutoScrollingRef.current = true;
+      container.scrollTop = newScrollTop;
+      setLastAutoScrollTop(newScrollTop);
+      setTimeout(() => {
+        isAutoScrollingRef.current = false;
+      }, 100);
+    }
+  }, [messages, isAutoScroll, lastAutoScrollTop, forceScroll])
+
+  const handleEdit = (messageIndex, responseIndex, newContent) => {
+    if (responseIndex === null) {
+      // ユーザーメッセージの編集
+      const newMessages = [...messages];
+      newMessages[messageIndex].user = newContent;
+      updateMessage(newMessages);
+    } else {
+      // AIの応答の編集
+      updateMessage(messageIndex, responseIndex, newContent);
+    }
   };
 
   return (
     <div className="responses-container" ref={containerRef} translate="no">
-      {messages.map((message, index) => (
+      {Array.isArray(messages) && messages.map((message, index) => (
         <div key={index} className="message-block">
           <div className="user">
-            <p contentEditable onBlur={(e) => handleEdit(index, null, e.target.textContent)}>{message.user}</p>
+            <p contentEditable onBlur={(e) => handleEdit(index, null, e.target.textContent)}>
+              {message.user}
+            </p>
           </div>
           <div className="scroll_area">
-            {message.llm.map((response, idx) => (
+            {Array.isArray(message.llm) && message.llm.map((response, idx) => (
               <div key={idx} className={`response ${response.role}`}>
                 <div className="meta">
                   <small>{response.model}</small>
@@ -279,7 +318,7 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
       const textarea = inputRef.current;
       const adjustHeight = () => {
         textarea.style.height = 'auto';
-        textarea.style.height = `${textarea.scrollHeight}px`;
+        textarea.style.height = `${Math.min(textarea.scrollHeight, parseInt(getComputedStyle(textarea).maxHeight))}px`;
       };
       textarea.addEventListener('input', adjustHeight);
       adjustHeight();
@@ -356,6 +395,7 @@ export default function Home() {
   const openai = useOpenAI(accessToken);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
+  const [forceScroll, setForceScroll] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [abortControllers, setAbortControllers] = useState([]);
   const [selectedModels, setSelectedModels] = useState(models);
@@ -369,8 +409,17 @@ export default function Home() {
 
   const updateMessage = (messageIndex, responseIndex, text) => {
     setMessages(prevMessages => {
+      // prevMessagesが配列でない場合、空の配列を返す
+      if (!Array.isArray(prevMessages)) return [];
+
       const newMessages = [...prevMessages];
-      newMessages[messageIndex].llm[responseIndex].text = text;
+      if (responseIndex === null) {
+        // ユーザーメッセージの更新
+        newMessages[messageIndex].user = text;
+      } else if (responseIndex !== undefined) {
+        // 特定のAI応答の更新
+        newMessages[messageIndex].llm[responseIndex].text = text;
+      }
       return newMessages;
     });
   };
@@ -421,21 +470,27 @@ export default function Home() {
     const modelsToUse = isPrimaryOnly ? [selectedModels[0]] : selectedModels;
 
     setIsGenerating(true);
+    setForceScroll(true); // メッセージ送信時に強制スクロールを有効にする
     const newAbortControllers = modelsToUse.map(() => new AbortController());
     setAbortControllers(newAbortControllers);
 
     setMessages(prevMessages => {
+      // prevMessagesが配列でない場合、空の配列を使用
+      const currentMessages = Array.isArray(prevMessages) ? prevMessages : [];
       const newMessage = {
         user: chatInput,
         llm: modelsToUse.map((model) => ({ role: 'assistant', model, text: '' }))
       };
-      const newMessages = [...prevMessages, newMessage];
+      const newMessages = [...currentMessages, newMessage];
       newMessage.llm.forEach((response, index) => {
         fetchChatResponse(response.model, newMessages.length - 1, index, newAbortControllers[index], inputText);
       });
       setIsAutoScroll(true);
       return newMessages;
     });
+
+    // メッセージ送信後、次のレンダリングサイクルで強制スクロールを無効にする
+    setTimeout(() => setForceScroll(false), 100);
   };
 
   const handleStop = () => {
@@ -545,7 +600,7 @@ export default function Home() {
         </h1>
         <div onClick={() => setIsModalOpen(!isModalOpen)} >⚙️</div>
       </header >
-      <Responses messages={messages} updateMessage={updateMessage} />
+      <Responses messages={messages} updateMessage={updateMessage} forceScroll={forceScroll} />
       <InputSection models={models} chatInput={chatInput} setChatInput={setChatInput} handleSend={handleSend} handleStop={handleStop} openModal={openModal} isGenerating={isGenerating} selectedModels={selectedModels} setSelectedModels={setSelectedModels} />
       <ModelInputModal models={models} setModels={setModels} isModalOpen={isModalOpen} closeModal={closeModal} />
     </>
