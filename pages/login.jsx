@@ -14,7 +14,7 @@ export default function LoginPage() {
     return (
         <div>
             <h1>Login</h1>
-            <button onClick={handleLogin}>Login to OpenRouter</button>
+            <button onClick={handleLogin} className="login-button">OpenRouterにログイン</button>
         </div>
     );
 }
