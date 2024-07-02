@@ -50,6 +50,7 @@ const useLocalStorage = (key, initialValue) => {
 
 const useAccessToken = () => {
   const [accessToken, setAccessToken] = useLocalStorage('accessToken', '');
+  const [demoAccessToken, setDemoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO_API_KEY || '');
 
   useEffect(() => {
     const fetchAccessToken = async (code) => {
@@ -83,7 +84,7 @@ const useAccessToken = () => {
     }
   }, [accessToken]);
 
-  return [accessToken, setAccessToken];
+  return [accessToken || demoAccessToken, setAccessToken];
 };
 
 const useOpenAI = (accessToken) => {
@@ -390,6 +391,7 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
 
 export default function Home() {
   const [models, setModels] = useLocalStorage('models', ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'cohere/command-r-plus', "meta-llama/llama-3-70b-instruct"]);
+  const [demoModels, setDemoModels] = useState(['google/gemma-2-9b-it:free', "meta-llama/llama-3-8b-instruct:free", "mistralai/mistral-7b-instruct:free"]);
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState([]);
   const [accessToken, setAccessToken] = useAccessToken();
@@ -404,6 +406,9 @@ export default function Home() {
   const router = useRouter();
   useEffect(() => {
     if (!accessToken) {
+      setSelectedModels(demoModels);
+    }
+    if (!accessToken && !process.env.NEXT_PUBLIC_DEMO_API_KEY) {
       router.replace('/login');
     }
   }, [accessToken]);
@@ -602,7 +607,17 @@ export default function Home() {
         <div onClick={() => setIsModalOpen(!isModalOpen)} >⚙️</div>
       </header >
       <Responses messages={messages} updateMessage={updateMessage} forceScroll={forceScroll} />
-      <InputSection models={models} chatInput={chatInput} setChatInput={setChatInput} handleSend={handleSend} handleStop={handleStop} openModal={openModal} isGenerating={isGenerating} selectedModels={selectedModels} setSelectedModels={setSelectedModels} />
+      <InputSection
+        models={accessToken ? models : demoModels}
+        chatInput={chatInput}
+        setChatInput={setChatInput}
+        handleSend={handleSend}
+        handleStop={handleStop}
+        openModal={openModal}
+        isGenerating={isGenerating}
+        selectedModels={selectedModels}
+        setSelectedModels={setSelectedModels}
+      />
       <ModelInputModal models={models} setModels={setModels} isModalOpen={isModalOpen} closeModal={closeModal} />
     </>
   );
