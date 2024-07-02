@@ -406,7 +406,7 @@ export default function Home() {
   const router = useRouter();
   useEffect(() => {
     if (!accessToken) {
-      setSelectedModels(demoModels);
+      setModels(models);
     }
     if (!accessToken && !process.env.NEXT_PUBLIC_DEMO_API_KEY) {
       router.replace('/login');
