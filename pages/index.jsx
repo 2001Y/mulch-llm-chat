@@ -165,25 +165,35 @@ const Responses = ({ messages = [], updateMessage, forceScroll }) => {
     }
   };
 
+  const handleSelectResponse = (messageIndex, responseIndex) => {
+    updateMessage(messageIndex, null, null, responseIndex);
+  };
+
   return (
     <div className="responses-container" ref={containerRef} translate="no">
-      {Array.isArray(messages) && messages.map((message, index) => (
-        <div key={index} className="message-block">
+      {Array.isArray(messages) && messages.map((message, messageIndex) => (
+        <div key={messageIndex} className="message-block">
           <div className="user">
-            <p contentEditable onBlur={(e) => handleEdit(index, null, e.target.textContent)}>
+            <p contentEditable onBlur={(e) => handleEdit(messageIndex, null, e.target.textContent)}>
               {message.user}
             </p>
           </div>
           <div className="scroll_area">
-            {Array.isArray(message.llm) && message.llm.map((response, idx) => (
-              <div key={idx} className={`response ${response.role}`}>
+            {Array.isArray(message.llm) && message.llm.map((response, responseIndex) => (
+              <div key={responseIndex} className={`response ${response.role}`}>
                 <div className="meta">
                   <small>{response.model}</small>
+                  <input
+                    type="radio"
+                    name={`response-${messageIndex}`}
+                    checked={response.selected}
+                    onChange={() => handleSelectResponse(messageIndex, responseIndex)}
+                  />
                 </div>
                 <div
                   className="markdown-content"
                   contentEditable
-                  onBlur={(e) => handleEdit(index, idx, e.target.innerHTML)}
+                  onBlur={(e) => handleEdit(messageIndex, responseIndex, e.target.innerHTML)}
                   dangerouslySetInnerHTML={{ __html: response.text }}
                 />
               </div>
@@ -390,7 +400,7 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
 
 export default function Home() {
   const [models, setModels] = useLocalStorage('models', ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'cohere/command-r-plus', "meta-llama/llama-3-70b-instruct"]);
-  const [demoModels, setDemoModels] = useState(['google/gemma-2-9b-it:free', "meta-llama/llama-3-8b-instruct:free", "mistralai/mistral-7b-instruct:free"]);
+  const [demoModels, setDemoModels] = useState(['google/gemma-2-9b-it:free', "google/gemma-7b-it:free", "meta-llama/llama-3-8b-instruct:free", "openchat/openchat-7b:free"]);
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState([]);
   const [accessToken, setAccessToken] = useAccessToken();
@@ -416,18 +426,23 @@ export default function Home() {
     }
   }, [accessToken, demoAccessToken]);
 
-  const updateMessage = (messageIndex, responseIndex, text) => {
+  const updateMessage = (messageIndex, responseIndex, text, selectedIndex) => {
     setMessages(prevMessages => {
       // prevMessagesが配列でない場合、空の配列を返す
       if (!Array.isArray(prevMessages)) return [];
 
       const newMessages = [...prevMessages];
-      if (responseIndex === null) {
+      if (responseIndex === null && text !== undefined) {
         // ユーザーメッセージの更新
         newMessages[messageIndex].user = text;
-      } else if (responseIndex !== undefined) {
+      } else if (responseIndex !== undefined && text !== undefined) {
         // 特定のAI応答の更新
         newMessages[messageIndex].llm[responseIndex].text = text;
+      } else if (selectedIndex !== undefined) {
+        // 選択状態の更新
+        newMessages[messageIndex].llm.forEach((response, index) => {
+          response.selected = index === selectedIndex;
+        });
       }
       return newMessages;
     });
@@ -487,7 +502,12 @@ export default function Home() {
       const currentMessages = Array.isArray(prevMessages) ? prevMessages : [];
       const newMessage = {
         user: chatInput,
-        llm: modelsToUse.map((model) => ({ role: 'assistant', model, text: '' }))
+        llm: modelsToUse.map((model, index) => ({
+          role: 'assistant',
+          model,
+          text: '',
+          selected: index === 0 // 最初のレスポンスをデフォルトで選択
+        }))
       };
       const newMessages = [...currentMessages, newMessage];
       newMessage.llm.forEach((response, index) => {
@@ -623,10 +643,15 @@ export default function Home() {
             </button>
           ) : (
             <button onClick={() => router.push('/login')} className="login">
-              Login with OpenRouter
+              Login
             </button>
           )}
-          <div onClick={() => setIsModalOpen(!isModalOpen)} >⚙️</div>
+          <div onClick={() => setIsModalOpen(!isModalOpen)} className="setting">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </div>
         </div>
         {!accessToken && <div className="free-version">Free Version</div>}
       </header >

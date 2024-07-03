@@ -20,14 +20,21 @@
       "@/*": [
         "./*"
       ]
-    }
+    },
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
     "pages/api/auth.js",
-    "pages/index.jsx"
+    "pages/index.jsx",
+    "app/page.jsx",
+    ".next/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"
