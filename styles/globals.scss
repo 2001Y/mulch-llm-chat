@@ -396,7 +396,6 @@ header {
         padding-bottom: calc(8em + env(safe-area-inset-bottom)*1.5);
         min-height: fit-content;
         overflow-y: hidden;
-        overscroll-behavior-block: contain;
       }
     }
 
@@ -412,7 +411,7 @@ header {
       display: flex;
       align-items: flex-start;
       overflow-x: auto;
-      overscroll-behavior-inline: contain;
+      // overscroll-behavior-inline: contain;
       gap: 1em;
       padding: 1em 0 1em $body-padding;
       scroll-snap-type: x mandatory;

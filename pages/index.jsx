@@ -333,6 +333,10 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
       };
       textarea.addEventListener('input', adjustHeight);
       adjustHeight();
+      // chatInputが空になったときに高さをリセット
+      if (chatInput === '') {
+        textarea.style.height = 'auto';
+      }
       return () => {
         textarea.removeEventListener('input', adjustHeight);
       };
