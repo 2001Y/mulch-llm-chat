@@ -182,7 +182,7 @@ const Responses = ({ messages = [], updateMessage, forceScroll }) => {
   };
 
   const handleSelectResponse = (messageIndex, responseIndex) => {
-    updateMessage(messageIndex, null, null, responseIndex);
+    updateMessage(messageIndex, responseIndex, undefined, null, true);
   };
 
   return (
@@ -200,9 +200,8 @@ const Responses = ({ messages = [], updateMessage, forceScroll }) => {
                 <div className="meta">
                   <small>{response.model}</small>
                   <input
-                    type="radio"
-                    name={`response-${messageIndex}`}
-                    checked={response.selected}
+                    type="checkbox"
+                    checked={response.selected || false}
                     onChange={() => handleSelectResponse(messageIndex, responseIndex)}
                   />
                 </div>
@@ -221,7 +220,7 @@ const Responses = ({ messages = [], updateMessage, forceScroll }) => {
   );
 };
 
-const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop, openModal, isGenerating, selectedModels, setSelectedModels }) => {
+const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop, openModal, isGenerating, selectedModels, setSelectedModels, showResetButton, handleReset }) => {
   const [isComposing, setIsComposing] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
@@ -361,6 +360,11 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
 
   return (
     <section className="input-section">
+      {showResetButton && (
+        <button className="reset-button" onClick={handleReset}>
+          Start New Chat
+        </button>
+      )}
       <div className="input-container model-select-area">
         {models.map((model, index) => (
           <div className="model-radio" key={model}>
@@ -432,6 +436,7 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [abortControllers, setAbortControllers] = useState([]);
   const [selectedModels, setSelectedModels] = useState(models);
+  const [showResetButton, setShowResetButton] = useState(false);
 
   const router = useRouter();
   useEffect(() => {
@@ -446,23 +451,20 @@ export default function Home() {
     }
   }, [accessToken, demoAccessToken]);
 
-  const updateMessage = (messageIndex, responseIndex, text, selectedIndex) => {
+  const updateMessage = (messageIndex, responseIndex, text, selectedIndex, toggleSelected) => {
     setMessages(prevMessages => {
-      // prevMessagesが配列でない場合、空の配列を返す
       if (!Array.isArray(prevMessages)) return [];
 
       const newMessages = [...prevMessages];
       if (responseIndex === null && text !== undefined) {
-        // ユーザーメッセージの更新
         newMessages[messageIndex].user = text;
-      } else if (responseIndex !== undefined && text !== undefined) {
-        // 特定のAI応答の更新
-        newMessages[messageIndex].llm[responseIndex].text = text;
-      } else if (selectedIndex !== undefined) {
-        // 選択状態の更新
-        newMessages[messageIndex].llm.forEach((response, index) => {
-          response.selected = index === selectedIndex;
-        });
+      } else if (responseIndex !== undefined) {
+        if (text !== undefined) {
+          newMessages[messageIndex].llm[responseIndex].text = text;
+        }
+        if (toggleSelected) {
+          newMessages[messageIndex].llm[responseIndex].selected = !newMessages[messageIndex].llm[responseIndex].selected;
+        }
       }
       return newMessages;
     });
@@ -470,10 +472,17 @@ export default function Home() {
 
   const fetchChatResponse = useCallback(async (model, messageIndex, responseIndex, abortController, inputText) => {
     try {
-      const pastMessages = messages.flatMap(msg => [
-        { role: 'user', content: msg.user },
-        ...msg.llm.map(llm => ({ role: 'assistant', content: llm.text }))
-      ]);
+      const pastMessages = messages.flatMap(msg => {
+        const userMessage = { role: 'user', content: msg.user };
+        const selectedResponses = msg.llm.filter(llm => llm.selected);
+
+        if (selectedResponses.length > 0) {
+          return [userMessage, ...selectedResponses.map(llm => ({ role: 'assistant', content: llm.text }))];
+        } else {
+          const modelResponse = msg.llm.find(llm => llm.model === model);
+          return modelResponse ? [userMessage, { role: 'assistant', content: modelResponse.text }] : [userMessage];
+        }
+      });
 
       const stream = await openai.chat.completions.create({
         model,
@@ -518,7 +527,6 @@ export default function Home() {
     setAbortControllers(newAbortControllers);
 
     setMessages(prevMessages => {
-      // prevMessagesが配列でない場合、空の配列を使用
       const currentMessages = Array.isArray(prevMessages) ? prevMessages : [];
       const newMessage = {
         user: chatInput,
@@ -526,7 +534,7 @@ export default function Home() {
           role: 'assistant',
           model,
           text: '',
-          selected: index === 0 // 最初のレスポンスをデフォルトで選択
+          selected: false
         }))
       };
       const newMessages = [...currentMessages, newMessage];
@@ -534,11 +542,22 @@ export default function Home() {
         fetchChatResponse(response.model, newMessages.length - 1, index, newAbortControllers[index], inputText);
       });
       setIsAutoScroll(true);
+
+      // 初めてメッセージが送信されたらリセットボタンを表示
+      if (currentMessages.length === 0) {
+        setShowResetButton(true);
+      }
+
       return newMessages;
     });
 
     // メッセージ送信後、次のレンダリングサイクルで強制スクロールを無効にする
     setTimeout(() => setForceScroll(false), 100);
+  };
+
+  const handleReset = () => {
+    setMessages([]);
+    setShowResetButton(false);
   };
 
   const handleStop = () => {
@@ -686,6 +705,8 @@ export default function Home() {
         isGenerating={isGenerating}
         selectedModels={selectedModels}
         setSelectedModels={setSelectedModels}
+        showResetButton={showResetButton}
+        handleReset={handleReset}
       />
       <ModelInputModal
         models={accessToken ? models : demoModels}

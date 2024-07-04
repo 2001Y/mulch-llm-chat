@@ -61,7 +61,7 @@ html {
   touch-action: manipulation;
 }
 
-:where(:any-link, button, [type='button'], [type='reset'], [type='submit'], label[for], select, summary, [role='tab'], [role='button']) {
+:where(:any-link, button, [type='button'], [type='reset'], [type='submit'], label[for], select, summary, [role='tab'], [role='button'], [type='checkbox']) {
   cursor: pointer;
 }
 
@@ -226,6 +226,13 @@ header {
     background: radial-gradient(ellipse, #000, transparent);
     pointer-events: none;
     z-index: -1;
+
+    @media (max-width: $chat-input-max-width) {
+      left: 0;
+      width: 100vw;
+      margin: 0 calc(50% - 50vw);
+      background: linear-gradient(to top, $bg_body, transparent);
+    }
   }
 
   .input-container {
@@ -366,6 +373,27 @@ header {
       }
     }
   }
+
+  .reset-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    height: 2em;
+    padding: 0 1em;
+    margin: auto;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: $border-radius;
+    transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      color: #15d186;
+      border-color: #15d186;
+    }
+  }
 }
 
 .responses-container {
@@ -406,11 +434,9 @@ header {
       display: flex;
       align-items: flex-start;
       overflow-x: auto;
-      // overscroll-behavior-inline: contain;
       gap: 1em;
       padding: 1em 0 1em $body-padding;
-      scroll-snap-type: x mandatory;
-      scroll-padding-left: $body-padding;
+      cursor: pointer;
 
       .response {
         width: calc(100vw - $body-padding);
@@ -421,9 +447,8 @@ header {
         display: flex;
         flex-direction: column;
         gap: .5em;
-        scroll-snap-align: start;
-        scroll-snap-stop: always;
         margin-right: $body-padding;
+        cursor: auto;
 
         p {
           white-space: normal;
