@@ -139,19 +139,35 @@ const Responses = ({ messages = [], updateMessage, forceScroll }) => {
   }, [lastManualScrollTop]);
 
   useEffect(() => {
-    if ((isAutoScroll || forceScroll) && containerRef.current) {
-      const container = containerRef.current;
-      const { scrollHeight, clientHeight } = container;
-      const newScrollTop = scrollHeight - clientHeight;
+    let scrollTimer;
+    const scrollInterval = 500; // スクロール更新の間隔（ミリ秒）
 
-      isAutoScrollingRef.current = true;
-      container.scrollTop = newScrollTop;
-      setLastAutoScrollTop(newScrollTop);
-      setTimeout(() => {
-        isAutoScrollingRef.current = false;
-      }, 100);
-    }
-  }, [messages, isAutoScroll, lastAutoScrollTop, forceScroll])
+    const scrollToBottom = () => {
+      if ((isAutoScroll || forceScroll) && containerRef.current) {
+        const container = containerRef.current;
+        const { scrollHeight, clientHeight } = container;
+        const newScrollTop = scrollHeight - clientHeight;
+
+        isAutoScrollingRef.current = true;
+        container.scrollTop = newScrollTop;
+        setLastAutoScrollTop(newScrollTop);
+        setTimeout(() => {
+          isAutoScrollingRef.current = false;
+        }, 100);
+      }
+    };
+
+    const scheduleScroll = () => {
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(scrollToBottom, scrollInterval);
+    };
+
+    scheduleScroll();
+
+    return () => {
+      clearTimeout(scrollTimer);
+    };
+  }, [messages, isAutoScroll, lastAutoScrollTop, forceScroll]);
 
   const handleEdit = (messageIndex, responseIndex, newContent) => {
     if (responseIndex === null) {

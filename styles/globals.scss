@@ -213,22 +213,19 @@ header {
   display: flex;
   flex-direction: column;
   gap: .5em;
+  overflow: visible;
 
-  &::after {
+  &::before {
     content: '';
     position: absolute;
-    bottom: 0;
+    bottom: -50%;
     left: 50%;
     transform: translateX(-50%);
-    width: calc(100% + #{$body-padding * 2}); // パディングを考慮して幅を計算
-    max-width: calc(#{$chat-input-max-width} + #{$body-padding * 2}); // 最大幅も同様に計算
-    height: 150%;
-    transition: height .3s;
-    background: radial-gradient(ellipse at bottom, $bg_body 60%, transparent 100%);
+    width: 100%;
+    height: 200%;
+    background: radial-gradient(ellipse, #000, transparent);
     pointer-events: none;
     z-index: -1;
-    border-top-left-radius: 50% 20%;
-    border-top-right-radius: 50% 20%;
   }
 
   .input-container {
