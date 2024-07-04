@@ -202,7 +202,8 @@ header {
 
 .input-section {
   width: 100%;
-  max-width: 50em;
+  $chat-input-max-width: 50em;
+  max-width: $chat-input-max-width;
   padding: 0 $padding;
   padding-bottom: calc(env(safe-area-inset-bottom) + $body-padding);
   position: fixed;
@@ -213,25 +214,21 @@ header {
   flex-direction: column;
   gap: .5em;
 
-  // @media (display-mode: standalone) and (pointer: coarse) {
-  //   @supports (padding: env(safe-area-inset-bottom)) {
-  //     flex-direction: column-reverse;
-  //     padding-bottom: env(safe-area-inset-bottom);
-  //   }
-  // }
-
   &::after {
     content: '';
     position: absolute;
     bottom: 0;
-    left: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% + #{$body-padding * 2}); // パディングを考慮して幅を計算
+    max-width: calc(#{$chat-input-max-width} + #{$body-padding * 2}); // 最大幅も同様に計算
     height: 150%;
     transition: height .3s;
-    width: 100vw;
-    margin: 0 calc(50% - 50vw);
-    background: linear-gradient(to top, $bg_body, transparent);
+    background: radial-gradient(ellipse at bottom, $bg_body 60%, transparent 100%);
     pointer-events: none;
     z-index: -1;
+    border-top-left-radius: 50% 20%;
+    border-top-right-radius: 50% 20%;
   }
 
   .input-container {
