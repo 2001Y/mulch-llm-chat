@@ -558,7 +558,7 @@ export default function Home() {
         ],
         stream: true,
         signal: abortController.signal,
-        file_ids: fileIds, // 添付ファイルのIDを送信
+        file_ids: fileIds.length > 0 ? fileIds : undefined, // ファイルIDがある場合のみ送信
       });
 
       let result = '';
