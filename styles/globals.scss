@@ -722,7 +722,7 @@ body {
     transition: transform .3s;
   }
 
-  &[data-software-keyboard="true"] {
+  &[data-input-focused="true"][data-software-keyboard="true"] {
     .responses-container {
       transform: translateY(calc(var(--keyboardHeight) - $height_header * 1.5));
     }

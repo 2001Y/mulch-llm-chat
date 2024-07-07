@@ -250,6 +250,26 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
     if (inputRef.current) {
       inputRef.current.focus();
     }
+
+    const handleFocus = () => {
+      document.body.dataset.inputFocused = 'true';
+    };
+
+    const handleBlur = () => {
+      document.body.dataset.inputFocused = 'false';
+    };
+
+    if (inputRef.current) {
+      inputRef.current.addEventListener('focus', handleFocus);
+      inputRef.current.addEventListener('blur', handleBlur);
+    }
+
+    return () => {
+      if (inputRef.current) {
+        inputRef.current.removeEventListener('focus', handleFocus);
+        inputRef.current.removeEventListener('blur', handleBlur);
+      }
+    };
   }, []);
 
   const handleKeyDown = (event) => {
