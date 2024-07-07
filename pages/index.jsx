@@ -215,9 +215,11 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
                         className={`response-select ${response.selected ? 'selected' : ''}`}
                         onClick={() => handleSelectResponse(messageIndex, responseIndex)}
                       >
-                        {response.selected ?
-                          (selectedResponses.findIndex(r => r === response) + 1)
-                          : ''}
+                        {response.selected ? (
+                          selectedResponses.length > 1 ?
+                            (selectedResponses.findIndex(r => r === response) + 1) :
+                            '✓'
+                        ) : ''}
                       </div>
                     </div>
                   </div>
