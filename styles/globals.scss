@@ -133,10 +133,17 @@ header {
     background: rgba(#000, .5);
     padding: 2px 5px;
     border-radius: 4px;
-    margin-left: 5px;
     position: fixed;
     top: calc($height_header / 2 - 1.5em);
     left: calc($body-padding + 13rem);
+
+    @media (max-width: 600px) {
+      font-size: .8em;
+      top: calc($height_header + 1.5em);
+      left: auto;
+      right: $body-padding;
+      z-index: 10;
+    }
   }
 
   .header-side {
@@ -386,7 +393,7 @@ header {
     align-items: center;
     justify-content: center;
     width: fit-content;
-    height: 2em;
+    height: 2.4em;
     padding: 0 1em;
     margin: auto;
     background: transparent;
