@@ -538,15 +538,17 @@ export default function Home() {
           .filter(llm => llm.selected)
           .sort((a, b) => a.selectedOrder - b.selectedOrder);
 
-        if (selectedResponses.length > 0) {
-          return [userMessage, ...selectedResponses.map(llm => ({ role: 'assistant', content: llm.text }))];
-        } else {
-          const modelResponse = msg.llm.find(llm => llm.model === model);
-          return modelResponse ? [userMessage, { role: 'assistant', content: modelResponse.text }] : [userMessage];
-        }
+        const responseMessages = selectedResponses.length > 0
+          ? selectedResponses.map(llm => ({ role: 'assistant', content: llm.text }))
+          : [{ role: 'assistant', content: msg.llm.find(llm => llm.model === model)?.text || '' }];
+
+        return [userMessage, ...responseMessages];
       });
 
       console.log('モデルに送信する過去の会話:', pastMessages);
+
+      const currentMessage = messages[messageIndex];
+      const fileIds = currentMessage.attachedFiles?.map(file => file.id) || [];
 
       const stream = await openai.chat.completions.create({
         model,
@@ -556,6 +558,7 @@ export default function Home() {
         ],
         stream: true,
         signal: abortController.signal,
+        file_ids: fileIds, // 添付ファイルのIDを送信
       });
 
       let result = '';
@@ -579,12 +582,15 @@ export default function Home() {
     }
   }, [messages, openai]);
 
-  const handleSend = async (event, isPrimaryOnly = false, fileContents = null) => {
+  const handleSend = async (event, isPrimaryOnly = false, fileInfos = null) => {
     if (isGenerating) return;
 
     let inputText = chatInput;
-    if (fileContents) {
-      inputText += "\n[添付ファイル情報]\n" + JSON.stringify(fileContents, null, 2);
+    if (fileInfos) {
+      const fileDetails = fileInfos.map(file =>
+        `File: ${file.name} (ID: ${file.id}, Type: ${file.type}, Size: ${file.size} bytes)`
+      ).join('\n');
+      inputText += `\n[Attached Files]\n${fileDetails}`;
     }
 
     const modelsToUse = isPrimaryOnly ? [selectedModels[0]] : selectedModels;
@@ -603,7 +609,8 @@ export default function Home() {
           model,
           text: '',
           selected: false
-        }))
+        })),
+        attachedFiles: fileInfos // 添付ファイル情報を保存
       };
       const newMessages = [...currentMessages, newMessage];
       newMessage.llm.forEach((response, index) => {
@@ -720,37 +727,52 @@ export default function Home() {
 
   const handleFileUpload = async (event) => {
     const files = Array.from(event.target.files);
-    const formData = new FormData();
+    const uploadedFileInfos = [];
 
-    files.forEach((file) => {
+    for (const file of files) {
+      const formData = new FormData();
       formData.append('file', file);
       formData.append('purpose', 'assistants');
-    });
 
-    try {
-      const response = await fetch('https://openrouter.ai/api/v1/files', {
-        method: 'POST',
-        body: formData,
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      try {
+        const response = await fetch('https://openrouter.ai/api/v1/files', {
+          method: 'POST',
+          body: formData,
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
 
-      const result = await response.json();
-      console.log('File uploaded:', result);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-      // Add the uploaded file to the chat input
-      const fileMessage = `File "${file.name}" uploaded successfully. File ID: ${result.id}`;
-      setChatInput((prevInput) => `${prevInput}${fileMessage}\n`);
+        const result = await response.json();
+        console.log('File uploaded:', result);
 
-      // Send the file information to the AI model
-      handleSend(null, false, [{ id: result.id, name: file.name }]);
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      // Add an error message to the chat input
-      const errorMessage = `Error uploading file "${file.name}": ${error.message}`;
-      setChatInput((prevInput) => `${prevInput}${errorMessage}\n`);
+        const fileInfo = {
+          id: result.id,
+          name: file.name,
+          type: file.type,
+          size: file.size,
+        };
+        uploadedFileInfos.push(fileInfo);
+        setUploadedFiles(prev => [...prev, fileInfo]);
+
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        // エラーメッセージをユーザーに表示する処理を追加
+      }
+    }
+
+    if (uploadedFileInfos.length > 0) {
+      const fileMessage = uploadedFileInfos.map(file =>
+        `File "${file.name}" (${file.type}, ${file.size} bytes) uploaded. ID: ${file.id}`
+      ).join('\n');
+      setChatInput(prev => `${prev}${fileMessage}\n`);
+
+      // ファイル情報をAIモデルに送信
+      handleSend(null, false, uploadedFileInfos);
     }
   };
 
