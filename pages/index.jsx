@@ -561,6 +561,7 @@ export default function Home() {
         file_ids: fileIds.length > 0 ? fileIds : undefined, // ファイルIDがある場合のみ送信
       });
 
+
       let result = '';
       for await (const part of stream) {
         if (abortController.signal.aborted) {
