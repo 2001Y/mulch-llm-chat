@@ -238,6 +238,7 @@ header {
   .input-container {
     display: flex;
     align-items: flex-end;
+    align-items: center;
     gap: 1em;
 
     .open-modal-button {
@@ -257,6 +258,12 @@ header {
       &::after {
         content: '△';
       }
+    }
+
+    .file-upload-button {
+      cursor: pointer;
+      font-size: 1.5em;
+      margin-left: 10px;
     }
 
     &.model-select-area {
@@ -434,7 +441,7 @@ header {
       display: flex;
       align-items: flex-start;
       overflow-x: auto;
-      gap: 1em;
+      gap: calc($body-padding * .7);
       padding: 1em 0 1em $body-padding;
       cursor: pointer;
 
@@ -447,8 +454,20 @@ header {
         display: flex;
         flex-direction: column;
         gap: .5em;
-        margin-right: $body-padding;
+        // margin-right: $body-padding;
         cursor: auto;
+
+        &.reply {
+          background-color: rgba(100, 100, 250, 0.1); // リプライメッセージの背景色
+        }
+
+        &.mention {
+          background-color: rgba(250, 250, 100, 0.1); // メンションメッセージの背景色
+        }
+
+        &.unselected {
+          color: rgba(#fff, 0.3);
+        }
 
         p {
           white-space: normal;
@@ -460,6 +479,47 @@ header {
           display: flex;
           justify-content: space-between;
           align-items: center;
+
+          .response-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5em;
+
+            .regenerate-button,
+            .response-select {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 2em;
+              height: 2em;
+              border-radius: 4px;
+              background-color: rgba(255, 255, 255, 0.1);
+              transition: all 0.3s ease;
+              cursor: pointer;
+
+              &:hover {
+                background-color: rgba(255, 255, 255, 0.2);
+                transform: translateY(-2px);
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+              }
+
+              &:active {
+                transform: translateY(0);
+                box-shadow: none;
+              }
+
+              svg {
+                width: 1.2em;
+                height: 1.2em;
+              }
+            }
+
+            .response-select.selected {
+              background-color: #007bff;
+              color: white;
+              border-color: #007bff;
+            }
+          }
         }
       }
     }
@@ -530,7 +590,7 @@ header {
   $border-radius: 5px;
 
   line-height: $line-height-base;
-  color: $color-base;
+  // color: $color-base;
 
   h1,
   h2,
@@ -585,13 +645,9 @@ header {
   blockquote {
     margin: 0.5rem 0;
     padding: 0.25rem 0.5rem;
-    border-left: 4px solid $color-border;
-    background-color: $color-bg-light;
-    color: $color-secondary;
-
-    p {
-      margin: 0;
-    }
+    border-left: 4px solid #808080;
+    background-color: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.8);
   }
 
   code {
@@ -606,11 +662,13 @@ header {
 
   pre {
     background-color: $color-code-bg;
-    padding: 0.5rem;
+    padding: .1em .3rem;
     border-radius: $border-radius;
     overflow-x: auto;
-    overscroll-behavior-block: contain;
+    // overscroll-behavior-block: contain;
     font-family: "JetBrains Mono", monospace;
+    font-size: .8em;
+    line-height: 1.2;
     font-optical-sizing: auto;
     white-space: pre;
     word-wrap: break-word;
@@ -681,14 +739,6 @@ body {
       padding-bottom: $body-padding;
     }
   }
-}
-
-.response.reply {
-  background-color: rgba(100, 100, 250, 0.1); // リプライメッセージの背景色
-}
-
-.response.mention {
-  background-color: rgba(250, 250, 100, 0.1); // メンションメッセージの背景色
 }
 
 textarea[fieldSizing="content"] {

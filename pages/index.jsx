@@ -6,6 +6,7 @@ import OpenAI from "openai";
 import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
+import { encode } from 'base64-arraybuffer';
 
 const isProduction = process.env.NODE_ENV === "production";
 const redirectUri = isProduction ? "https://mulch-llm-chat.vercel.app" : "https://3000.2001y.dev";
@@ -103,7 +104,7 @@ const useOpenAI = (accessToken) => {
   return openai;
 };
 
-const Responses = ({ messages = [], updateMessage, forceScroll }) => {
+const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate }) => {
   const containerRef = useRef(null);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
   const [lastManualScrollTop, setLastManualScrollTop] = useState(0);
@@ -181,46 +182,62 @@ const Responses = ({ messages = [], updateMessage, forceScroll }) => {
     }
   };
 
-  const handleSelectResponse = (messageIndex, responseIndex) => {
+  const handleSelectResponse = useCallback((messageIndex, responseIndex) => {
     updateMessage(messageIndex, responseIndex, undefined, null, true);
-  };
+  }, [updateMessage]);
 
   return (
     <div className="responses-container" ref={containerRef} translate="no">
-      {Array.isArray(messages) && messages.map((message, messageIndex) => (
-        <div key={messageIndex} className="message-block">
-          <div className="user">
-            <p contentEditable onBlur={(e) => handleEdit(messageIndex, null, e.target.textContent)}>
-              {message.user}
-            </p>
-          </div>
-          <div className="scroll_area">
-            {Array.isArray(message.llm) && message.llm.map((response, responseIndex) => (
-              <div key={responseIndex} className={`response ${response.role}`}>
-                <div className="meta">
-                  <small>{response.model}</small>
-                  <input
-                    type="checkbox"
-                    checked={response.selected || false}
-                    onChange={() => handleSelectResponse(messageIndex, responseIndex)}
+      {Array.isArray(messages) && messages.map((message, messageIndex) => {
+        const selectedResponses = message.llm.filter(r => r.selected).sort((a, b) => a.selectedOrder - b.selectedOrder);
+        const hasSelectedResponse = selectedResponses.length > 0;
+        return (
+          <div key={messageIndex} className="message-block">
+            <div className="user">
+              <p contentEditable onBlur={(e) => handleEdit(messageIndex, null, e.target.textContent)}>
+                {message.user}
+              </p>
+            </div>
+            <div className="scroll_area">
+              {Array.isArray(message.llm) && message.llm.map((response, responseIndex) => (
+                <div key={responseIndex} className={`response ${response.role} ${hasSelectedResponse && !response.selected ? 'unselected' : ''}`}>
+                  <div className="meta">
+                    <small>{response.model}</small>
+                    <div className="response-controls">
+                      <button
+                        className="regenerate-button"
+                        onClick={() => handleRegenerate(messageIndex, responseIndex, response.model)}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
+                        </svg>
+                      </button>
+                      <div
+                        className={`response-select ${response.selected ? 'selected' : ''}`}
+                        onClick={() => handleSelectResponse(messageIndex, responseIndex)}
+                      >
+                        {response.selected ?
+                          (selectedResponses.findIndex(r => r === response) + 1)
+                          : ''}
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    className="markdown-content"
+                    contentEditable
+                    onBlur={(e) => handleEdit(messageIndex, responseIndex, e.target.innerHTML)}
+                    dangerouslySetInnerHTML={{ __html: response.text }}
                   />
                 </div>
-                <div
-                  className="markdown-content"
-                  contentEditable
-                  onBlur={(e) => handleEdit(messageIndex, responseIndex, e.target.innerHTML)}
-                  dangerouslySetInnerHTML={{ __html: response.text }}
-                />
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
 
-const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop, openModal, isGenerating, selectedModels, setSelectedModels, showResetButton, handleReset }) => {
+const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop, openModal, isGenerating, selectedModels, setSelectedModels, showResetButton, handleReset, handleFileUpload }) => {
   const [isComposing, setIsComposing] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
@@ -362,7 +379,7 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
     <section className="input-section">
       {showResetButton && (
         <button className="reset-button" onClick={handleReset}>
-          Start New Chat
+          Clear Chat
         </button>
       )}
       <div className="input-container model-select-area">
@@ -382,6 +399,16 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
         ))}
       </div>
       <div className="input-container chat-input-area">
+        <input
+          type="file"
+          id="file-upload"
+          style={{ display: 'none' }}
+          onChange={handleFileUpload}
+          multiple
+        />
+        <label htmlFor="file-upload" className="file-upload-button">
+          📎
+        </label>
         <textarea
           ref={inputRef}
           value={chatInput}
@@ -437,44 +464,57 @@ export default function Home() {
   const [abortControllers, setAbortControllers] = useState([]);
   const [selectedModels, setSelectedModels] = useState(models);
   const [showResetButton, setShowResetButton] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
 
   const router = useRouter();
   useEffect(() => {
-    if (!accessToken) {
-      console.log('No Login')
-      if (demoAccessToken) {
-        setModels(demoModels);
-        setSelectedModels(demoModels);
-      } else {
-        router.replace('/login');
-      }
+    if (accessToken) {
+      setSelectedModels(models);
+    } else {
+      setSelectedModels(demoModels);
     }
-  }, [accessToken, demoAccessToken]);
+  }, [accessToken, models, demoModels]);
+  useEffect(() => {
+    setIsLoggedIn(!!accessToken);
+  }, [accessToken]);
 
-  const updateMessage = (messageIndex, responseIndex, text, selectedIndex, toggleSelected) => {
+  const updateMessage = useCallback((messageIndex, responseIndex, text, selectedIndex, toggleSelected) => {
     setMessages(prevMessages => {
-      if (!Array.isArray(prevMessages)) return [];
-
-      const newMessages = [...prevMessages];
-      if (responseIndex === null && text !== undefined) {
-        newMessages[messageIndex].user = text;
-      } else if (responseIndex !== undefined) {
+      const newMessages = JSON.parse(JSON.stringify(prevMessages));
+      if (responseIndex !== undefined) {
         if (text !== undefined) {
           newMessages[messageIndex].llm[responseIndex].text = text;
         }
         if (toggleSelected) {
-          newMessages[messageIndex].llm[responseIndex].selected = !newMessages[messageIndex].llm[responseIndex].selected;
+          const currentResponse = newMessages[messageIndex].llm[responseIndex];
+          if (currentResponse.selected) {
+            currentResponse.selected = false;
+            delete currentResponse.selectedOrder;
+            // 他の選択されたレスポンスの順序を更新
+            newMessages[messageIndex].llm.forEach(response => {
+              if (response.selected && response.selectedOrder > currentResponse.selectedOrder) {
+                response.selectedOrder--;
+              }
+            });
+          } else {
+            const selectedCount = newMessages[messageIndex].llm.filter(r => r.selected).length;
+            currentResponse.selected = true;
+            currentResponse.selectedOrder = selectedCount + 1;
+          }
         }
       }
       return newMessages;
     });
-  };
+  }, []);
 
   const fetchChatResponse = useCallback(async (model, messageIndex, responseIndex, abortController, inputText) => {
     try {
       const pastMessages = messages.flatMap(msg => {
         const userMessage = { role: 'user', content: msg.user };
-        const selectedResponses = msg.llm.filter(llm => llm.selected);
+        const selectedResponses = msg.llm
+          .filter(llm => llm.selected)
+          .sort((a, b) => a.selectedOrder - b.selectedOrder);
 
         if (selectedResponses.length > 0) {
           return [userMessage, ...selectedResponses.map(llm => ({ role: 'assistant', content: llm.text }))];
@@ -483,6 +523,8 @@ export default function Home() {
           return modelResponse ? [userMessage, { role: 'assistant', content: modelResponse.text }] : [userMessage];
         }
       });
+
+      console.log('モデルに送信する過去の会話:', pastMessages);
 
       const stream = await openai.chat.completions.create({
         model,
@@ -515,10 +557,14 @@ export default function Home() {
     }
   }, [messages, openai]);
 
-  const handleSend = async (event, isPrimaryOnly = false) => {
+  const handleSend = async (event, isPrimaryOnly = false, fileContents = null) => {
     if (isGenerating) return;
 
     let inputText = chatInput;
+    if (fileContents) {
+      inputText += "\n[添付ファイル情報]\n" + JSON.stringify(fileContents, null, 2);
+    }
+
     const modelsToUse = isPrimaryOnly ? [selectedModels[0]] : selectedModels;
 
     setIsGenerating(true);
@@ -529,7 +575,7 @@ export default function Home() {
     setMessages(prevMessages => {
       const currentMessages = Array.isArray(prevMessages) ? prevMessages : [];
       const newMessage = {
-        user: chatInput,
+        user: inputText,
         llm: modelsToUse.map((model, index) => ({
           role: 'assistant',
           model,
@@ -543,7 +589,6 @@ export default function Home() {
       });
       setIsAutoScroll(true);
 
-      // 初めてメッセージが送信されたらリセットボタンを表示
       if (currentMessages.length === 0) {
         setShowResetButton(true);
       }
@@ -551,7 +596,7 @@ export default function Home() {
       return newMessages;
     });
 
-    // メッセージ送信後、次のレンダリングサイクルで強制スクロールを無効にする
+    setChatInput('');
     setTimeout(() => setForceScroll(false), 100);
   };
 
@@ -651,6 +696,55 @@ export default function Home() {
     setMessages([]);
   };
 
+  const handleFileUpload = async (event) => {
+    const files = Array.from(event.target.files);
+    const formData = new FormData();
+
+    files.forEach((file) => {
+      formData.append('file', file);
+      formData.append('purpose', 'assistants');
+    });
+
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/files', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      const result = await response.json();
+      console.log('File uploaded:', result);
+
+      // Add the uploaded file to the chat input
+      const fileMessage = `File "${file.name}" uploaded successfully. File ID: ${result.id}`;
+      setChatInput((prevInput) => `${prevInput}${fileMessage}\n`);
+
+      // Send the file information to the AI model
+      handleSend(null, false, [{ id: result.id, name: file.name }]);
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      // Add an error message to the chat input
+      const errorMessage = `Error uploading file "${file.name}": ${error.message}`;
+      setChatInput((prevInput) => `${prevInput}${errorMessage}\n`);
+    }
+  };
+
+  const handleRegenerate = async (messageIndex, responseIndex, model) => {
+    const inputText = messages[messageIndex].user;
+    const abortController = new AbortController();
+    setAbortControllers([abortController]);
+    setIsGenerating(true);
+
+    try {
+      await fetchChatResponse(model, messageIndex, responseIndex, abortController, inputText);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
     <>
       <Head>
@@ -676,7 +770,7 @@ export default function Home() {
           </h1>
         </div>
         <div className="header-side">
-          {accessToken ? (
+          {isLoggedIn ? (
             <button onClick={handleLogout}>
               Logout
             </button>
@@ -692,11 +786,16 @@ export default function Home() {
             </svg>
           </div>
         </div>
-        {!accessToken && <div className="free-version">Free Version</div>}
+        {!isLoggedIn && <div className="free-version">Free Version</div>}
       </header >
-      <Responses messages={messages} updateMessage={updateMessage} forceScroll={forceScroll} />
+      <Responses
+        messages={messages}
+        updateMessage={updateMessage}
+        forceScroll={forceScroll}
+        handleRegenerate={handleRegenerate}
+      />
       <InputSection
-        models={accessToken ? models : demoModels}
+        models={isLoggedIn ? models : demoModels}
         chatInput={chatInput}
         setChatInput={setChatInput}
         handleSend={handleSend}
@@ -707,10 +806,11 @@ export default function Home() {
         setSelectedModels={setSelectedModels}
         showResetButton={showResetButton}
         handleReset={handleReset}
+        handleFileUpload={handleFileUpload}
       />
       <ModelInputModal
-        models={accessToken ? models : demoModels}
-        setModels={accessToken ? setModels : setDemoModels}
+        models={isLoggedIn ? models : demoModels}
+        setModels={isLoggedIn ? setModels : () => { }}
         isModalOpen={isModalOpen}
         closeModal={closeModal}
       />
