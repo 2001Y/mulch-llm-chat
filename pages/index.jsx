@@ -6,7 +6,6 @@ import OpenAI from "openai";
 import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
-import { encode } from 'base64-arraybuffer';
 
 const isProduction = process.env.NODE_ENV === "production";
 const redirectUri = isProduction ? "https://mulch-llm-chat.vercel.app" : "https://3000.2001y.dev";
@@ -239,7 +238,7 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
   );
 };
 
-const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop, openModal, isGenerating, selectedModels, setSelectedModels, showResetButton, handleReset, handleFileUpload }) => {
+const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop, openModal, isGenerating, selectedModels, setSelectedModels, showResetButton, handleReset }) => {
   const [isComposing, setIsComposing] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
@@ -421,16 +420,6 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
         ))}
       </div>
       <div className="input-container chat-input-area">
-        <input
-          type="file"
-          id="file-upload"
-          style={{ display: 'none' }}
-          onChange={handleFileUpload}
-          multiple
-        />
-        <label htmlFor="file-upload" className="file-upload-button">
-          📎
-        </label>
         <textarea
           ref={inputRef}
           value={chatInput}
@@ -547,9 +536,6 @@ export default function Home() {
 
       console.log('モデルに送信する過去の会話:', pastMessages);
 
-      const currentMessage = messages[messageIndex];
-      const fileIds = currentMessage.attachedFiles?.map(file => file.id) || [];
-
       const stream = await openai.chat.completions.create({
         model,
         messages: [
@@ -558,9 +544,7 @@ export default function Home() {
         ],
         stream: true,
         signal: abortController.signal,
-        file_ids: fileIds.length > 0 ? fileIds : undefined, // ファイルIDがある場合のみ送信
       });
-
 
       let result = '';
       for await (const part of stream) {
@@ -583,17 +567,10 @@ export default function Home() {
     }
   }, [messages, openai]);
 
-  const handleSend = async (event, isPrimaryOnly = false, fileInfos = null) => {
+  const handleSend = async (event, isPrimaryOnly = false) => {
     if (isGenerating) return;
 
     let inputText = chatInput;
-    if (fileInfos) {
-      const fileDetails = fileInfos.map(file =>
-        `File: ${file.name} (ID: ${file.id}, Type: ${file.type}, Size: ${file.size} bytes)`
-      ).join('\n');
-      inputText += `\n[Attached Files]\n${fileDetails}`;
-    }
-
     const modelsToUse = isPrimaryOnly ? [selectedModels[0]] : selectedModels;
 
     setIsGenerating(true);
@@ -610,8 +587,7 @@ export default function Home() {
           model,
           text: '',
           selected: false
-        })),
-        attachedFiles: fileInfos // 添付ファイル情報を保存
+        }))
       };
       const newMessages = [...currentMessages, newMessage];
       newMessage.llm.forEach((response, index) => {
@@ -851,7 +827,6 @@ export default function Home() {
         setSelectedModels={setSelectedModels}
         showResetButton={showResetButton}
         handleReset={handleReset}
-        handleFileUpload={handleFileUpload}
       />
       <ModelInputModal
         models={isLoggedIn ? models : demoModels}
