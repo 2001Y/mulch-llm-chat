@@ -441,6 +441,66 @@ header {
 
       p {
         white-space: pre-wrap;
+        position: relative;
+
+        &.edited {
+          +.reset-regenerate-button-area {
+            display: flex;
+          }
+        }
+      }
+
+      .shortcut {
+        display: none;
+        margin-right: .5em;
+      }
+
+      &.editing {
+        p {
+          outline: none;
+          background-color: rgba(255, 255, 255, .3);
+          border-radius: 4px;
+          padding: 8px;
+        }
+
+        .shortcut {
+          display: inline-block;
+        }
+      }
+
+      &.edited {
+        .reset-regenerate-button-area {
+          display: flex;
+        }
+      }
+
+      .reset-regenerate-button-area {
+        display: none;
+
+        button {
+          font-size: 0.8em;
+          padding: 0.5em 1em;
+          background-color: mix(#fff, #000, 10%);
+          color: mix(#fff, #000, 70%);
+          border-radius: $border-radius;
+          margin-top: 0.5em;
+          transition: background-color 0.3s, color 0.3s;
+
+          &:hover {
+            background-color: mix(#fff, #000, 15%);
+            color: #fff;
+          }
+
+          &.reset-regenerate-button {
+            margin-right: 0.5em;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+
+            &:hover {
+              background-color: mix(#fff, #000, 20%);
+              border-color: rgba(255, 255, 255, 0.4);
+            }
+          }
+        }
       }
     }
 

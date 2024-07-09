@@ -6,6 +6,8 @@ import OpenAI from "openai";
 import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
+import classNames from "classnames";
+
 
 const isProduction = process.env.NODE_ENV === "production";
 const redirectUri = isProduction ? "https://mulch-llm-chat.vercel.app" : "https://3000.2001y.dev";
@@ -103,7 +105,7 @@ const useOpenAI = (accessToken) => {
   return openai;
 };
 
-const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate }) => {
+const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate, handleResetAndRegenerate }) => {
   const containerRef = useRef(null);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
   const [lastManualScrollTop, setLastManualScrollTop] = useState(0);
@@ -174,6 +176,7 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
       // ユーザーメッセージの編集
       const newMessages = [...messages];
       newMessages[messageIndex].user = newContent;
+      newMessages[messageIndex].edited = true; // 編集フラグを追加
       updateMessage(newMessages);
     } else {
       // AIの応答の編集
@@ -185,17 +188,56 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
     updateMessage(messageIndex, responseIndex, undefined, null, true);
   }, [updateMessage]);
 
+  const handleFocus = (event) => {
+    const userDiv = event.target.closest('.user');
+    if (userDiv) {
+      userDiv.classList.add("edit");
+    }
+  };
   return (
     <div className="responses-container" ref={containerRef} translate="no">
       {Array.isArray(messages) && messages.map((message, messageIndex) => {
         const selectedResponses = message.llm.filter(r => r.selected).sort((a, b) => a.selectedOrder - b.selectedOrder);
         const hasSelectedResponse = selectedResponses.length > 0;
         return (
-          <div key={messageIndex} className="message-block">
+          <div key={messageIndex} className="message-block" >
             <div className="user">
-              <p contentEditable onBlur={(e) => handleEdit(messageIndex, null, e.target.textContent)}>
+              <p
+                contentEditable
+                onFocus={(e) => {
+                  e.target.parentElement.classList.toggle('editing', true);
+                }}
+                onBlur={(e) => {
+                  e.target.parentElement.classList.toggle('editing', false);
+                  handleEdit(messageIndex, null, e.target.textContent);
+                }}
+                onInput={(e) => {
+                  const isEdited = e.target.textContent !== message.user;
+                  e.target.parentElement.classList.toggle('edited', isEdited);
+                }}
+                onKeyDown={(e) => {
+                  if (e.metaKey || e.ctrlKey) {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleResetAndRegenerate(messageIndex)
+                    }
+                  }
+                }}
+                suppressContentEditableWarning={true}
+              >
                 {message.user}
               </p>
+              <div className="reset-regenerate-button-area">
+                <button
+                  onClick={() => handleResetAndRegenerate(messageIndex)}
+                  className="reset-regenerate-button"
+                >
+                  <span className="shortcut">[⌘+Enter]</span>Yes, All Regenerate
+                </button>
+                <button>
+                  <span className="shortcut">[⌘+Delete]</span>No Regenerate
+                </button>
+              </div>
             </div>
             <div className="scroll_area">
               {Array.isArray(message.llm) && message.llm.map((response, responseIndex) => (
@@ -234,7 +276,7 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
           </div>
         );
       })}
-    </div>
+    </div >
   );
 };
 
@@ -766,6 +808,46 @@ export default function Home() {
     }
   };
 
+  const handleResetAndRegenerate = async (messageIndex) => {
+    setIsGenerating(true);
+    setForceScroll(true);
+
+    // メッセージブロックを取得
+    const messageBlock = document.querySelector(`.message-block:nth-child(${messageIndex + 1})`);
+    if (messageBlock) {
+      const userDiv = messageBlock.querySelector('.user');
+      if (userDiv) {
+        userDiv.classList.remove('edited');
+        const contentEditableElement = userDiv.querySelector('[contenteditable]');
+        if (contentEditableElement) {
+          contentEditableElement.blur();
+        }
+      }
+    }
+
+    const newMessages = [...messages];
+    const userMessage = newMessages[messageIndex].user;
+    newMessages.splice(messageIndex + 1);
+    newMessages[messageIndex].llm = selectedModels.map(model => ({
+      role: 'assistant',
+      model,
+      text: '',
+      selected: false
+    }));
+
+    setMessages(newMessages);
+
+    const newAbortControllers = selectedModels.map(() => new AbortController());
+    setAbortControllers(newAbortControllers);
+
+    newMessages[messageIndex].llm.forEach((response, index) => {
+      fetchChatResponse(response.model, messageIndex, index, newAbortControllers[index], userMessage);
+    });
+
+    setIsAutoScroll(true);
+    setTimeout(() => setForceScroll(false), 100);
+  };
+
   return (
     <>
       <Head>
@@ -814,6 +896,7 @@ export default function Home() {
         updateMessage={updateMessage}
         forceScroll={forceScroll}
         handleRegenerate={handleRegenerate}
+        handleResetAndRegenerate={handleResetAndRegenerate}
       />
       <InputSection
         models={isLoggedIn ? models : demoModels}
