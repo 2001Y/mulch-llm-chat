@@ -2,7 +2,7 @@ export default function handler(req, res) {
   const manifest = {
     name: "Mulch AI Chat",
     short_name: "Mulch AI Chat",
-    start_url: req.url,
+    start_url: req.query.url || '/',
     display: "standalone",
     background_color: "#000000",
     theme_color: "#000000",

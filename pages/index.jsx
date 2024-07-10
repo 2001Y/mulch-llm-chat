@@ -545,8 +545,16 @@ export default function Home() {
   const [showResetButton, setShowResetButton] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [manifestUrl, setManifestUrl] = useState('/api/manifest.json');
 
   const router = useRouter();
+
+
+  useEffect(() => {
+    // クライアントサイドでのみ実行
+    const currentUrl = window.location.href;
+    setManifestUrl(`/api/manifest.json?url=${encodeURIComponent(currentUrl)}`);
+  }, []);
 
   useEffect(() => {
     if (accessToken) {
@@ -907,7 +915,7 @@ export default function Home() {
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
         <meta name="theme-color" content="#000000" />
-        <link rel="manifest" href={`/api/manifest.json?${new URLSearchParams(router.query).toString()}`} />
+        <link rel="manifest" href={manifestUrl} />
         <link rel="icon" href="https://mulch-llm-chat.vercel.app/apple-touch-icon.jpg" />
         <link rel="apple-touch-icon" href="https://mulch-llm-chat.vercel.app/apple-touch-icon.jpg" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
