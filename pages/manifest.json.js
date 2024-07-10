@@ -19,17 +19,9 @@ export async function getServerSideProps(context) {
         ]
     };
 
-    return {
-        props: {
-            manifest
-        }
-    };
-}
+    context.res.setHeader('Content-Type', 'application/json');
+    context.res.write(JSON.stringify(manifest));
+    context.res.end();
 
-export default function Manifest({ manifest }) {
-    return (
-        <div>
-            <pre>{JSON.stringify(manifest, null, 2)}</pre>
-        </div>
-    );
+    return { props: {} };
 }

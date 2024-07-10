@@ -1,14 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  async rewrites() {
-    return [
-      {
-        source: '/manifest.json',
-        destination: '/manifest.json.js'
-      }
-    ];
-  }
+  reactStrictMode: true
 };
 
 export default nextConfig;
