@@ -52,6 +52,13 @@ const useLocalStorage = (key, initialValue) => {
 
 const useAccessToken = () => {
   const [accessToken, setAccessToken] = useLocalStorage('accessToken', '');
+  const [previousAccessToken, setPreviousAccessToken] = useState(accessToken);
+
+  useEffect(() => {
+    if (accessToken !== previousAccessToken) {
+      setPreviousAccessToken(accessToken);
+    }
+  }, [accessToken, previousAccessToken]);
 
   useEffect(() => {
     const fetchAccessToken = async (code) => {
@@ -78,13 +85,12 @@ const useAccessToken = () => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
-      const ssnb = urlParams.get('ssnb'); // 新たなパラメータを取得
+      const ssnb = urlParams.get('ssnb');
 
       if (code && !accessToken) {
         fetchAccessToken(code);
       }
 
-      // ssnbが存在する場合、新たな環境変数からアクセストークンを取得
       if (ssnb) {
         const newAccessToken = process.env.NEXT_PUBLIC_SSNB;
         setAccessToken(newAccessToken);
@@ -92,7 +98,7 @@ const useAccessToken = () => {
     }
   }, [accessToken]);
 
-  return [accessToken, setAccessToken];
+  return [accessToken, setAccessToken, previousAccessToken];
 };
 
 const useOpenAI = (accessToken) => {
@@ -533,7 +539,7 @@ export default function Home({ manifestUrl }) {
   const [demoModels, setDemoModels] = useState(['google/gemma-2-9b-it:free', "google/gemma-7b-it:free", "meta-llama/llama-3-8b-instruct:free", "openchat/openchat-7b:free"]);
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState([]);
-  const [accessToken, setAccessToken] = useAccessToken();
+  const [accessToken, setAccessToken, previousAccessToken] = useAccessToken();
   const [demoAccessToken, setDemoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO || '');
   const openai = useOpenAI(accessToken || demoAccessToken);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -547,6 +553,13 @@ export default function Home({ manifestUrl }) {
   const [uploadedFiles, setUploadedFiles] = useState([]);
 
   const router = useRouter();
+
+  useEffect(() => {
+    if (accessToken !== previousAccessToken) {
+      // アクセストークンが変更された場合、modelsをリセット
+      setModels(['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'cohere/command-r-plus', "meta-llama/llama-3-70b-instruct"]);
+    }
+  }, [accessToken, previousAccessToken, setModels]);
 
   useEffect(() => {
     if (accessToken) {
