@@ -907,7 +907,7 @@ export default function Home() {
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
         <meta name="theme-color" content="#000000" />
-        <link rel="manifest" href="/api/manifest.json" />
+        <link rel="manifest" href={`/api/manifest.json?${new URLSearchParams(router.query).toString()}`} />
         <link rel="icon" href="https://mulch-llm-chat.vercel.app/apple-touch-icon.jpg" />
         <link rel="apple-touch-icon" href="https://mulch-llm-chat.vercel.app/apple-touch-icon.jpg" />
         <meta name="apple-mobile-web-app-capable" content="yes" />

@@ -1,11 +1,8 @@
 export default function handler(req, res) {
-  const { query } = req;
-  const startUrl = new URL('/?' + new URLSearchParams(query), 'https://mulch-llm-chat.vercel.app');
-
   const manifest = {
     name: "Mulch AI Chat",
     short_name: "Mulch AI Chat",
-    start_url: startUrl.toString(),
+    start_url: req.url,
     display: "standalone",
     background_color: "#000000",
     theme_color: "#000000",
