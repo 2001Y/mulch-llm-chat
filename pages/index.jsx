@@ -528,7 +528,7 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
   );
 };
 
-export default function Home() {
+export default function Home({ manifestUrl }) {
   const [models, setModels] = useLocalStorage('models', ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'cohere/command-r-plus', "meta-llama/llama-3-70b-instruct"]);
   const [demoModels, setDemoModels] = useState(['google/gemma-2-9b-it:free', "google/gemma-7b-it:free", "meta-llama/llama-3-8b-instruct:free", "openchat/openchat-7b:free"]);
   const [chatInput, setChatInput] = useState('');
@@ -545,16 +545,8 @@ export default function Home() {
   const [showResetButton, setShowResetButton] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
-  const [manifestUrl, setManifestUrl] = useState('/api/manifest.json');
 
   const router = useRouter();
-
-
-  useEffect(() => {
-    // クライアントサイドでのみ実行
-    const currentUrl = window.location.href;
-    setManifestUrl(`/api/manifest.json?url=${encodeURIComponent(currentUrl)}`);
-  }, []);
 
   useEffect(() => {
     if (accessToken) {
@@ -981,4 +973,17 @@ export default function Home() {
       />
     </>
   );
+}
+
+export async function getServerSideProps(context) {
+  const baseUrl = context.req.headers.host;
+  const protocol = context.req.headers['x-forwarded-proto'] || 'http';
+  const fullUrl = `${protocol}://${baseUrl}${context.resolvedUrl}`;
+  const manifestUrl = `/api/manifest.json?url=${encodeURIComponent(fullUrl)}`;
+
+  return {
+    props: {
+      manifestUrl,
+    },
+  };
 }
