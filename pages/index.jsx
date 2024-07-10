@@ -78,9 +78,16 @@ const useAccessToken = () => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
+      const ssnb = urlParams.get('ssnb'); // 新たなパラメータを取得
 
       if (code && !accessToken) {
         fetchAccessToken(code);
+      }
+
+      // ssnbが存在する場合、新たな環境変数からアクセストークンを取得
+      if (ssnb) {
+        const newAccessToken = process.env.NEXT_PUBLIC_SSNB;
+        setAccessToken(newAccessToken);
       }
     }
   }, [accessToken]);
@@ -105,7 +112,12 @@ const useOpenAI = (accessToken) => {
   return openai;
 };
 
-const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate, handleResetAndRegenerate }) => {
+const useMessages = () => {
+  const [messages, setMessages] = useLocalStorage('messages', []);
+  return [messages, setMessages];
+};
+
+const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate, handleResetAndRegenerate, handleStop }) => {
   const containerRef = useRef(null);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
   const [lastManualScrollTop, setLastManualScrollTop] = useState(0);
@@ -188,12 +200,10 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
     updateMessage(messageIndex, responseIndex, undefined, null, true);
   }, [updateMessage]);
 
-  const handleFocus = (event) => {
-    const userDiv = event.target.closest('.user');
-    if (userDiv) {
-      userDiv.classList.add("edit");
-    }
+  const handleSaveOnly = (messageIndex) => {
+    updateMessage(messageIndex, null, null, null, false, true);
   };
+
   return (
     <div className="responses-container" ref={containerRef} translate="no">
       {Array.isArray(messages) && messages.map((message, messageIndex) => {
@@ -230,12 +240,18 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
               <div className="reset-regenerate-button-area">
                 <button
                   onClick={() => handleResetAndRegenerate(messageIndex)}
-                  className="reset-regenerate-button"
+                  className="reset-regenerate-button icon-button"
                 >
-                  <span className="shortcut">[⌘+Enter]</span>Yes, All Regenerate
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
+                  </svg>
+                  <span className="shortcut">[⌘+Enter]</span>
                 </button>
-                <button>
-                  <span className="shortcut">[⌘+Delete]</span>No Regenerate
+                <button
+                  className="saveOnly-button"
+                  onClick={() => handleSaveOnly(messageIndex)}
+                >
+                  <span className="shortcut">[⌘+Delete]</span>
                 </button>
               </div>
             </div>
@@ -246,11 +262,21 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
                     <small>{response.model}</small>
                     <div className="response-controls">
                       <button
-                        className="regenerate-button"
-                        onClick={() => handleRegenerate(messageIndex, responseIndex, response.model)}>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
-                        </svg>
+                        className={response.isGenerating ? "stop-button" : "regenerate-button"}
+                        onClick={() => response.isGenerating
+                          ? handleStop(messageIndex, responseIndex)
+                          : handleRegenerate(messageIndex, responseIndex, response.model)
+                        }
+                      >
+                        {response.isGenerating ? (
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                            <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+                          </svg>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
+                          </svg>
+                        )}
                       </button>
                       <div
                         className={`response-select ${response.selected ? 'selected' : ''}`}
@@ -508,7 +534,7 @@ export default function Home() {
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState([]);
   const [accessToken, setAccessToken] = useAccessToken();
-  const [demoAccessToken, setDemoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO_API_KEY || '');
+  const [demoAccessToken, setDemoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO || '');
   const openai = useOpenAI(accessToken || demoAccessToken);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
@@ -521,6 +547,7 @@ export default function Home() {
   const [uploadedFiles, setUploadedFiles] = useState([]);
 
   const router = useRouter();
+
   useEffect(() => {
     if (accessToken) {
       setSelectedModels(models);
@@ -528,6 +555,7 @@ export default function Home() {
       setSelectedModels(demoModels);
     }
   }, [accessToken, models, demoModels]);
+
   useEffect(() => {
     setIsLoggedIn(!!accessToken);
   }, [accessToken]);
@@ -563,6 +591,12 @@ export default function Home() {
 
   const fetchChatResponse = useCallback(async (model, messageIndex, responseIndex, abortController, inputText) => {
     try {
+      // レスポンスの生成状態を更新
+      setMessages(prevMessages => {
+        const newMessages = [...prevMessages];
+        newMessages[messageIndex].llm[responseIndex].isGenerating = true;
+        return newMessages;
+      });
       const pastMessages = messages.flatMap(msg => {
         const userMessage = { role: 'user', content: msg.user };
         const selectedResponses = msg.llm
@@ -605,6 +639,13 @@ export default function Home() {
         console.log(messages);
       }
     } finally {
+      // レスポンスの生成状態を更新
+      setMessages(prevMessages => {
+        const newMessages = [...prevMessages];
+        newMessages[messageIndex].llm[responseIndex].isGenerating = false;
+        return newMessages;
+      });
+      setIsGenerating(false);
       setIsGenerating(false);
     }
   }, [messages, openai]);
@@ -653,17 +694,29 @@ export default function Home() {
     setShowResetButton(false);
   };
 
-  const handleStop = () => {
-    console.log('Stopping generation');
-    abortControllers.forEach(controller => {
-      try {
-        controller.abort();
-      } catch (error) {
-        console.error('Error while aborting:', error);
-      }
-    });
-    setIsGenerating(false);
+  // const handleStop = () => {
+  //   console.log('Stopping generation');
+  //   abortControllers.forEach(controller => {
+  //     try {
+  //       controller.abort();
+  //     } catch (error) {
+  //       console.error('Error while aborting:', error);
+  //     }
+  //   });
+  //   setIsGenerating(false);
+  // };
+  const handleStop = (messageIndex, responseIndex) => {
+    const controller = abortControllers[responseIndex];
+    if (controller) {
+      controller.abort();
+      setMessages(prevMessages => {
+        const newMessages = [...prevMessages];
+        newMessages[messageIndex].llm[responseIndex].isGenerating = false;
+        return newMessages;
+      });
+    }
   };
+
 
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
@@ -897,6 +950,7 @@ export default function Home() {
         forceScroll={forceScroll}
         handleRegenerate={handleRegenerate}
         handleResetAndRegenerate={handleResetAndRegenerate}
+        handleStop={handleStop}
       />
       <InputSection
         models={isLoggedIn ? models : demoModels}
