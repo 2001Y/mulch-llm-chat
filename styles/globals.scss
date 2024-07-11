@@ -254,7 +254,7 @@ header {
 
     &.model-select-area {
       color: mix(#fff, #000, 70%);
-      display: flex;
+      // display: flex;
       gap: .5em;
       width: 100vw;
       margin: 0 calc(50% - 50vw);
@@ -458,6 +458,13 @@ header {
 
     .model-select-area,
     .input-actions {
+      display: flex;
+    }
+  }
+
+  &.focused {
+
+    .model-select-area {
       display: flex;
     }
   }

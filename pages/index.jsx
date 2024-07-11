@@ -338,10 +338,16 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
 
     const handleFocus = () => {
       document.body.dataset.inputFocused = 'true';
+      if (sectionRef.current) {
+        sectionRef.current.classList.add('focused');
+      }
     };
 
     const handleBlur = () => {
       document.body.dataset.inputFocused = 'false';
+      if (sectionRef.current) {
+        sectionRef.current.classList.remove('focused');
+      }
     };
 
     if (inputRef.current) {
