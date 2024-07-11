@@ -1,15 +1,11 @@
 import { useRef, useState, useEffect, useCallback } from "react";
-import Head from "next/head";
 import Image from "next/image";
+import Head from "next/head";
 import { useRouter } from "next/router";
 import OpenAI from "openai";
 import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
-import classNames from "classnames";
-
-
-const isProduction = process.env.NODE_ENV === "production";
 
 marked.use(
   markedHighlight({
@@ -22,24 +18,31 @@ marked.use(
 );
 
 const useLocalStorage = (key, initialValue) => {
-  const [storedValue, setStoredValue] = useState(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const item = localStorage.getItem(key);
-        return item ? JSON.parse(item) : initialValue;
-      } catch (error) {
-        console.error('Error reading from localStorage:', error);
-        return initialValue;
+  const [storedValue, setStoredValue] = useState(initialValue);
+  const isInitialized = useRef(false);
+
+  useEffect(() => {
+    if (!isInitialized.current) {
+      if (typeof window !== 'undefined') {
+        try {
+          const item = localStorage.getItem(key);
+          if (item) {
+            setStoredValue(JSON.parse(item));
+          }
+        } catch (error) {
+          console.error('Error reading from localStorage:', error);
+        }
       }
+      isInitialized.current = true;
     }
-    return initialValue;
-  });
+  }, [key]);
 
   const setValue = (value) => {
     try {
-      setStoredValue(value);
+      const valueToStore = value instanceof Function ? value(storedValue) : value;
+      setStoredValue(valueToStore);
       if (typeof window !== 'undefined') {
-        localStorage.setItem(key, JSON.stringify(value));
+        localStorage.setItem(key, JSON.stringify(valueToStore));
       }
     } catch (error) {
       console.error('Error writing to localStorage:', error);
@@ -117,11 +120,6 @@ const useOpenAI = (accessToken) => {
   return openai;
 };
 
-const useMessages = () => {
-  const [messages, setMessages] = useLocalStorage('messages', []);
-  return [messages, setMessages];
-};
-
 const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate, handleResetAndRegenerate, handleStop, handleSend, models, chatInput, setChatInput, openModal, isGenerating, selectedModels, setSelectedModels, showResetButton, handleReset }) => {
   const containerRef = useRef(null);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
@@ -158,8 +156,8 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
   }, [lastManualScrollTop]);
 
   useEffect(() => {
-    let scrollTimer;
-    const scrollInterval = 500; // スクロール更新の間隔（ミリ秒）
+    let scrollInterval;
+    const scrollIntervalTime = 300; // スクロール更新の間隔（ミリ秒）
 
     const scrollToBottom = () => {
       if ((isAutoScroll || forceScroll) && containerRef.current) {
@@ -176,17 +174,20 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
       }
     };
 
-    const scheduleScroll = () => {
-      clearTimeout(scrollTimer);
-      scrollTimer = setTimeout(scrollToBottom, scrollInterval);
-    };
-
-    scheduleScroll();
+    // ストリーミング中は定期的にスクロールを実行
+    if (isGenerating) {
+      scrollInterval = setInterval(scrollToBottom, scrollIntervalTime);
+    } else {
+      // ストリーミングが終了したら最後に一度スクロール
+      scrollToBottom();
+    }
 
     return () => {
-      clearTimeout(scrollTimer);
+      if (scrollInterval) {
+        clearInterval(scrollInterval);
+      }
     };
-  }, [messages, isAutoScroll, lastAutoScrollTop, forceScroll]);
+  }, [messages, isAutoScroll, lastAutoScrollTop, forceScroll, isGenerating]);
 
   const handleEdit = (messageIndex, responseIndex, newContent) => {
     if (responseIndex === null) {
@@ -623,7 +624,6 @@ export default function Home({ manifestUrl }) {
   const [selectedModels, setSelectedModels] = useState(models);
   const [showResetButton, setShowResetButton] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState([]);
 
   const router = useRouter();
 
@@ -913,57 +913,6 @@ export default function Home({ manifestUrl }) {
     setSelectedModels(demoModels);
     // メッセージ履歴をクリア
     setMessages([]);
-  };
-
-  const handleFileUpload = async (event) => {
-    const files = Array.from(event.target.files);
-    const uploadedFileInfos = [];
-
-    for (const file of files) {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('purpose', 'assistants');
-
-      try {
-        const response = await fetch('https://openrouter.ai/api/v1/files', {
-          method: 'POST',
-          body: formData,
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const result = await response.json();
-        console.log('File uploaded:', result);
-
-        const fileInfo = {
-          id: result.id,
-          name: file.name,
-          type: file.type,
-          size: file.size,
-        };
-        uploadedFileInfos.push(fileInfo);
-        setUploadedFiles(prev => [...prev, fileInfo]);
-
-      } catch (error) {
-        console.error('Error uploading file:', error);
-        // エラーメッセージをユーザーに表示する処理を追加
-      }
-    }
-
-    if (uploadedFileInfos.length > 0) {
-      const fileMessage = uploadedFileInfos.map(file =>
-        `File "${file.name}" (${file.type}, ${file.size} bytes) uploaded. ID: ${file.id}`
-      ).join('\n');
-      setChatInput(prev => `${prev}${fileMessage}\n`);
-
-      // ファイル情報をAIモデルに送信
-      handleSend(null, false, uploadedFileInfos);
-    }
   };
 
   const handleRegenerate = async (messageIndex, responseIndex, model) => {

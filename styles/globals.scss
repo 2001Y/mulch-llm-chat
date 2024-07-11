@@ -534,7 +534,7 @@ header {
   }
 
   &.newThread {
-    background-color: rgba(46, 204, 64, 0.2);
+    background-color: rgb(34 135 45 / 20%);
     color: #2ecc40;
   }
 
@@ -560,6 +560,7 @@ header {
 
   .message-block {
     width: 100%;
+    padding-bottom: 8rem;
 
     &:last-of-type {
       display: flex;
@@ -979,27 +980,27 @@ body {
     transition: transform .3s;
   }
 
-  &[data-input-focused="true"][data-software-keyboard="true"] {
-    .responses-container {
-      transform: translateY(calc(var(--keyboardHeight) - $height_header * 1.5));
-    }
+  // &[data-input-focused="true"][data-software-keyboard="true"] {
+  //   .responses-container {
+  //     transform: translateY(calc(var(--keyboardHeight) - $height_header * 1.5));
+  //   }
 
-    .chat-input-area {
-      max-height: calc(var(--actual-100dvh) - $modal-button_height - $body-padding*2 - env(safe-area-inset-top)) !important;
+  //   .chat-input-area {
+  //     max-height: calc(var(--actual-100dvh) - $modal-button_height - $body-padding*2 - env(safe-area-inset-top)) !important;
 
-      .chat-input {
-        max-height: calc(var(--actual-100dvh) - $modal-button_height - $body-padding*2 - env(safe-area-inset-top) - 2em) !important;
-      }
-    }
+  //     .chat-input {
+  //       max-height: calc(var(--actual-100dvh) - $modal-button_height - $body-padding*2 - env(safe-area-inset-top) - 2em) !important;
+  //     }
+  //   }
 
-    .input-section {
-      padding-bottom: $body-padding;
-    }
+  //   .input-section {
+  //     padding-bottom: $body-padding;
+  //   }
 
-    .reset-button {
-      bottom: calc(var(--keyboardHeight) + 1.5em);
-    }
-  }
+  //   .reset-button {
+  //     bottom: calc(var(--keyboardHeight) + 1.5em);
+  //   }
+  // }
 }
 
 textarea[fieldSizing="content"] {
