@@ -10,7 +10,6 @@ import classNames from "classnames";
 
 
 const isProduction = process.env.NODE_ENV === "production";
-const redirectUri = isProduction ? "https://mulch-llm-chat.vercel.app" : "https://3000.2001y.dev";
 
 marked.use(
   markedHighlight({
@@ -123,7 +122,7 @@ const useMessages = () => {
   return [messages, setMessages];
 };
 
-const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate, handleResetAndRegenerate, handleStop }) => {
+const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate, handleResetAndRegenerate, handleStop, handleSend, models, chatInput, setChatInput, openModal, isGenerating, selectedModels, setSelectedModels, showResetButton, handleReset }) => {
   const containerRef = useRef(null);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
   const [lastManualScrollTop, setLastManualScrollTop] = useState(0);
@@ -192,10 +191,7 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
   const handleEdit = (messageIndex, responseIndex, newContent) => {
     if (responseIndex === null) {
       // ユーザーメッセージの編集
-      const newMessages = [...messages];
-      newMessages[messageIndex].user = newContent;
-      newMessages[messageIndex].edited = true; // 編集フラグを追加
-      updateMessage(newMessages);
+      updateMessage(messageIndex, null, newContent);
     } else {
       // AIの応答の編集
       updateMessage(messageIndex, responseIndex, newContent);
@@ -212,107 +208,160 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
 
   return (
     <div className="responses-container" ref={containerRef} translate="no">
-      {Array.isArray(messages) && messages.map((message, messageIndex) => {
-        const selectedResponses = message.llm.filter(r => r.selected).sort((a, b) => a.selectedOrder - b.selectedOrder);
-        const hasSelectedResponse = selectedResponses.length > 0;
-        return (
-          <div key={messageIndex} className="message-block" >
-            <div className="user">
-              <p
-                contentEditable
-                onFocus={(e) => {
-                  e.target.parentElement.classList.toggle('editing', true);
-                }}
-                onBlur={(e) => {
-                  e.target.parentElement.classList.toggle('editing', false);
-                  handleEdit(messageIndex, null, e.target.textContent);
-                }}
-                onInput={(e) => {
-                  const isEdited = e.target.textContent !== message.user;
-                  e.target.parentElement.classList.toggle('edited', isEdited);
-                }}
-                onKeyDown={(e) => {
-                  if (e.metaKey || e.ctrlKey) {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleResetAndRegenerate(messageIndex)
+      {Array.isArray(messages) && messages.length > 0 ? (
+        messages.map((message, messageIndex) => {
+          const selectedResponses = message.llm.filter(r => r.selected).sort((a, b) => a.selectedOrder - b.selectedOrder);
+          const hasSelectedResponse = selectedResponses.length > 0;
+          return (
+            <div key={messageIndex} className="message-block" >
+              <InputSection
+                models={models}
+                chatInput={message.user}
+                setChatInput={(newInput) => updateMessage(messageIndex, null, newInput)}
+                handleSend={(event, isPrimaryOnly) => handleSend(event, isPrimaryOnly, messageIndex)}
+                handleStop={handleStop}
+                openModal={openModal}
+                isGenerating={isGenerating}
+                selectedModels={selectedModels}
+                setSelectedModels={setSelectedModels}
+                showResetButton={showResetButton}
+                handleReset={handleReset}
+                isEditMode={true}
+                messageIndex={messageIndex}
+                handleResetAndRegenerate={handleResetAndRegenerate}
+                handleSaveOnly={handleSaveOnly}
+              />
+              {/* <div className="user">
+                <p
+                  contentEditable
+                  onFocus={(e) => {
+                    e.target.parentElement.classList.toggle('editing', true);
+                  }}
+                  onBlur={(e) => {
+                    e.target.parentElement.classList.toggle('editing', false);
+                    handleEdit(messageIndex, null, e.target.textContent);
+                  }}
+                  onInput={(e) => {
+                    const isEdited = e.target.textContent !== message.user;
+                    e.target.parentElement.classList.toggle('edited', isEdited);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.metaKey || e.ctrlKey) {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleResetAndRegenerate(messageIndex)
+                      } else if (e.key === 'Backspace') {
+                        e.preventDefault();
+                        handleSaveOnly(messageIndex);
+                      }
                     }
-                  }
-                }}
-                suppressContentEditableWarning={true}
-              >
-                {message.user}
-              </p>
-              <div className="reset-regenerate-button-area">
-                <button
-                  onClick={() => handleResetAndRegenerate(messageIndex)}
-                  className="reset-regenerate-button icon-button"
+                  }}
+                  suppressContentEditableWarning={true}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
-                  </svg>
-                  <span className="shortcut">[⌘+Enter]</span>
-                </button>
-                <button
-                  className="saveOnly-button"
-                  onClick={() => handleSaveOnly(messageIndex)}
-                >
-                  <span className="shortcut">[⌘+Delete]</span>
-                </button>
-              </div>
-            </div>
-            <div className="scroll_area">
-              {Array.isArray(message.llm) && message.llm.map((response, responseIndex) => (
-                <div key={responseIndex} className={`response ${response.role} ${hasSelectedResponse && !response.selected ? 'unselected' : ''}`}>
-                  <div className="meta">
-                    <small>{response.model}</small>
-                    <div className="response-controls">
-                      <button
-                        className={response.isGenerating ? "stop-button" : "regenerate-button"}
-                        onClick={() => response.isGenerating
-                          ? handleStop(messageIndex, responseIndex)
-                          : handleRegenerate(messageIndex, responseIndex, response.model)
-                        }
-                      >
-                        {response.isGenerating ? (
-                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                            <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
-                          </svg>
-                        ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
-                          </svg>
-                        )}
-                      </button>
-                      <div
-                        className={`response-select ${response.selected ? 'selected' : ''}`}
-                        onClick={() => handleSelectResponse(messageIndex, responseIndex)}
-                      >
-                        {response.selected ? (
-                          selectedResponses.length > 1 ?
-                            (selectedResponses.findIndex(r => r === response) + 1) :
-                            '✓'
-                        ) : ''}
+                  {message.user}
+                </p>
+                <div className="reset-regenerate-button-area">
+                  <button
+                    onClick={() => handleResetAndRegenerate(messageIndex)}
+                    className="reset-regenerate-button icon-button"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
+                    </svg>
+                    <span className="shortcut">[⌘+Enter]</span>
+                  </button>
+                  <button
+                    className="saveOnly-button"
+                    onClick={() => handleSaveOnly(messageIndex)}
+                  >
+                    <span className="shortcut">[⌘+Delete]</span>
+                  </button>
+                </div>
+              </div> */}
+              <div className="scroll_area">
+                {Array.isArray(message.llm) && message.llm.map((response, responseIndex) => (
+                  <div key={responseIndex} className={`response ${response.role} ${hasSelectedResponse && !response.selected ? 'unselected' : ''}`}>
+                    <div className="meta">
+                      <small>{response.model}</small>
+                      <div className="response-controls">
+                        <button
+                          className={response.isGenerating ? "stop-button" : "regenerate-button"}
+                          onClick={() => response.isGenerating
+                            ? handleStop(messageIndex, responseIndex)
+                            : handleRegenerate(messageIndex, responseIndex, response.model)
+                          }
+                        >
+                          {response.isGenerating ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                              <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+                            </svg>
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
+                            </svg>
+                          )}
+                        </button>
+                        <div
+                          className={`response-select ${response.selected ? 'selected' : ''}`}
+                          onClick={() => handleSelectResponse(messageIndex, responseIndex)}
+                        >
+                          {response.selected ? (
+                            selectedResponses.length > 1 ?
+                              (selectedResponses.findIndex(r => r === response) + 1) :
+                              '✓'
+                          ) : ''}
+                        </div>
                       </div>
                     </div>
+                    <div
+                      className="markdown-content"
+                      contentEditable
+                      onBlur={(e) => handleEdit(messageIndex, responseIndex, e.target.innerHTML)}
+                      dangerouslySetInnerHTML={{ __html: response.text }}
+                    />
                   </div>
-                  <div
-                    className="markdown-content"
-                    contentEditable
-                    onBlur={(e) => handleEdit(messageIndex, responseIndex, e.target.innerHTML)}
-                    dangerouslySetInnerHTML={{ __html: response.text }}
-                  />
-                </div>
-              ))}
+                ))}
+              </div>
+              {messageIndex === messages.length - 1 && (
+                <InputSection
+                  models={models}
+                  chatInput={chatInput}
+                  setChatInput={setChatInput}
+                  handleSend={(event, isPrimaryOnly) => handleSend(event, isPrimaryOnly, messageIndex)}
+                  handleStop={handleStop}
+                  openModal={openModal}
+                  isGenerating={isGenerating}
+                  selectedModels={selectedModels}
+                  setSelectedModels={setSelectedModels}
+                  showResetButton={showResetButton}
+                  handleReset={handleReset}
+                  isEditMode={false}
+                />
+              )}
             </div>
-          </div>
-        );
-      })}
+          );
+        })
+      ) : (
+        <InputSection
+          models={models}
+          chatInput={chatInput}
+          setChatInput={setChatInput}
+          handleSend={(event, isPrimaryOnly) => handleSend(event, isPrimaryOnly, -1)}
+          handleStop={handleStop}
+          openModal={openModal}
+          isGenerating={isGenerating}
+          selectedModels={selectedModels}
+          setSelectedModels={setSelectedModels}
+          showResetButton={showResetButton}
+          handleReset={handleReset}
+          isEditMode={false}
+        />
+      )}
     </div >
   );
 };
 
-const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop, openModal, isGenerating, selectedModels, setSelectedModels, showResetButton, handleReset }) => {
+const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop, openModal, isGenerating, selectedModels, setSelectedModels, showResetButton, handleReset, isEditMode, messageIndex, handleResetAndRegenerate }) => {
   const [isComposing, setIsComposing] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
@@ -349,15 +398,19 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
     if (document.body.dataset.softwareKeyboard === 'false') {
       if (event.key === 'Enter' && !isComposing) {
         if (event.metaKey || event.ctrlKey) {
-          // コマンド/コントロール+エンターで単体送信
           event.preventDefault();
-          handleSend(event, true);
+          if (isEditMode) {
+            handleResetAndRegenerate(messageIndex);
+          } else {
+            handleSend(event, true);
+          }
           setChatInput('');
         } else if (!event.shiftKey) {
-          // 通常のエンターで複数送信
           event.preventDefault();
-          handleSend(event, false);
-          setChatInput('');
+          if (!isEditMode) {
+            handleSend(event, false);
+            setChatInput('');
+          }
         }
       } else if (event.key === 'ArrowDown') {
         if (showSuggestions) {
@@ -472,27 +525,6 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
 
   return (
     <section className="input-section">
-      {showResetButton && (
-        <button className="reset-button" onClick={handleReset}>
-          Clear Chat
-        </button>
-      )}
-      <div className="input-container model-select-area">
-        {models.map((model, index) => (
-          <div className="model-radio" key={model}>
-            <input
-              type="checkbox"
-              id={`model-${index}`}
-              value={model}
-              checked={selectedModels.includes(model)}
-              onChange={() => handleModelChange(model)}
-            />
-            <label htmlFor={`model-${index}`}>
-              {model.split('/')[1]}
-            </label>
-          </div>
-        ))}
-      </div>
       <div className="input-container chat-input-area">
         <textarea
           ref={inputRef}
@@ -502,7 +534,7 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
           className="chat-input"
-          placeholder="Type your message here…"
+          placeholder={isEditMode ? "Edit your message here..." : "Type your message here…"}
           fieldSizing="content"
         />
         {showSuggestions && (
@@ -526,9 +558,85 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
             ))}
           </ul>
         )}
-        <button onClick={isGenerating ? handleStop : handleSend} className="send-button">
-          {isGenerating ? '⏹' : '↑'}
-        </button>
+      </div>
+
+      <div className="input-container model-select-area">
+        {models.map((model, index) => (
+          <div className="model-radio" key={model}>
+            <input
+              type="checkbox"
+              id={`model-${index}`}
+              value={model}
+              checked={selectedModels.includes(model)}
+              onChange={() => handleModelChange(model)}
+            />
+            <label htmlFor={`model-${index}`}>
+              {model.split('/')[1]}
+            </label>
+          </div>
+        ))}
+      </div>
+
+      <div className="input-actions">
+        {isEditMode ? (
+          <>
+            <button
+              onClick={() => handleResetAndRegenerate(messageIndex)}
+              className="action-button reset-regenerate-button icon-button"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
+              </svg>
+
+              <span>Regenerate<span className="shortcut">[⌘+Enter]</span></span>
+            </button>
+            <button
+              onClick={() => handleSaveOnly(messageIndex)}
+              className="action-button save-only-button icon-button"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                <polyline points="7 3 7 8 15 8"></polyline>
+              </svg>
+              <span>
+                Save
+                <span className="shortcut">
+                  [⌘+
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path>
+                    <line x1="18" y1="9" x2="12" y2="15"></line>
+                    <line x1="12" y1="9" x2="18" y2="15"></line>
+                  </svg>
+                  ]
+                </span>
+              </span>
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={(e) => handleSend(e, false)}
+              className="action-button send-button icon-button"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+              <span>Send<span className="shortcut">[Enter]</span></span>
+            </button>
+            <button
+              onClick={(e) => handleSend(e, true)}
+              className="action-button send-primary-button icon-button"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+
+              <span>Send to Primary Model<span className="shortcut">[⌘+Enter]</span></span>
+            </button>
+          </>
+        )}
       </div>
     </section>
   );
@@ -663,7 +771,7 @@ export default function Home({ manifestUrl }) {
     }
   }, [messages, openai]);
 
-  const handleSend = async (event, isPrimaryOnly = false) => {
+  const handleSend = async (event, isPrimaryOnly = false, messageIndex) => {
     if (isGenerating) return;
 
     let inputText = chatInput;
@@ -703,21 +811,25 @@ export default function Home({ manifestUrl }) {
   };
 
   const handleReset = () => {
-    setMessages([]);
-    setShowResetButton(false);
+    if (isGenerating) {
+      // 生成中の場合は停止
+      abortControllers.forEach(controller => {
+        try {
+          controller.abort();
+        } catch (error) {
+          console.error('Error while aborting:', error);
+        }
+      });
+      setIsGenerating(false);
+    } else {
+      // 生成が終了している場合は新規スレッドを開始
+      if (window.confirm('Are you sure you want to clear the chat history? This action cannot be undone.')) {
+        setMessages([]);
+        setShowResetButton(false);
+      }
+    }
   };
 
-  // const handleStop = () => {
-  //   console.log('Stopping generation');
-  //   abortControllers.forEach(controller => {
-  //     try {
-  //       controller.abort();
-  //     } catch (error) {
-  //       console.error('Error while aborting:', error);
-  //     }
-  //   });
-  //   setIsGenerating(false);
-  // };
   const handleStop = (messageIndex, responseIndex) => {
     const controller = abortControllers[responseIndex];
     if (controller) {
@@ -957,6 +1069,21 @@ export default function Home({ manifestUrl }) {
         </div>
         {!isLoggedIn && <div className="free-version">Free Version</div>}
       </header >
+      {(showResetButton || isGenerating) && (
+        <button className={`reset-button ${isGenerating ? 'generating' : 'newThread'}`} onClick={handleReset}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {isGenerating ? (
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            ) : (
+              <>
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </>
+            )}
+          </svg>
+          <span>{isGenerating ? 'Stop generation' : 'New thread'}</span>
+        </button>
+      )}
       <Responses
         messages={messages}
         updateMessage={updateMessage}
@@ -964,13 +1091,10 @@ export default function Home({ manifestUrl }) {
         handleRegenerate={handleRegenerate}
         handleResetAndRegenerate={handleResetAndRegenerate}
         handleStop={handleStop}
-      />
-      <InputSection
+        handleSend={handleSend}
         models={isLoggedIn ? models : demoModels}
         chatInput={chatInput}
         setChatInput={setChatInput}
-        handleSend={handleSend}
-        handleStop={handleStop}
         openModal={openModal}
         isGenerating={isGenerating}
         selectedModels={selectedModels}

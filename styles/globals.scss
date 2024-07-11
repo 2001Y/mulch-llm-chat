@@ -8,6 +8,7 @@ $bg_body: #000;
 $padding: $body-padding;
 $shadow: 0 0 .5em rgba(0, 0, 0, 1);
 $modal-button_height: 2em;
+$accent-color: #C02020;
 
 @media (prefers-color-scheme: dark) {
   $bg_body: #000;
@@ -128,8 +129,8 @@ header {
 
   .free-version {
     font-size: 1.3em;
-    color: #ff0000;
-    border: 2px solid #ff0000;
+    color: $accent-color;
+    border: 2px solid $accent-color;
     background: rgba(#000, .5);
     padding: 2px 5px;
     border-radius: 4px;
@@ -155,7 +156,7 @@ header {
     gap: .5em;
 
     .login {
-      background-color: #ff0000;
+      background-color: $accent-color;
       color: #ffffff;
       font-weight: bold;
       padding: 0.5em 1em;
@@ -165,11 +166,11 @@ header {
       transition: background-color 0.3s ease;
 
       &:hover {
-        background-color: #cc0000;
+        background-color: darken($accent-color, 10%);
       }
 
       &:active {
-        background-color: #990000;
+        background-color: darken($accent-color, 20%);
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
       }
     }
@@ -213,34 +214,11 @@ header {
   max-width: $chat-input-max-width;
   padding: 0 $padding;
   padding-bottom: calc(env(safe-area-inset-bottom) + $body-padding);
-  position: fixed;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   gap: .5em;
   overflow: visible;
-
-  &::before {
-    content: '';
-    position: absolute;
-    bottom: -50%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 100%;
-    height: 200%;
-    background: radial-gradient(ellipse, #000, transparent);
-    pointer-events: none;
-    z-index: -1;
-
-    @media (max-width: $chat-input-max-width) {
-      left: 0;
-      width: 100vw;
-      margin: 0 calc(50% - 50vw);
-      background: linear-gradient(to top, $bg_body, transparent);
-    }
-  }
+  font-size: 0.8rem;
 
   .input-container {
     display: flex;
@@ -280,20 +258,30 @@ header {
       margin: 0 calc(50% - 50vw);
       padding: 0 calc(50vw - 50%);
       overflow-x: auto;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(255, 255, 255, 0.5) transparent;
+      scrollbar-width: none;
+      scrollbar-color: transparent transparent;
 
       &::-webkit-scrollbar {
-        height: 6px;
+        width: 0;
+        height: 0;
       }
 
-      &::-webkit-scrollbar-track {
-        background: transparent;
-      }
+      &:hover {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 
-      &::-webkit-scrollbar-thumb {
-        background-color: rgba(255, 255, 255, 0.5);
-        border-radius: 3px;
+        &::-webkit-scrollbar {
+          height: 6px;
+        }
+
+        &::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        &::-webkit-scrollbar-thumb {
+          background-color: rgba(255, 255, 255, 0.2);
+          border-radius: 3px;
+        }
       }
 
       .model-radio {
@@ -344,11 +332,11 @@ header {
       background: mix(#fff, #000, 10%);
       border-radius: $border-radius;
       box-shadow: $shadow;
+      font-size: 1rem;
 
       .chat-input {
         margin: auto;
         padding: 1em 0;
-        // height: 1em;
         max-height: calc($maxHeight - 2em);
         resize: none;
 
@@ -362,8 +350,92 @@ header {
         max-height: 40px;
         aspect-ratio: 1/1;
         margin: .5em;
-        background: mix(#fff, #15d186, 10%);
+        background: mix(#fff, $accent-color, 10%);
         border-radius: calc($border-radius - .25em);
+      }
+    }
+  }
+
+  .input-actions {
+    // display: none;
+    display: flex;
+    gap: 0.5em;
+
+    &.show {
+      display: flex;
+      /* または適切なdisplayプロパティ */
+    }
+
+    .action-button {
+      $button-icon-size: 1.2em;
+      $button-padding-vertical: 0.5em;
+      $button-padding-horizontal: 0.9em;
+
+      padding: $button-padding-vertical $button-padding-horizontal;
+      background-color: mix(#fff, #000, 10%);
+      color: mix(#fff, #000, 70%);
+      border-radius: $border-radius;
+      transition: background-color 0.3s, color 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 0.5em;
+      white-space: nowrap;
+      position: relative;
+
+      &:hover {
+        background-color: mix(#fff, #000, 15%);
+        color: #fff;
+      }
+
+      >svg {
+        width: $button-icon-size;
+        height: $button-icon-size;
+      }
+
+      &.icon-button {
+        padding-left: calc($button-icon-size + $button-padding-horizontal * 2 * 0.9);
+
+        >svg {
+          position: absolute;
+          left: $button-padding-horizontal;
+          top: 50%;
+          transform: translateY(-50%);
+        }
+      }
+
+      .shortcut {
+        margin-left: .5em;
+        opacity: .5;
+        display: inline-flex;
+        align-items: center;
+
+        svg {
+          width: 1.1em;
+          aspect-ratio: 1/1;
+        }
+      }
+    }
+
+    &.reset-regenerate-button,
+    &.send-button {
+      border: 1px solid rgba(255, 255, 255, 0.2);
+
+      &:hover {
+        background-color: mix(#fff, #000, 20%);
+        border-color: rgba(255, 255, 255, 0.4);
+      }
+    }
+
+    &.save-only-button,
+    &.send-primary-button {
+      background-color: rgba($accent-color, 0.2);
+      border: 1px solid rgba($accent-color, 0.4);
+      color: lighten($accent-color, 20%);
+
+      &:hover {
+        background-color: rgba($accent-color, 0.3);
+        border-color: rgba($accent-color, 0.6);
+        color: #ffffff;
       }
     }
   }
@@ -402,26 +474,53 @@ header {
       }
     }
   }
+}
 
-  .reset-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: fit-content;
-    height: 2.4em;
-    padding: 0 1em;
-    margin: auto;
-    background: transparent;
-    color: rgba(255, 255, 255, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: $border-radius;
-    transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+.reset-button {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom) + 2em);
+  right: calc(env(safe-area-inset-right) + 2em);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1em 1.5em;
+  background: transparent;
+  backdrop-filter: blur(10px);
+  color: rgba(255, 255, 255, 0.7);
+  border: none;
+  border-radius: $border-radius;
+  box-shadow: $shadow;
+  transition: backdrop-filter 0.3s, color 0.3s;
+  overflow: visible;
+  gap: 1em;
 
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.1);
-      color: #15d186;
-      border-color: #15d186;
-    }
+  &:hover {
+    backdrop-filter: blur(15px);
+    color: #fff;
+  }
+
+  &:active {
+    backdrop-filter: blur(20px);
+  }
+
+  &.generating {
+    background-color: rgba(255, 65, 54, 0.2);
+    color: #ff4136;
+  }
+
+  &.newThread {
+    background-color: rgba(46, 204, 64, 0.2);
+    color: #2ecc40;
+  }
+
+  svg {
+    width: 1.4em;
+    height: 1.4em;
+  }
+
+  span {
+    white-space: nowrap;
   }
 }
 
@@ -444,8 +543,7 @@ header {
       min-height: calc(100svh - $height_header*1.5);
 
       .scroll_area {
-        flex: 1;
-        padding-bottom: calc(8em + env(safe-area-inset-bottom)*1.5);
+        // padding-bottom: calc(8em + env(safe-area-inset-bottom)*1.5);
         min-height: fit-content;
         overflow-y: hidden;
       }
@@ -588,7 +686,6 @@ header {
       display: flex;
       flex-direction: column;
       gap: .5em;
-      // margin-right: $body-padding;
       cursor: auto;
 
       &.reply {
@@ -664,9 +761,9 @@ header {
           }
 
           .response-select.selected {
-            background-color: #007bff;
+            background-color: $accent-color;
             color: white;
-            border-color: #007bff;
+            border-color: $accent-color;
           }
         }
       }
@@ -725,6 +822,10 @@ header {
   }
 }
 
+.markdown-editor {
+  min-height: 5em;
+}
+
 // Markdown Styles
 .markdown-content {
   $line-height-base: 1.6;
@@ -737,43 +838,29 @@ header {
   $color-code-bg: #060606;
   $border-radius: 5px;
 
+  $heading-base-size: 1rem;
+  $heading-scale: 1.2;
+  $heading-margin-top: 1.5rem;
+  $heading-margin-bottom: 0.75rem;
+
   line-height: $line-height-base;
-  // color: $color-base;
 
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    margin-top: 1rem;
-    margin-bottom: 0.5rem;
-    font-weight: bold;
-    line-height: 1.2;
-
-    &:nth-child(1) {
-      font-size: 2rem;
+  @for $i from 1 through 6 {
+    h#{$i} {
+      font-size: $heading-base-size * pow($heading-scale, 6 - $i);
+      margin-top: $heading-margin-top;
+      margin-bottom: $heading-margin-bottom;
+      font-weight: bold;
+      line-height: 1.2;
     }
+  }
 
-    &:nth-child(2) {
-      font-size: 1.75rem;
-    }
+  h1 {
+    margin-top: $heading-margin-top * 1.5;
+  }
 
-    &:nth-child(3) {
-      font-size: 1.5rem;
-    }
-
-    &:nth-child(4) {
-      font-size: 1.25rem;
-    }
-
-    &:nth-child(5) {
-      font-size: 1rem;
-    }
-
-    &:nth-child(6) {
-      font-size: 0.875rem;
-    }
+  h2 {
+    margin-top: $heading-margin-top * 1.25;
   }
 
   p {
@@ -813,7 +900,6 @@ header {
     padding: .1em .3rem;
     border-radius: $border-radius;
     overflow-x: auto;
-    // overscroll-behavior-block: contain;
     font-family: "JetBrains Mono", monospace;
     font-size: .8em;
     line-height: 1.2;
@@ -863,7 +949,6 @@ header {
   }
 }
 
-
 body {
   .responses-container {
     will-change: transform;
@@ -886,6 +971,10 @@ body {
     .input-section {
       padding-bottom: $body-padding;
     }
+
+    .reset-button {
+      bottom: calc(var(--keyboardHeight) + 1.5em);
+    }
   }
 }
 
@@ -897,14 +986,12 @@ textarea[fieldSizing="content"] {
   overscroll-behavior-block: none;
 }
 
-
-
 .login-button {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   padding: 1em;
-  background: red;
+  background: $accent-color;
   border-radius: .5em;
 }
