@@ -208,7 +208,7 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
   };
 
   return (
-    <div className="responses-container" ref={containerRef} translate="no">
+    <div className={`responses-container ${messages.length <= 1 ? 'initial-screen' : ''}`} ref={containerRef} translate="no">
       {Array.isArray(messages) && messages.length > 0 ? (
         messages.map((message, messageIndex) => {
           const selectedResponses = message.llm.filter(r => r.selected).sort((a, b) => a.selectedOrder - b.selectedOrder);

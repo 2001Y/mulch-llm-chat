@@ -556,6 +556,12 @@ header {
   overscroll-behavior-block: none;
   scroll-behavior: smooth;
 
+  &.initial-screen {
+    padding-top: 0;
+    display: grid;
+    place-items: center;
+  }
+
   .message-block {
     width: 100%;
     padding-bottom: 8rem;
