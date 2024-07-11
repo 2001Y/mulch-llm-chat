@@ -213,12 +213,13 @@ header {
   $chat-input-max-width: 50em;
   max-width: $chat-input-max-width;
   padding: 0 $padding;
-  padding-bottom: calc(env(safe-area-inset-bottom) + $body-padding);
+  // padding-bottom: calc(env(safe-area-inset-bottom) + $body-padding);
   display: flex;
   flex-direction: column;
   gap: .5em;
   overflow: visible;
   font-size: 0.8rem;
+  margin: 0 auto;
 
   .input-container {
     display: flex;
@@ -252,8 +253,9 @@ header {
     }
 
     &.model-select-area {
+      color: mix(#fff, #000, 70%);
       display: flex;
-      gap: .5em;
+      gap: .2em;
       width: 100vw;
       margin: 0 calc(50% - 50vw);
       padding: 0 calc(50vw - 50%);
@@ -354,6 +356,11 @@ header {
         border-radius: calc($border-radius - .25em);
       }
     }
+  }
+
+  .action-button,
+  .model-radio label {
+    height: 2rem;
   }
 
   .input-actions {
@@ -529,7 +536,7 @@ header {
   min-height: 100svh;
   height: 100svh;
   max-height: 100svh;
-  padding-top: calc($height_header * 1.5 + env(safe-area-inset-top));
+  padding-top: calc($height_header * 2 + env(safe-area-inset-top));
   overflow-y: auto;
   overscroll-behavior-block: none;
   scroll-behavior: smooth;

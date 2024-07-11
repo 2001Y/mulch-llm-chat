@@ -397,21 +397,13 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
   const handleKeyDown = (event) => {
     if (document.body.dataset.softwareKeyboard === 'false') {
       if (event.key === 'Enter' && !isComposing) {
-        if (event.metaKey || event.ctrlKey) {
-          event.preventDefault();
-          if (isEditMode) {
-            handleResetAndRegenerate(messageIndex);
-          } else {
-            handleSend(event, true);
-          }
-          setChatInput('');
-        } else if (!event.shiftKey) {
-          event.preventDefault();
-          if (!isEditMode) {
-            handleSend(event, false);
-            setChatInput('');
-          }
+        event.preventDefault();
+        if (isEditMode) {
+          handleResetAndRegenerate(messageIndex);
+        } else {
+          handleSend(event, true);
         }
+        setChatInput('');
       } else if (event.key === 'ArrowDown') {
         if (showSuggestions) {
           event.preventDefault();
@@ -588,7 +580,7 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
                 <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
               </svg>
 
-              <span>Regenerate<span className="shortcut">[⌘+Enter]</span></span>
+              <span>Regenerate<span className="shortcut"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span></span>
             </button>
             <button
               onClick={() => handleSaveOnly(messageIndex)}
@@ -602,13 +594,12 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
               <span>
                 Save
                 <span className="shortcut">
-                  [⌘+
+                  ⌘
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path>
                     <line x1="18" y1="9" x2="12" y2="15"></line>
                     <line x1="12" y1="9" x2="18" y2="15"></line>
                   </svg>
-                  ]
                 </span>
               </span>
             </button>
@@ -684,7 +675,13 @@ export default function Home({ manifestUrl }) {
   const updateMessage = useCallback((messageIndex, responseIndex, text, selectedIndex, toggleSelected) => {
     setMessages(prevMessages => {
       const newMessages = JSON.parse(JSON.stringify(prevMessages));
-      if (responseIndex !== undefined) {
+      if (responseIndex === null) {
+        // ユーザーメッセージの編集
+        if (text !== undefined) {
+          newMessages[messageIndex].user = text;
+        }
+      } else if (newMessages[messageIndex]?.llm[responseIndex] !== undefined) {
+        // AIの応答の編集
         if (text !== undefined) {
           newMessages[messageIndex].llm[responseIndex].text = text;
         }
@@ -715,7 +712,9 @@ export default function Home({ manifestUrl }) {
       // レスポンスの生成状態を更新
       setMessages(prevMessages => {
         const newMessages = [...prevMessages];
-        newMessages[messageIndex].llm[responseIndex].isGenerating = true;
+        if (newMessages[messageIndex]?.llm[responseIndex] !== undefined) {
+          newMessages[messageIndex].llm[responseIndex].isGenerating = true;
+        }
         return newMessages;
       });
       const pastMessages = messages.flatMap(msg => {
@@ -763,10 +762,11 @@ export default function Home({ manifestUrl }) {
       // レスポンスの生成状態を更新
       setMessages(prevMessages => {
         const newMessages = [...prevMessages];
-        newMessages[messageIndex].llm[responseIndex].isGenerating = false;
+        if (newMessages[messageIndex]?.llm[responseIndex] !== undefined) {
+          newMessages[messageIndex].llm[responseIndex].isGenerating = false;
+        }
         return newMessages;
       });
-      setIsGenerating(false);
       setIsGenerating(false);
     }
   }, [messages, openai]);
