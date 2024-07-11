@@ -599,7 +599,7 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
               </svg>
 
-              <span>Send to Primary Model<span className="shortcut">[⌘+Enter]</span></span>
+              <span>Send to Primary Model<span className="shortcut">⌘⏎</span></span>
             </button>
           </>
         )}
