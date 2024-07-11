@@ -329,7 +329,7 @@ header {
       $maxHeight: calc(100svh - $height_header - $modal-button_height - $body-padding * 3 - env(safe-area-inset-top));
       max-height: $maxHeight;
       max-width: 100%;
-      padding: 0 1.5em;
+      padding: 0 1em;
       padding-right: 0;
       background: mix(#fff, #000, 10%);
       border-radius: $border-radius;
