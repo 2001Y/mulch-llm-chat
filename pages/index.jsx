@@ -230,54 +230,8 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
                 messageIndex={messageIndex}
                 handleResetAndRegenerate={handleResetAndRegenerate}
                 handleSaveOnly={handleSaveOnly}
+                originalMessage={message.originalUser || message.user}
               />
-              {/* <div className="user">
-                <p
-                  contentEditable
-                  onFocus={(e) => {
-                    e.target.parentElement.classList.toggle('editing', true);
-                  }}
-                  onBlur={(e) => {
-                    e.target.parentElement.classList.toggle('editing', false);
-                    handleEdit(messageIndex, null, e.target.textContent);
-                  }}
-                  onInput={(e) => {
-                    const isEdited = e.target.textContent !== message.user;
-                    e.target.parentElement.classList.toggle('edited', isEdited);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.metaKey || e.ctrlKey) {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleResetAndRegenerate(messageIndex)
-                      } else if (e.key === 'Backspace') {
-                        e.preventDefault();
-                        handleSaveOnly(messageIndex);
-                      }
-                    }
-                  }}
-                  suppressContentEditableWarning={true}
-                >
-                  {message.user}
-                </p>
-                <div className="reset-regenerate-button-area">
-                  <button
-                    onClick={() => handleResetAndRegenerate(messageIndex)}
-                    className="reset-regenerate-button icon-button"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
-                    </svg>
-                    <span className="shortcut">[⌘+Enter]</span>
-                  </button>
-                  <button
-                    className="saveOnly-button"
-                    onClick={() => handleSaveOnly(messageIndex)}
-                  >
-                    <span className="shortcut">[⌘+Delete]</span>
-                  </button>
-                </div>
-              </div> */}
               <div className="scroll_area">
                 {Array.isArray(message.llm) && message.llm.map((response, responseIndex) => (
                   <div key={responseIndex} className={`response ${response.role} ${hasSelectedResponse && !response.selected ? 'unselected' : ''}`}>
@@ -361,12 +315,20 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
   );
 };
 
-const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop, openModal, isGenerating, selectedModels, setSelectedModels, showResetButton, handleReset, isEditMode, messageIndex, handleResetAndRegenerate }) => {
+const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop, openModal, isGenerating, selectedModels, setSelectedModels, showResetButton, handleReset, isEditMode, messageIndex, handleResetAndRegenerate, handleSaveOnly, originalMessage }) => {
   const [isComposing, setIsComposing] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [filteredModels, setFilteredModels] = useState(models);
   const inputRef = useRef(null);
+  const sectionRef = useRef(null);
+
+  useEffect(() => {
+    if (sectionRef.current) {
+      const isEdited = chatInput !== originalMessage;
+      sectionRef.current.classList.toggle('edited', isEdited);
+    }
+  }, [chatInput, originalMessage]);
 
   useEffect(() => {
     if (inputRef.current) {
@@ -397,13 +359,15 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
   const handleKeyDown = (event) => {
     if (document.body.dataset.softwareKeyboard === 'false') {
       if (event.key === 'Enter' && !isComposing) {
+        if (event.shiftKey) {
+          return; // Shift+Enterで改行
+        }
         event.preventDefault();
         if (isEditMode) {
           handleResetAndRegenerate(messageIndex);
         } else {
-          handleSend(event, true);
+          handleSend(event, event.metaKey || event.ctrlKey);
         }
-        setChatInput('');
       } else if (event.key === 'ArrowDown') {
         if (showSuggestions) {
           event.preventDefault();
@@ -416,6 +380,12 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
         }
       } else if (event.key === 'Escape') {
         setShowSuggestions(false);
+      } else if (event.key === 'Backspace' && (event.metaKey || event.ctrlKey)) {
+        // ⌘+Deleteの処理
+        event.preventDefault();
+        if (isEditMode) {
+          setChatInput(originalMessage);
+        }
       }
     }
   };
@@ -433,6 +403,10 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
   const onChange = (e) => {
     const text = e.target.value;
     setChatInput(text);
+    if (sectionRef.current) {
+      const isEdited = text !== originalMessage;
+      sectionRef.current.classList.toggle('edited', isEdited);
+    }
     // 複数の「@」に対応するため、最後の「@」以降の文字列をマッチさせる正規表現
     const mentionMatch = text.match(/@[^@]*$/);
     if (mentionMatch && mentionMatch[0]) {
@@ -516,7 +490,7 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
   }, []);
 
   return (
-    <section className="input-section">
+    <section className="input-section" ref={sectionRef}>
       <div className="input-container chat-input-area">
         <textarea
           ref={inputRef}
@@ -614,7 +588,7 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
                 <line x1="22" y1="2" x2="11" y2="13"></line>
                 <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
               </svg>
-              <span>Send<span className="shortcut">[Enter]</span></span>
+              <span>Send<span className="shortcut">⏎</span></span>
             </button>
             <button
               onClick={(e) => handleSend(e, true)}
@@ -672,12 +646,15 @@ export default function Home({ manifestUrl }) {
     setIsLoggedIn(!!accessToken);
   }, [accessToken]);
 
-  const updateMessage = useCallback((messageIndex, responseIndex, text, selectedIndex, toggleSelected) => {
+  const updateMessage = useCallback((messageIndex, responseIndex, text, selectedIndex, toggleSelected, saveOnly, isEditing) => {
     setMessages(prevMessages => {
       const newMessages = JSON.parse(JSON.stringify(prevMessages));
       if (responseIndex === null) {
         // ユーザーメッセージの編集
         if (text !== undefined) {
+          if (!newMessages[messageIndex].originalUser) {
+            newMessages[messageIndex].originalUser = newMessages[messageIndex].user;
+          }
           newMessages[messageIndex].user = text;
         }
       } else if (newMessages[messageIndex]?.llm[responseIndex] !== undefined) {
@@ -767,7 +744,6 @@ export default function Home({ manifestUrl }) {
         }
         return newMessages;
       });
-      setIsGenerating(false);
     }
   }, [messages, openai]);
 
@@ -790,12 +766,24 @@ export default function Home({ manifestUrl }) {
           role: 'assistant',
           model,
           text: '',
-          selected: false
+          selected: false,
+          isGenerating: true
         }))
       };
       const newMessages = [...currentMessages, newMessage];
       newMessage.llm.forEach((response, index) => {
-        fetchChatResponse(response.model, newMessages.length - 1, index, newAbortControllers[index], inputText);
+        fetchChatResponse(response.model, newMessages.length - 1, index, newAbortControllers[index], inputText)
+          .finally(() => {
+            setMessages(prevMessages => {
+              const updatedMessages = [...prevMessages];
+              updatedMessages[newMessages.length - 1].llm[index].isGenerating = false;
+              const allResponsesComplete = updatedMessages[newMessages.length - 1].llm.every(response => !response.isGenerating);
+              if (allResponsesComplete) {
+                setIsGenerating(false);
+              }
+              return updatedMessages;
+            });
+          });
       });
       setIsAutoScroll(true);
 
@@ -805,14 +793,13 @@ export default function Home({ manifestUrl }) {
 
       return newMessages;
     });
-
     setChatInput('');
+
     setTimeout(() => setForceScroll(false), 100);
   };
 
   const handleReset = () => {
     if (isGenerating) {
-      // 生成中の場合は停止
       abortControllers.forEach(controller => {
         try {
           controller.abort();
@@ -821,14 +808,20 @@ export default function Home({ manifestUrl }) {
         }
       });
       setIsGenerating(false);
+      setMessages(prevMessages => {
+        return prevMessages.map(message => ({
+          ...message,
+          llm: message.llm.map(response => ({ ...response, isGenerating: false }))
+        }));
+      });
     } else {
-      // 生成が終了している場合は新規スレッドを開始
-      if (window.confirm('Are you sure you want to clear the chat history? This action cannot be undone.')) {
+      if (window.confirm('本当にチャット履歴をクリアしますか？この操作は元に戻せません。')) {
         setMessages([]);
         setShowResetButton(false);
       }
     }
   };
+
 
   const handleStop = (messageIndex, responseIndex) => {
     const controller = abortControllers[responseIndex];

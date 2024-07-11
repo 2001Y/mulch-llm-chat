@@ -255,7 +255,7 @@ header {
     &.model-select-area {
       color: mix(#fff, #000, 70%);
       display: flex;
-      gap: .2em;
+      gap: .5em;
       width: 100vw;
       margin: 0 calc(50% - 50vw);
       padding: 0 calc(50vw - 50%);
@@ -447,6 +447,20 @@ header {
           color: #ffffff;
         }
       }
+    }
+
+  }
+
+  .model-select-area,
+  .input-actions {
+    display: none;
+  }
+
+  &.edited {
+
+    .model-select-area,
+    .input-actions {
+      display: flex; // または適切なdisplayプロパティ
     }
   }
 
