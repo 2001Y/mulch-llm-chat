@@ -364,13 +364,11 @@ header {
   }
 
   .input-actions {
-    // display: none;
     display: flex;
     gap: 0.5em;
 
     &.show {
       display: flex;
-      /* または適切なdisplayプロパティ */
     }
 
     .action-button {
@@ -460,7 +458,7 @@ header {
 
     .model-select-area,
     .input-actions {
-      display: flex; // または適切なdisplayプロパティ
+      display: flex;
     }
   }
 
@@ -714,11 +712,11 @@ header {
       cursor: auto;
 
       &.reply {
-        background-color: rgba(100, 100, 250, 0.1); // リプライメッセージの背景色
+        background-color: rgba(100, 100, 250, 0.1);
       }
 
       &.mention {
-        background-color: rgba(250, 250, 100, 0.1); // メンションメッセージの背景色
+        background-color: rgba(250, 250, 100, 0.1);
       }
 
       &.unselected {
