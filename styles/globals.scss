@@ -421,28 +421,31 @@ header {
           aspect-ratio: 1/1;
         }
       }
-    }
 
-    &.reset-regenerate-button,
-    &.send-button {
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      &.reset-regenerate-button,
+      &.send-button {
+        background-color: rgba(0, 255, 0, 0.2);
+        border: 1px solid rgba(0, 255, 0, 0.4);
+        color: #00ff00;
+        display: block;
 
-      &:hover {
-        background-color: mix(#fff, #000, 20%);
-        border-color: rgba(255, 255, 255, 0.4);
+        &:hover {
+          background-color: rgba(0, 255, 0, 0.3);
+          border-color: rgba(0, 255, 0, 0.6);
+          color: #ffffff;
+        }
       }
-    }
 
-    &.save-only-button,
-    &.send-primary-button {
-      background-color: rgba($accent-color, 0.2);
-      border: 1px solid rgba($accent-color, 0.4);
-      color: lighten($accent-color, 20%);
+      &.save-only-button {
+        background-color: rgba($accent-color, 0.2);
+        border: 1px solid rgba($accent-color, 0.4);
+        color: lighten($accent-color, 20%);
 
-      &:hover {
-        background-color: rgba($accent-color, 0.3);
-        border-color: rgba($accent-color, 0.6);
-        color: #ffffff;
+        &:hover {
+          background-color: rgba($accent-color, 0.3);
+          border-color: rgba($accent-color, 0.6);
+          color: #ffffff;
+        }
       }
     }
   }
