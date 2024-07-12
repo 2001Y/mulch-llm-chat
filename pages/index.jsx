@@ -133,6 +133,10 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
     setExpandedMessages(prev => {
       const currentLevel = prev[messageIndex] || 0;
       const newLevel = (currentLevel + 1) % 3; // 0, 1, 2 の循環
+
+      // 高さを更新する関数を呼び出す
+      setTimeout(() => updateResponseHeights(messageIndex, newLevel), 0);
+
       return {
         ...prev,
         [messageIndex]: newLevel
@@ -141,66 +145,63 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
   };
 
   useEffect(() => {
-    const updateSelectedResponsesHeight = () => {
-      const messageBlocks = document.querySelectorAll('.message-block');
-      const newMessageHeights = {};
+    // 初期表示時に高さを設定
+    messages.forEach((_, index) => {
+      updateResponseHeights(index, expandedMessages[index] || 0);
+    });
 
-      messageBlocks.forEach((block, index) => {
-        const responses = block.querySelectorAll('.response');
-        const scrollArea = block.querySelector('.scroll_area');
-        if (responses.length > 0) {
-          // 一時的にmax-heightを解除して実際の高さを取得
-          scrollArea.style.maxHeight = 'none';
-
-          // 各レスポンスの実際の高さを取得
-          const heights = Array.from(responses).map(r => {
-            const clone = r.cloneNode(true);
-            clone.style.maxHeight = 'none';
-            clone.style.position = 'absolute';
-            clone.style.visibility = 'hidden';
-            document.body.appendChild(clone);
-            const height = clone.offsetHeight;
-            document.body.removeChild(clone);
-            return height;
-          });
-
-          const minHeight = Math.max(Math.min(...heights), 100); // 最小値を100pxに設定
-          const maxHeight = Math.max(...heights);
-
-          newMessageHeights[index] = heights;
-
-          scrollArea.dataset.minHeight = `${minHeight}px`;
-          scrollArea.dataset.maxHeight = `${maxHeight}px`;
-
-          // 展開レベルに応じて max-height を設定
-          const expandLevel = expandedMessages[index] || 0;
-          if (expandLevel === 0) {
-            scrollArea.style.maxHeight = '70vh';
-          } else if (expandLevel === 1) {
-            const shortestVisibleHeight = Math.min(...heights.slice(0, selectedModels.length));
-            scrollArea.style.maxHeight = `${shortestVisibleHeight}px`;
-          } else {
-            scrollArea.style.maxHeight = 'none';
-          }
-        } else {
-          scrollArea.removeAttribute('data-min-height');
-          scrollArea.removeAttribute('data-max-height');
-          scrollArea.style.maxHeight = '70vh';
-        }
+    // ウィンドウリサイズ時に高さを再計算
+    const handleResize = () => {
+      messages.forEach((_, index) => {
+        updateResponseHeights(index, expandedMessages[index] || 0);
       });
-
-      setMessageHeights(newMessageHeights);
     };
 
-    // レスポンスの内容が完全に描画されるのを待つ
-    setTimeout(updateSelectedResponsesHeight, 0);
-
-    window.addEventListener('resize', updateSelectedResponsesHeight);
+    window.addEventListener('resize', handleResize);
 
     return () => {
-      window.removeEventListener('resize', updateSelectedResponsesHeight);
+      window.removeEventListener('resize', handleResize);
     };
   }, [messages, expandedMessages, selectedModels]);
+
+  const updateResponseHeights = (messageIndex, expandLevel) => {
+    const messageBlock = document.querySelector(`.message-block:nth-child(${messageIndex + 1})`);
+    if (!messageBlock) return;
+
+    const scrollArea = messageBlock.querySelector('.scroll_area');
+    const responses = messageBlock.querySelectorAll('.response');
+
+    if (responses.length === 0) {
+      scrollArea.style.maxHeight = '70vh';
+      return;
+    }
+
+    // 各レスポンスの実際の高さを取得
+    const heights = Array.from(responses).map(r => r.offsetHeight);
+
+    switch (expandLevel) {
+      case 0: // 折りたたみ状態
+        scrollArea.style.maxHeight = '70vh';
+        break;
+      case 1: // 一部展開状態
+        const visibleResponses = selectedModels.length;
+        // 表示されるレスポンスの中で最小の高さを採用
+        const visibleHeight = Math.min(...heights.slice(0, visibleResponses));
+
+        // レベル1と2の値が大差ない場合、直接レベル2に移行
+        if (visibleHeight > scrollArea.offsetHeight * 0.9) {
+          scrollArea.style.maxHeight = 'none';
+          setExpandedMessages(prev => ({ ...prev, [messageIndex]: 2 }));
+        } else {
+          scrollArea.style.maxHeight = `${visibleHeight}px`;
+        }
+        break;
+      case 2: // 完全展開状態
+        scrollArea.style.maxHeight = 'none';
+        break;
+    }
+  };
+
 
   const handleScroll = () => {
     const container = containerRef.current;
@@ -655,7 +656,7 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
         ))}
       </div>
 
-      <div className="input-actions">
+      <div className="input-container input-actions">
         {isEditMode ? (
           <>
             <button
@@ -666,7 +667,7 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
                 <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
               </svg>
 
-              <span>Regenerate<span className="shortcut"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span></span>
+              <span>Regenerate<span className="shortcut">⏎</span></span>
             </button>
             <button
               onClick={() => handleSaveOnly(messageIndex)}
@@ -680,15 +681,15 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
               <span>
                 Save
                 <span className="shortcut">
-                  ⌘
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path>
-                    <line x1="18" y1="9" x2="12" y2="15"></line>
-                    <line x1="12" y1="9" x2="18" y2="15"></line>
-                  </svg>
+                  ⌘⌫
                 </span>
               </span>
             </button>
+
+            <span className="shortcut-area">
+              Line break
+              <span className="shortcut">⇧⏎</span>
+            </span>
           </>
         ) : (
           <>
@@ -710,7 +711,10 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
               </svg>
 
-              <span>Send to Primary Model<span className="shortcut">⌘⏎</span></span>
+              <span>
+                Send to <code>{selectedModels[0].split('/')[1]}</code>
+                <span className="shortcut">⌘⏎</span>
+              </span>
             </button>
           </>
         )}

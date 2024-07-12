@@ -212,7 +212,7 @@ header {
   width: 100%;
   $chat-input-max-width: 50em;
   max-width: $chat-input-max-width;
-  padding: 0 $padding;
+  // padding: 0 $padding;
   // padding-bottom: calc(env(safe-area-inset-bottom) + $body-padding);
   display: flex;
   flex-direction: column;
@@ -226,6 +226,7 @@ header {
     align-items: flex-end;
     align-items: center;
     gap: 1em;
+    padding: 0 $padding;
 
     .open-modal-button {
       height: $modal-button_height;
@@ -256,9 +257,13 @@ header {
       color: mix(#fff, #000, 70%);
       // display: flex;
       gap: .5em;
-      width: 100vw;
-      margin: 0 calc(50% - 50vw);
-      padding: 0 calc(50vw - 50%);
+      // width: 100vw;
+      // margin: 0 calc(50% - 50vw);
+      // padding: 0 calc(50vw - 50%);
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+
       overflow-x: auto;
       scrollbar-width: none;
       scrollbar-color: transparent transparent;
@@ -329,12 +334,12 @@ header {
       $maxHeight: calc(100svh - $height_header - $modal-button_height - $body-padding * 3 - env(safe-area-inset-top));
       max-height: $maxHeight;
       max-width: 100%;
-      padding-right: 0;
       background: mix(#fff, #000, 10%);
       border-radius: $border-radius;
       box-shadow: $shadow;
       font-size: 1rem;
       padding: 1em;
+      margin: 0 1em;
 
       .chat-input {
         margin: auto;
@@ -361,6 +366,7 @@ header {
   }
 
   .action-button,
+  .shortcut-area,
   .model-radio label {
     height: 2rem;
   }
@@ -373,21 +379,57 @@ header {
       display: flex;
     }
 
-    .action-button {
-      $button-icon-size: 1.2em;
-      $button-padding-vertical: 0.5em;
-      $button-padding-horizontal: 0.9em;
+    $button-icon-size: 1.2em;
+    $button-padding-vertical: 0.5em;
+    $button-padding-horizontal: 0.9em;
 
-      padding: $button-padding-vertical $button-padding-horizontal;
-      background-color: mix(#fff, #000, 10%);
+    code {
+      font-family: monospace;
+      padding: 0 .1em;
+      font-size: 0.9em;
+      opacity: .8;
+
+      &:before,
+      &:after {
+        content: '"';
+        opacity: .5;
+      }
+    }
+
+    .action-button,
+    .shortcut-area {
       color: mix(#fff, #000, 70%);
-      border-radius: $border-radius;
-      transition: background-color 0.3s, color 0.3s;
+      padding: $button-padding-vertical $button-padding-horizontal;
       display: flex;
       align-items: center;
-      gap: 0.5em;
       white-space: nowrap;
       position: relative;
+
+      .shortcut {
+        margin-left: .5em;
+        opacity: .5;
+        display: inline-flex;
+        align-items: center;
+
+        svg {
+          width: 1.1em;
+          aspect-ratio: 1/1;
+        }
+      }
+    }
+
+    .shortcut-area {
+      opacity: .5;
+
+      .shortcut {
+        opacity: 1;
+      }
+    }
+
+    .action-button {
+      background-color: mix(#fff, #000, 10%);
+      border-radius: $border-radius;
+      transition: background-color 0.3s, color 0.3s;
 
       &:hover {
         background-color: mix(#fff, #000, 15%);
@@ -410,18 +452,6 @@ header {
         }
       }
 
-      .shortcut {
-        margin-left: .5em;
-        opacity: .5;
-        display: inline-flex;
-        align-items: center;
-
-        svg {
-          width: 1.1em;
-          aspect-ratio: 1/1;
-        }
-      }
-
       &.reset-regenerate-button,
       &.send-button {
         background-color: rgba(0, 255, 0, 0.2);
@@ -437,14 +467,10 @@ header {
       }
 
       &.save-only-button {
-        background-color: rgba($accent-color, 0.2);
-        border: 1px solid rgba($accent-color, 0.4);
-        color: lighten($accent-color, 20%);
+        border: 1px solid rgba(255, 255, 255, 0.245);
 
         &:hover {
-          background-color: rgba($accent-color, 0.3);
-          border-color: rgba($accent-color, 0.6);
-          color: #ffffff;
+          border-color: rgba(255, 255, 255, 0.6);
         }
       }
     }
@@ -561,6 +587,7 @@ header {
   height: 100svh;
   max-height: 100svh;
   padding-top: calc($height_header * 2 + env(safe-area-inset-top));
+  overflow: hidden;
   overflow-y: auto;
   overscroll-behavior-block: none;
   scroll-behavior: smooth;
