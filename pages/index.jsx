@@ -125,7 +125,82 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
   const [isAutoScroll, setIsAutoScroll] = useState(true);
   const [lastManualScrollTop, setLastManualScrollTop] = useState(0);
   const [lastAutoScrollTop, setLastAutoScrollTop] = useState(0);
+  const [expandedMessages, setExpandedMessages] = useState({});
+  const [messageHeights, setMessageHeights] = useState({});
   const isAutoScrollingRef = useRef(false);
+
+  const toggleExpand = (messageIndex) => {
+    setExpandedMessages(prev => {
+      const currentLevel = prev[messageIndex] || 0;
+      const newLevel = (currentLevel + 1) % 3; // 0, 1, 2 の循環
+      return {
+        ...prev,
+        [messageIndex]: newLevel
+      };
+    });
+  };
+
+  useEffect(() => {
+    const updateSelectedResponsesHeight = () => {
+      const messageBlocks = document.querySelectorAll('.message-block');
+      const newMessageHeights = {};
+
+      messageBlocks.forEach((block, index) => {
+        const responses = block.querySelectorAll('.response');
+        const scrollArea = block.querySelector('.scroll_area');
+        if (responses.length > 0) {
+          // 一時的にmax-heightを解除して実際の高さを取得
+          scrollArea.style.maxHeight = 'none';
+
+          // 各レスポンスの実際の高さを取得
+          const heights = Array.from(responses).map(r => {
+            const clone = r.cloneNode(true);
+            clone.style.maxHeight = 'none';
+            clone.style.position = 'absolute';
+            clone.style.visibility = 'hidden';
+            document.body.appendChild(clone);
+            const height = clone.offsetHeight;
+            document.body.removeChild(clone);
+            return height;
+          });
+
+          const minHeight = Math.max(Math.min(...heights), 100); // 最小値を100pxに設定
+          const maxHeight = Math.max(...heights);
+
+          newMessageHeights[index] = heights;
+
+          scrollArea.dataset.minHeight = `${minHeight}px`;
+          scrollArea.dataset.maxHeight = `${maxHeight}px`;
+
+          // 展開レベルに応じて max-height を設定
+          const expandLevel = expandedMessages[index] || 0;
+          if (expandLevel === 0) {
+            scrollArea.style.maxHeight = '70vh';
+          } else if (expandLevel === 1) {
+            const shortestVisibleHeight = Math.min(...heights.slice(0, selectedModels.length));
+            scrollArea.style.maxHeight = `${shortestVisibleHeight}px`;
+          } else {
+            scrollArea.style.maxHeight = 'none';
+          }
+        } else {
+          scrollArea.removeAttribute('data-min-height');
+          scrollArea.removeAttribute('data-max-height');
+          scrollArea.style.maxHeight = '70vh';
+        }
+      });
+
+      setMessageHeights(newMessageHeights);
+    };
+
+    // レスポンスの内容が完全に描画されるのを待つ
+    setTimeout(updateSelectedResponsesHeight, 0);
+
+    window.addEventListener('resize', updateSelectedResponsesHeight);
+
+    return () => {
+      window.removeEventListener('resize', updateSelectedResponsesHeight);
+    };
+  }, [messages, expandedMessages, selectedModels]);
 
   const handleScroll = () => {
     const container = containerRef.current;
@@ -276,6 +351,15 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
                     />
                   </div>
                 ))}
+              </div>
+              <div className="expand-control">
+                <button
+                  onClick={() => toggleExpand(messageIndex)}
+                  className={expandedMessages[messageIndex] === 2 ? 'folded' : ''}
+                >
+                  {expandedMessages[messageIndex] === 2 ? '折りたたむ' :
+                    expandedMessages[messageIndex] === 1 ? '全て表示する' : 'もっと見る'}
+                </button>
               </div>
               {messageIndex === messages.length - 1 && (
                 <InputSection
@@ -480,21 +564,42 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
   useEffect(() => {
     if (!CSS.supports('field-sizing: content')) {
       const textarea = inputRef.current;
+      if (!textarea) return;
+
       const adjustHeight = () => {
-        textarea.style.height = 'auto';
-        textarea.style.height = `${Math.min(textarea.scrollHeight, parseInt(getComputedStyle(textarea).maxHeight))}px`;
+        textarea.style.height = '1lh'; // 未入力時の高さを1lhに設定
+        textarea.style.height = `${Math.max(textarea.scrollHeight, parseFloat(getComputedStyle(textarea).lineHeight))}px`;
+        const computedStyle = window.getComputedStyle(textarea);
+        const maxHeight = parseInt(computedStyle.maxHeight);
+        if (textarea.scrollHeight > maxHeight) {
+          textarea.style.height = `${maxHeight}px`;
+          textarea.style.overflowY = 'auto';
+        } else {
+          textarea.style.overflowY = 'hidden';
+        }
       };
+
       textarea.addEventListener('input', adjustHeight);
+      window.addEventListener('resize', adjustHeight);
+
+      // 初期高さを設定
       adjustHeight();
-      // chatInputが空になったときに高さをリセット
+
+      // chatInputが変更されたときに高さを調整
       if (chatInput === '') {
-        textarea.style.height = 'auto';
+        textarea.style.height = '1lh'; // 未入力時の高さを1lhに設定
+      } else {
+        adjustHeight();
       }
+
       return () => {
         textarea.removeEventListener('input', adjustHeight);
+        window.removeEventListener('resize', adjustHeight);
       };
     }
-  }, []);
+  }, [chatInput]);
+
+
 
   return (
     <section className="input-section" ref={sectionRef}>
