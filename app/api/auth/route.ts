@@ -1,5 +1,7 @@
-export default async function handler(req, res) {
-    const { code, redirectUri, codeVerifier } = req.body;
+import { NextResponse } from 'next/server';
+
+export async function POST(req: Request) {
+    const { code } = await req.json();
 
     try {
         const response = await fetch('https://openrouter.ai/api/v1/auth/keys', {
@@ -13,9 +15,9 @@ export default async function handler(req, res) {
         });
 
         const data = await response.json();
-        res.status(200).json(data);
+        return NextResponse.json(data);
     } catch (error) {
         console.error('Error fetching access token:', error);
-        res.status(500).json({ error: 'Error fetching access token' });
+        return NextResponse.json({ error: 'Error fetching access token' }, { status: 500 });
     }
 }
