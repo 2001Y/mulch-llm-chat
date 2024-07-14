@@ -235,6 +235,7 @@ export default function Responses({
                             originalMessage={message.originalUser || message.user}
                             mainInput={false}
                             isInitialScreen={false}
+                            handleReset={handleReset}
                         />
                         <div className="scroll_area">
                             {Array.isArray(message.llm) && message.llm.map((response, responseIndex) => (
@@ -305,6 +306,7 @@ export default function Responses({
                 handleSaveOnly={() => { }}
                 originalMessage=""
                 isInitialScreen={messages.length === 0}
+                handleReset={handleReset}
             />
         </div >
     );

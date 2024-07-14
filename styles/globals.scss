@@ -596,7 +596,7 @@ header {
   min-height: 100svh;
   height: 100svh;
   max-height: 100svh;
-  padding-top: calc($height_header * 2 + env(safe-area-inset-top));
+  padding: calc($height_header * 2 + env(safe-area-inset-top)) 0;
   overflow: hidden;
   overflow-y: auto;
   overscroll-behavior-block: none;

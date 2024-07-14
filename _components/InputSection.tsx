@@ -15,6 +15,7 @@ interface InputSectionProps {
     handleSaveOnly: (messageIndex: number) => void;
     originalMessage: string;
     isInitialScreen: boolean;
+    handleReset: () => void;
 }
 
 export default function InputSection({
@@ -32,6 +33,7 @@ export default function InputSection({
     handleSaveOnly,
     originalMessage,
     isInitialScreen,
+    handleReset
 }: InputSectionProps) {
     const [isComposing, setIsComposing] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
@@ -109,7 +111,7 @@ export default function InputSection({
                 setShowSuggestions(false);
             } else if ((event.key === 'Backspace' || event.key === 'Delete') && (event.metaKey || event.ctrlKey)) {
                 event.preventDefault();
-                handleStop();
+                handleReset();
             }
         }
     };
