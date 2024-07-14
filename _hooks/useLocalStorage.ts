@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 
-export default function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val: T) => T)) => void] {
+export default function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val: T) => T)) => void, boolean] {
     const [storedValue, setStoredValue] = useState<T>(initialValue);
+    const [isLoaded, setIsLoaded] = useState(false);
     const isInitialized = useRef(false);
 
     useEffect(() => {
@@ -11,9 +12,12 @@ export default function useLocalStorage<T>(key: string, initialValue: T): [T, (v
                     const item = localStorage.getItem(key);
                     if (item) {
                         setStoredValue(JSON.parse(item));
+                        console.log(`ローカルストレージからキー「${key}」の値を読み込みました:`, JSON.parse(item));
                     }
                 } catch (error) {
-                    console.error('Error reading from localStorage:', error);
+                    console.error('ローカルストレージからの読み込みエラー:', error);
+                } finally {
+                    setIsLoaded(true);
                 }
             }
             isInitialized.current = true;
@@ -26,11 +30,12 @@ export default function useLocalStorage<T>(key: string, initialValue: T): [T, (v
             setStoredValue(valueToStore);
             if (typeof window !== 'undefined') {
                 localStorage.setItem(key, JSON.stringify(valueToStore));
+                console.log(`ローカルストレージにキー「${key}」の値を保存しました:`, valueToStore);
             }
         } catch (error) {
-            console.error('Error writing to localStorage:', error);
+            console.error('ローカルストレージへの書き込みエラー:', error);
         }
     };
 
-    return [storedValue, setValue];
+    return [storedValue, setValue, isLoaded];
 }

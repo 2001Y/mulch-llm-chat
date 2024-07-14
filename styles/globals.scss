@@ -426,6 +426,10 @@ header {
     .shortcut-area {
       opacity: .5;
 
+      &.line-break {
+        display: none;
+      }
+
       .shortcut {
         opacity: 1;
       }
@@ -457,7 +461,6 @@ header {
         }
       }
 
-      &.reset-regenerate-button,
       &.send-button {
         background-color: rgba(0, 255, 0, 0.2);
         border: 1px solid rgba(0, 255, 0, 0.4);
@@ -492,18 +495,44 @@ header {
     .input-actions,
     .model-select-area {
       display: flex;
+
+      .line-break {
+        display: flex;
+      }
     }
   }
 
   &.edited {
     .input-actions {
       display: flex;
+
+      .reset-regenerate-button {
+        background-color: rgba(0, 255, 0, 0.2);
+        border: 1px solid rgba(0, 255, 0, 0.4);
+        color: #00ff00;
+
+        &:hover {
+          background-color: rgba(0, 255, 0, 0.3);
+          border-color: rgba(0, 255, 0, 0.6);
+          color: #ffffff;
+        }
+      }
     }
   }
 
   &.focused {
+
+    .input-actions,
     .model-select-area {
       display: flex;
+
+      .line-break {
+        display: flex;
+      }
+    }
+
+    .save-only-button {
+      display: none;
     }
   }
 
@@ -601,16 +630,6 @@ header {
   overflow-y: auto;
   overscroll-behavior-block: none;
   scroll-behavior: smooth;
-
-  // .input-section {
-  //   transition: .3s transform;
-  // }
-
-  // &.initial-screen {
-  //   .input-section {
-  //     transform: translateY(calc(50vh - $height_header * 1.5 - 50%));
-  //   }
-  // }
 
   .message-block {
     width: 100%;
@@ -725,16 +744,6 @@ header {
           display: flex;
 
           .reset-regenerate-button {
-            background-color: rgba(0, 255, 0, 0.2);
-            border: 1px solid rgba(0, 255, 0, 0.4);
-            color: #00ff00;
-            display: block;
-
-            &:hover {
-              background-color: rgba(0, 255, 0, 0.3);
-              border-color: rgba(0, 255, 0, 0.6);
-              color: #ffffff;
-            }
 
             &::before {
               content: "Yes, All Regenerate";

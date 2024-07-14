@@ -74,9 +74,9 @@ export default function Responses({
         return () => {
             window.removeEventListener('resize', handleResize);
         };
-    }, [messages, expandedMessages, selectedModels]);
+    }, [messages, selectedModels]);
 
-    const updateResponseHeights = (messageIndex: number) => {
+    const updateResponseHeights = useCallback((messageIndex: number) => {
         const messageBlock = document.querySelector(`.message-block:nth-child(${messageIndex + 1})`);
         if (!messageBlock) return;
 
@@ -119,7 +119,7 @@ export default function Responses({
                 });
             }
         }
-    };
+    }, [expandedMessages]);
 
     const toggleExpand = (messageIndex: number) => {
         setExpandedMessages(prev => ({

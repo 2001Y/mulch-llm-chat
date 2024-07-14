@@ -38,8 +38,22 @@ export default function Home() {
   const [selectedModels, setSelectedModels] = useState<string[]>(models);
   const [showResetButton, setShowResetButton] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-
+  const [storedMessages, setStoredMessages, isStoredMessagesLoaded] = useLocalStorage<any[]>('chatMessages', []);
   const router = useRouter();
+
+  useEffect(() => {
+    if (isStoredMessagesLoaded) {
+      if (storedMessages.length > 0) {
+        try {
+          console.log('以前のメッセージを復元:', storedMessages);
+          setMessages(storedMessages);
+          setShowResetButton(true);
+        } catch (error) {
+          console.error('メッセージの解析エラー:', error);
+        }
+      }
+    }
+  }, [isStoredMessagesLoaded, storedMessages]);
 
   useEffect(() => {
     if (accessToken !== previousAccessToken) {
@@ -95,9 +109,10 @@ export default function Home() {
           }
         }
       }
+      setStoredMessages(newMessages);
       return newMessages;
     });
-  }, []);
+  }, [setMessages, setStoredMessages]);
 
   const fetchChatResponse = useCallback(async (model: string, messageIndex: number, responseIndex: number, abortController: AbortController, inputText: string) => {
     try {
@@ -162,6 +177,7 @@ export default function Home() {
         if (newMessages[messageIndex]?.llm[responseIndex] !== undefined) {
           newMessages[messageIndex].llm[responseIndex].isGenerating = false;
         }
+        setStoredMessages(newMessages);
         return newMessages;
       });
       setMessages(prevMessages => {
@@ -172,7 +188,7 @@ export default function Home() {
         return prevMessages;
       });
     }
-  }, [messages, openai, updateMessage]);
+  }, [messages, openai, updateMessage, setStoredMessages]);
 
   const handleSend = async (event: React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>, isPrimaryOnly = false, messageIndex?: number) => {
     if (isGenerating) return;
@@ -242,8 +258,9 @@ export default function Home() {
         }));
       });
     } else {
-      if (window.confirm('本当にチャット履歴をクリアしますか？この操作は元に戻せません。')) {
+      if (window.confirm('Are you sure you want to clear your chat history? This operation cannot be undone.')) {
         setMessages([]);
+        setStoredMessages([]);
         setShowResetButton(false);
       }
     }
