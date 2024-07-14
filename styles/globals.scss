@@ -78,6 +78,18 @@ html {
   }
 }
 
+.shortcut {
+  margin-left: .5em;
+  opacity: .5;
+  display: inline-flex;
+  align-items: center;
+
+  svg {
+    width: 1.1em;
+    aspect-ratio: 1/1;
+  }
+}
+
 header {
   display: flex;
   align-items: center;
@@ -221,6 +233,14 @@ header {
   font-size: 0.8rem;
   margin: 0 auto;
 
+  &:first-of-type {
+    transition: .5s transform;
+  }
+
+  &.initial-screen {
+    transform: translateY(calc(50vh - $height_header * 1.5 - 50%));
+  }
+
   .input-container {
     display: flex;
     align-items: flex-end;
@@ -339,7 +359,7 @@ header {
       box-shadow: $shadow;
       font-size: 1rem;
       padding: 1em;
-      margin: 0 1em;
+      margin: 0 $padding;
 
       .chat-input {
         margin: auto;
@@ -375,10 +395,6 @@ header {
     display: flex;
     gap: 0.5em;
 
-    &.show {
-      display: flex;
-    }
-
     $button-icon-size: 1.2em;
     $button-padding-vertical: 0.5em;
     $button-padding-horizontal: 0.9em;
@@ -404,18 +420,6 @@ header {
       align-items: center;
       white-space: nowrap;
       position: relative;
-
-      .shortcut {
-        margin-left: .5em;
-        opacity: .5;
-        display: inline-flex;
-        align-items: center;
-
-        svg {
-          width: 1.1em;
-          aspect-ratio: 1/1;
-        }
-      }
     }
 
     .shortcut-area {
@@ -482,16 +486,21 @@ header {
     display: none;
   }
 
-  &.edited {
+  &.full-input {
 
-    .model-select-area,
+    .input-actions,
+    .model-select-area {
+      display: flex;
+    }
+  }
+
+  &.edited {
     .input-actions {
       display: flex;
     }
   }
 
   &.focused {
-
     .model-select-area {
       display: flex;
     }
@@ -592,20 +601,25 @@ header {
   overscroll-behavior-block: none;
   scroll-behavior: smooth;
 
-  &.initial-screen {
-    padding-top: 0;
-    display: grid;
-    place-items: center;
-  }
+  // .input-section {
+  //   transition: .3s transform;
+  // }
+
+  // &.initial-screen {
+  //   .input-section {
+  //     transform: translateY(calc(50vh - $height_header * 1.5 - 50%));
+  //   }
+  // }
 
   .message-block {
     width: 100%;
-    padding-bottom: 8rem;
+    transition: .3s transform;
+    transform: translateY(0);
 
     &:last-of-type {
       display: flex;
       flex-direction: column;
-      min-height: calc(100svh - $height_header*1.5);
+      // min-height: calc(100svh - $height_header*1.5);
 
       .scroll_area {
         // padding-bottom: calc(8em + env(safe-area-inset-bottom)*1.5);
@@ -738,7 +752,7 @@ header {
     display: flex;
     align-items: flex-start;
     overflow-x: auto;
-    overflow-y: auto;
+    overflow-y: hidden;
     transition: max-height 0.3s ease;
     gap: calc($body-padding * .7);
     padding: 1em 2em 2em $body-padding;
@@ -1072,28 +1086,6 @@ body {
     will-change: transform;
     transition: transform .3s;
   }
-
-  // &[data-input-focused="true"][data-software-keyboard="true"] {
-  //   .responses-container {
-  //     transform: translateY(calc(var(--keyboardHeight) - $height_header * 1.5));
-  //   }
-
-  //   .chat-input-area {
-  //     max-height: calc(var(--actual-100dvh) - $modal-button_height - $body-padding*2 - env(safe-area-inset-top)) !important;
-
-  //     .chat-input {
-  //       max-height: calc(var(--actual-100dvh) - $modal-button_height - $body-padding*2 - env(safe-area-inset-top) - 2em) !important;
-  //     }
-  //   }
-
-  //   .input-section {
-  //     padding-bottom: $body-padding;
-  //   }
-
-  //   .reset-button {
-  //     bottom: calc(var(--keyboardHeight) + 1.5em);
-  //   }
-  // }
 }
 
 textarea[fieldSizing="content"] {

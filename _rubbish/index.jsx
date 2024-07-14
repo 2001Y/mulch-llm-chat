@@ -126,34 +126,16 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
   const [lastManualScrollTop, setLastManualScrollTop] = useState(0);
   const [lastAutoScrollTop, setLastAutoScrollTop] = useState(0);
   const [expandedMessages, setExpandedMessages] = useState({});
-  const [messageHeights, setMessageHeights] = useState({});
   const isAutoScrollingRef = useRef(false);
 
-  const toggleExpand = (messageIndex) => {
-    setExpandedMessages(prev => {
-      const currentLevel = prev[messageIndex] || 0;
-      const newLevel = (currentLevel + 1) % 3; // 0, 1, 2 の循環
-
-      // 高さを更新する関数を呼び出す
-      setTimeout(() => updateResponseHeights(messageIndex, newLevel), 0);
-
-      return {
-        ...prev,
-        [messageIndex]: newLevel
-      };
-    });
-  };
-
   useEffect(() => {
-    // 初期表示時に高さを設定
     messages.forEach((_, index) => {
-      updateResponseHeights(index, expandedMessages[index] || 0);
+      updateResponseHeights(index);
     });
 
-    // ウィンドウリサイズ時に高さを再計算
     const handleResize = () => {
       messages.forEach((_, index) => {
-        updateResponseHeights(index, expandedMessages[index] || 0);
+        updateResponseHeights(index);
       });
     };
 
@@ -164,7 +146,7 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
     };
   }, [messages, expandedMessages, selectedModels]);
 
-  const updateResponseHeights = (messageIndex, expandLevel) => {
+  const updateResponseHeights = (messageIndex) => {
     const messageBlock = document.querySelector(`.message-block:nth-child(${messageIndex + 1})`);
     if (!messageBlock) return;
 
@@ -176,32 +158,42 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
       return;
     }
 
-    // 各レスポンスの実際の高さを取得
-    const heights = Array.from(responses).map(r => r.offsetHeight);
+    const responseHeights = Array.from(responses).map(response => response.offsetHeight);
+    const minHeight = Math.min(...responseHeights);
+    const maxHeight = Math.max(...responseHeights);
+    const totalHeight = responseHeights.reduce((sum, height) => sum + height, 0);
 
-    switch (expandLevel) {
-      case 0: // 折りたたみ状態
-        scrollArea.style.maxHeight = '70vh';
-        break;
-      case 1: // 一部展開状態
-        const visibleResponses = selectedModels.length;
-        // 表示されるレスポンスの中で最小の高さを採用
-        const visibleHeight = Math.min(...heights.slice(0, visibleResponses));
+    const isShort = totalHeight <= 300 || maxHeight <= 300;
 
-        // レベル1と2の値が大差ない場合、直接レベル2に移行
-        if (visibleHeight > scrollArea.offsetHeight * 0.9) {
-          scrollArea.style.maxHeight = 'none';
-          setExpandedMessages(prev => ({ ...prev, [messageIndex]: 2 }));
-        } else {
-          scrollArea.style.maxHeight = `${visibleHeight}px`;
-        }
-        break;
-      case 2: // 完全展開状態
+    if (isShort) {
+      scrollArea.style.maxHeight = 'none';
+      setExpandedMessages(prev => ({ ...prev, [messageIndex]: true }));
+    } else {
+      const isExpanded = expandedMessages[messageIndex];
+      if (isExpanded) {
         scrollArea.style.maxHeight = 'none';
-        break;
+      } else {
+        scrollArea.style.maxHeight = `${minHeight}px`;
+        responses.forEach((response, index) => {
+          if (responseHeights[index] > minHeight) {
+            response.style.maxHeight = `${minHeight}px`;
+            response.style.overflow = 'hidden';
+          } else {
+            response.style.maxHeight = 'none';
+            response.style.overflow = 'visible';
+          }
+        });
+      }
     }
   };
 
+  const toggleExpand = (messageIndex) => {
+    setExpandedMessages(prev => ({
+      ...prev,
+      [messageIndex]: !prev[messageIndex]
+    }));
+    setTimeout(() => updateResponseHeights(messageIndex), 0);
+  };
 
   const handleScroll = () => {
     const container = containerRef.current;
@@ -280,128 +272,113 @@ const Responses = ({ messages = [], updateMessage, forceScroll, handleRegenerate
   }, [updateMessage]);
 
   const handleSaveOnly = (messageIndex) => {
-    updateMessage(messageIndex, null, null, null, false, true);
+    const currentMessage = messages[messageIndex];
+    updateMessage(messageIndex, null, currentMessage.user, null, false, true);
   };
 
   return (
-    <div className={`responses-container ${messages.length < 1 ? 'initial-screen' : ''}`} ref={containerRef} translate="no">
-      {Array.isArray(messages) && messages.length > 0 ? (
-        messages.map((message, messageIndex) => {
-          const selectedResponses = message.llm.filter(r => r.selected).sort((a, b) => a.selectedOrder - b.selectedOrder);
-          const hasSelectedResponse = selectedResponses.length > 0;
-          return (
-            <div key={messageIndex} className="message-block" >
-              <InputSection
-                models={models}
-                chatInput={message.user}
-                setChatInput={(newInput) => updateMessage(messageIndex, null, newInput)}
-                handleSend={(event, isPrimaryOnly) => handleSend(event, isPrimaryOnly, messageIndex)}
-                handleStop={handleStop}
-                openModal={openModal}
-                isGenerating={isGenerating}
-                selectedModels={selectedModels}
-                setSelectedModels={setSelectedModels}
-                showResetButton={showResetButton}
-                handleReset={handleReset}
-                isEditMode={true}
-                messageIndex={messageIndex}
-                handleResetAndRegenerate={handleResetAndRegenerate}
-                handleSaveOnly={handleSaveOnly}
-                originalMessage={message.originalUser || message.user}
-              />
-              <div className="scroll_area">
-                {Array.isArray(message.llm) && message.llm.map((response, responseIndex) => (
-                  <div key={responseIndex} className={`response ${response.role} ${hasSelectedResponse && !response.selected ? 'unselected' : ''}`}>
-                    <div className="meta">
-                      <small>{response.model}</small>
-                      <div className="response-controls">
-                        <button
-                          className={response.isGenerating ? "stop-button" : "regenerate-button"}
-                          onClick={() => response.isGenerating
-                            ? handleStop(messageIndex, responseIndex)
-                            : handleRegenerate(messageIndex, responseIndex, response.model)
-                          }
-                        >
-                          {response.isGenerating ? (
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                              <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
-                            </svg>
-                          ) : (
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
-                            </svg>
-                          )}
-                        </button>
-                        <div
-                          className={`response-select ${response.selected ? 'selected' : ''}`}
-                          onClick={() => handleSelectResponse(messageIndex, responseIndex)}
-                        >
-                          {response.selected ? (
-                            selectedResponses.length > 1 ?
-                              (selectedResponses.findIndex(r => r === response) + 1) :
-                              '✓'
-                          ) : ''}
-                        </div>
+    <div className={`responses-container ${messages.length === 0 ? 'initial-screen' : ''}`} ref={containerRef} translate="no">
+      {messages.map((message, messageIndex) => {
+        const selectedResponses = message.llm.filter(r => r.selected).sort((a, b) => a.selectedOrder - b.selectedOrder);
+        const hasSelectedResponse = selectedResponses.length > 0;
+        const isExpanded = expandedMessages[messageIndex];
+        return (
+          <div key={messageIndex} className="message-block" >
+            <InputSection
+              models={models}
+              chatInput={message.user}
+              setChatInput={(newInput) => updateMessage(messageIndex, null, newInput)}
+              handleSend={(event, isPrimaryOnly) => handleSend(event, isPrimaryOnly, messageIndex)}
+              handleStop={handleStop}
+              openModal={openModal}
+              isGenerating={isGenerating}
+              selectedModels={selectedModels}
+              setSelectedModels={setSelectedModels}
+              showResetButton={showResetButton}
+              handleReset={handleReset}
+              isEditMode={true}
+              messageIndex={messageIndex}
+              handleResetAndRegenerate={handleResetAndRegenerate}
+              handleSaveOnly={handleSaveOnly}
+              originalMessage={message.originalUser || message.user}
+            />
+            <div className="scroll_area">
+              {Array.isArray(message.llm) && message.llm.map((response, responseIndex) => (
+                <div key={responseIndex} className={`response ${response.role} ${hasSelectedResponse && !response.selected ? 'unselected' : ''}`}>
+                  <div className="meta">
+                    <small>{response.model}</small>
+                    <div className="response-controls">
+                      <button
+                        className={response.isGenerating ? "stop-button" : "regenerate-button"}
+                        onClick={() => response.isGenerating
+                          ? handleStop(messageIndex, responseIndex)
+                          : handleRegenerate(messageIndex, responseIndex, response.model)
+                        }
+                      >
+                        {response.isGenerating ? (
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                            <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+                          </svg>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
+                          </svg>
+                        )}
+                      </button>
+                      <div
+                        className={`response-select ${response.selected ? 'selected' : ''}`}
+                        onClick={() => handleSelectResponse(messageIndex, responseIndex)}
+                      >
+                        {response.selected ? (
+                          selectedResponses.length > 1 ?
+                            (selectedResponses.findIndex(r => r === response) + 1) :
+                            '✓'
+                        ) : ''}
                       </div>
                     </div>
-                    <div
-                      className="markdown-content"
-                      contentEditable
-                      onBlur={(e) => handleEdit(messageIndex, responseIndex, e.target.innerHTML)}
-                      dangerouslySetInnerHTML={{ __html: response.text }}
-                    />
                   </div>
-                ))}
-              </div>
+                  <div
+                    className="markdown-content"
+                    contentEditable
+                    onBlur={(e) => handleEdit(messageIndex, responseIndex, e.target.innerHTML)}
+                    dangerouslySetInnerHTML={{ __html: response.text }}
+                  />
+                </div>
+              ))}
+            </div>
+            {!isExpanded && message.llm.length > 0 && (
               <div className="expand-control">
-                <button
-                  onClick={() => toggleExpand(messageIndex)}
-                  className={expandedMessages[messageIndex] === 2 ? 'folded' : ''}
-                >
-                  {expandedMessages[messageIndex] === 2 ? '折りたたむ' :
-                    expandedMessages[messageIndex] === 1 ? '全て表示する' : 'もっと見る'}
+                <button onClick={() => toggleExpand(messageIndex)}>
+                  すべて表示
                 </button>
               </div>
-              {messageIndex === messages.length - 1 && (
-                <InputSection
-                  models={models}
-                  chatInput={chatInput}
-                  setChatInput={setChatInput}
-                  handleSend={(event, isPrimaryOnly) => handleSend(event, isPrimaryOnly, messageIndex)}
-                  handleStop={handleStop}
-                  openModal={openModal}
-                  isGenerating={isGenerating}
-                  selectedModels={selectedModels}
-                  setSelectedModels={setSelectedModels}
-                  showResetButton={showResetButton}
-                  handleReset={handleReset}
-                  isEditMode={false}
-                />
-              )}
-            </div>
-          );
-        })
-      ) : (
-        <InputSection
-          models={models}
-          chatInput={chatInput}
-          setChatInput={setChatInput}
-          handleSend={(event, isPrimaryOnly) => handleSend(event, isPrimaryOnly, -1)}
-          handleStop={handleStop}
-          openModal={openModal}
-          isGenerating={isGenerating}
-          selectedModels={selectedModels}
-          setSelectedModels={setSelectedModels}
-          showResetButton={showResetButton}
-          handleReset={handleReset}
-          isEditMode={false}
-        />
-      )}
+            )}
+          </div>
+        );
+      })}
+      {/* {messages.length === 0 && ( */}
+      <InputSection
+        mainInput={true}
+        models={models}
+        chatInput={chatInput}
+        setChatInput={setChatInput}
+        handleSend={(event, isPrimaryOnly) => handleSend(event, isPrimaryOnly, messages.length - 1)}
+        handleStop={handleStop}
+        openModal={openModal}
+        isGenerating={isGenerating}
+        selectedModels={selectedModels}
+        setSelectedModels={setSelectedModels}
+        showResetButton={showResetButton}
+        handleReset={handleReset}
+        isEditMode={false}
+        isInitialScreen={messages.length === 0}
+      />
+      {/* {)}} */}
     </div >
   );
 };
 
-const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop, openModal, isGenerating, selectedModels, setSelectedModels, showResetButton, handleReset, isEditMode, messageIndex, handleResetAndRegenerate, handleSaveOnly, originalMessage }) => {
+const InputSection = ({ models, mainInput, chatInput, setChatInput, handleSend, handleStop, openModal, isGenerating, selectedModels, setSelectedModels, showResetButton, handleReset, isEditMode, messageIndex, handleResetAndRegenerate, handleSaveOnly, originalMessage, isInitialScreen }) => {
   const [isComposing, setIsComposing] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
@@ -475,9 +452,7 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
       } else if (event.key === 'Backspace' && (event.metaKey || event.ctrlKey)) {
         // ⌘+Deleteの処理
         event.preventDefault();
-        if (isEditMode) {
-          setChatInput(originalMessage);
-        }
+        handleStop();
       }
     }
   };
@@ -550,11 +525,17 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
   const handleModelChange = (model) => {
     const wasInputFocused = document.activeElement === inputRef.current;
     setSelectedModels((prevSelectedModels) => {
+      let newSelectedModels;
       if (prevSelectedModels.includes(model)) {
-        return prevSelectedModels.filter((m) => m !== model);
+        newSelectedModels = prevSelectedModels.filter((m) => m !== model);
       } else {
-        return [...prevSelectedModels, model];
+        newSelectedModels = [model, ...prevSelectedModels.filter((m) => m !== model)];
       }
+      // 選択されたモデルが1つもない場合、最初のモデルを選択状態にする
+      if (newSelectedModels.length === 0) {
+        newSelectedModels = [models[0]];
+      }
+      return newSelectedModels;
     });
     if (wasInputFocused && inputRef.current) {
       setTimeout(() => inputRef.current.focus(), 0);
@@ -603,7 +584,7 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
 
 
   return (
-    <section className="input-section" ref={sectionRef}>
+    <section className={`input-section ${isInitialScreen ? 'initial-screen' : ''} ${mainInput ? 'full-input' : ''}`} ref={sectionRef}>
       <div className="input-container chat-input-area">
         <textarea
           ref={inputRef}
@@ -680,9 +661,6 @@ const InputSection = ({ models, chatInput, setChatInput, handleSend, handleStop,
               </svg>
               <span>
                 Save
-                <span className="shortcut">
-                  ⌘⌫
-                </span>
               </span>
             </button>
 
@@ -767,10 +745,16 @@ export default function Home({ manifestUrl }) {
       if (responseIndex === null) {
         // ユーザーメッセージの編集
         if (text !== undefined) {
-          if (!newMessages[messageIndex].originalUser) {
-            newMessages[messageIndex].originalUser = newMessages[messageIndex].user;
+          if (saveOnly) {
+            // handleSaveOnlyの場合、originalUserを更新
+            newMessages[messageIndex].originalUser = text;
+            newMessages[messageIndex].user = text;
+          } else {
+            if (!newMessages[messageIndex].originalUser) {
+              newMessages[messageIndex].originalUser = newMessages[messageIndex].user;
+            }
+            newMessages[messageIndex].user = text;
           }
-          newMessages[messageIndex].user = text;
         }
       } else if (newMessages[messageIndex]?.llm[responseIndex] !== undefined) {
         // AIの応答の編集
@@ -858,6 +842,14 @@ export default function Home({ manifestUrl }) {
           newMessages[messageIndex].llm[responseIndex].isGenerating = false;
         }
         return newMessages;
+      });
+      // 全てのレスポンスの生成が完了したかチェック
+      setMessages(prevMessages => {
+        const allResponsesComplete = prevMessages[messageIndex].llm.every(response => !response.isGenerating);
+        if (allResponsesComplete) {
+          setIsGenerating(false);
+        }
+        return prevMessages;
       });
     }
   }, [messages, openai]);
@@ -1138,7 +1130,12 @@ export default function Home({ manifestUrl }) {
               </>
             )}
           </svg>
-          <span>{isGenerating ? 'Stop generation' : 'New thread'}</span>
+          <span className="shortcut-area">{isGenerating ? (<>
+            Stop generation
+            <span className="shortcut">
+              ⌘⌫
+            </span>
+          </>) : 'New thread'}</span>
         </button>
       )}
       <Responses
