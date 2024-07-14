@@ -107,8 +107,7 @@ export default function InputSection({
                 }
             } else if (event.key === 'Escape') {
                 setShowSuggestions(false);
-            } else if (event.key === 'Backspace' && (event.metaKey || event.ctrlKey)) {
-                // ⌘+Deleteの処理
+            } else if ((event.key === 'Backspace' || event.key === 'Delete') && (event.metaKey || event.ctrlKey)) {
                 event.preventDefault();
                 handleStop();
             }
