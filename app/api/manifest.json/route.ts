@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 
 export async function GET(req: Request) {
+    const { searchParams } = new URL(req.url);
+    const startUrl = searchParams.get('url') || '/';
+
     const manifest = {
         name: "Mulch AI Chat",
         short_name: "Mulch AI Chat",
-        start_url: '/',
+        start_url: startUrl,
         display: "standalone",
         background_color: "#000000",
         theme_color: "#000000",
