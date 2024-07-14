@@ -1,18 +1,16 @@
 'use client';
 
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import OpenAI from "openai";
 import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
-import Responses from "/_components/Responses";
-import InputSection from "/_components/InputSection";
-import ModelInputModal from "/_components/ModelInputModal";
-import useLocalStorage from "/_hooks/useLocalStorage";
-import useAccessToken from "/_hooks/useAccessToken";
-import { useOpenAI } from "/_hooks/useOpenAI";
+import Responses from "_components/Responses";
+import ModelInputModal from "_components/ModelInputModal";
+import useLocalStorage from "_hooks/useLocalStorage";
+import useAccessToken from "_hooks/useAccessToken";
+import { useOpenAI } from "_hooks/useOpenAI";
 
 marked.use(
   markedHighlight({
@@ -25,19 +23,19 @@ marked.use(
 );
 
 export default function Home() {
-  const [models, setModels] = useLocalStorage('models', ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'cohere/command-r-plus', "meta-llama/llama-3-70b-instruct"]);
-  const [demoModels, setDemoModels] = useState(['google/gemma-2-9b-it:free', "google/gemma-7b-it:free", "meta-llama/llama-3-8b-instruct:free", "openchat/openchat-7b:free"]);
+  const [models, setModels] = useLocalStorage<string[]>('models', ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'cohere/command-r-plus', "meta-llama/llama-3-70b-instruct"]);
+  const [demoModels] = useState<string[]>(['google/gemma-2-9b-it:free', "google/gemma-7b-it:free", "meta-llama/llama-3-8b-instruct:free", "openchat/openchat-7b:free"]);
   const [chatInput, setChatInput] = useState('');
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState<any[]>([]);
   const [accessToken, setAccessToken, previousAccessToken] = useAccessToken();
-  const [demoAccessToken, setDemoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO || '');
+  const [demoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO || '');
   const openai = useOpenAI(accessToken || demoAccessToken);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
   const [forceScroll, setForceScroll] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [abortControllers, setAbortControllers] = useState([]);
-  const [selectedModels, setSelectedModels] = useState(models);
+  const [abortControllers, setAbortControllers] = useState<AbortController[]>([]);
+  const [selectedModels, setSelectedModels] = useState<string[]>(models);
   const [showResetButton, setShowResetButton] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
@@ -61,7 +59,7 @@ export default function Home() {
     setIsLoggedIn(!!accessToken);
   }, [accessToken]);
 
-  const updateMessage = useCallback((messageIndex, responseIndex, text, selectedIndex, toggleSelected, saveOnly, isEditing) => {
+  const updateMessage = useCallback((messageIndex: number, responseIndex: number | null, text: string | undefined, selectedIndex?: number | undefined, toggleSelected?: boolean, saveOnly?: boolean, isEditing?: boolean) => {
     setMessages(prevMessages => {
       const newMessages = JSON.parse(JSON.stringify(prevMessages));
       if (responseIndex === null) {
@@ -85,13 +83,13 @@ export default function Home() {
           if (currentResponse.selected) {
             currentResponse.selected = false;
             delete currentResponse.selectedOrder;
-            newMessages[messageIndex].llm.forEach(response => {
+            newMessages[messageIndex].llm.forEach((response: any) => {
               if (response.selected && response.selectedOrder > currentResponse.selectedOrder) {
                 response.selectedOrder--;
               }
             });
           } else {
-            const selectedCount = newMessages[messageIndex].llm.filter(r => r.selected).length;
+            const selectedCount = newMessages[messageIndex].llm.filter((r: any) => r.selected).length;
             currentResponse.selected = true;
             currentResponse.selectedOrder = selectedCount + 1;
           }
@@ -101,7 +99,7 @@ export default function Home() {
     });
   }, []);
 
-  const fetchChatResponse = useCallback(async (model, messageIndex, responseIndex, abortController, inputText) => {
+  const fetchChatResponse = useCallback(async (model: string, messageIndex: number, responseIndex: number, abortController: AbortController, inputText: string) => {
     try {
       setMessages(prevMessages => {
         const newMessages = [...prevMessages];
@@ -113,42 +111,49 @@ export default function Home() {
       const pastMessages = messages.flatMap(msg => {
         const userMessage = { role: 'user', content: msg.user };
         const selectedResponses = msg.llm
-          .filter(llm => llm.selected)
-          .sort((a, b) => a.selectedOrder - b.selectedOrder);
+          .filter((llm: any) => llm.selected)
+          .sort((a: any, b: any) => a.selectedOrder - b.selectedOrder);
 
         const responseMessages = selectedResponses.length > 0
-          ? selectedResponses.map(llm => ({ role: 'assistant', content: llm.text }))
-          : [{ role: 'assistant', content: msg.llm.find(llm => llm.model === model)?.text || '' }];
+          ? selectedResponses.map((llm: any) => ({ role: 'assistant', content: llm.text }))
+          : [{ role: 'assistant', content: msg.llm.find((llm: any) => llm.model === model)?.text || '' }];
 
         return [userMessage, ...responseMessages];
       });
 
       console.log('モデルに送信する過去の会話:', pastMessages);
-
-      const stream = await openai.chat.completions.create({
+      const stream = await openai?.chat.completions.create({
         model,
         messages: [
           ...pastMessages,
           { role: 'user', content: inputText }
         ],
         stream: true,
+      }, {
         signal: abortController.signal,
       });
 
-      let result = '';
-      for await (const part of stream) {
-        if (abortController.signal.aborted) {
-          throw new DOMException('Aborted', 'AbortError');
+      if (stream) {
+        let result = '';
+        for await (const part of stream) {
+          if (abortController.signal.aborted) {
+            throw new DOMException('Aborted', 'AbortError');
+          }
+          const content = part.choices[0]?.delta?.content || '';
+          result += content;
+          const markedResult = await marked(result);
+          updateMessage(messageIndex, responseIndex, markedResult, undefined, false, false, false);
         }
-        const content = part.choices[0]?.delta?.content || '';
-        result += content;
-        updateMessage(messageIndex, responseIndex, marked(result));
+        setIsAutoScroll(false);
+      } else {
+        console.error('ストリームの作成に失敗しました');
+        updateMessage(messageIndex, responseIndex, 'エラー: レスポンスの生成に失敗しました', undefined, false, false, false);
       }
       setIsAutoScroll(false);
-    } catch (error) {
+    } catch (error: any) {
       if (error.name !== 'AbortError') {
         console.error('Error fetching response from model:', model, error);
-        updateMessage(messageIndex, responseIndex, `Error: ${error.message}`);
+        updateMessage(messageIndex, responseIndex, `Error: ${error.message}`, undefined, false, false, false);
         console.log(messages);
       }
     } finally {
@@ -160,7 +165,7 @@ export default function Home() {
         return newMessages;
       });
       setMessages(prevMessages => {
-        const allResponsesComplete = prevMessages[messageIndex].llm.every(response => !response.isGenerating);
+        const allResponsesComplete = prevMessages[messageIndex].llm.every((response: any) => !response.isGenerating);
         if (allResponsesComplete) {
           setIsGenerating(false);
         }
@@ -169,7 +174,7 @@ export default function Home() {
     }
   }, [messages, openai, updateMessage]);
 
-  const handleSend = async (event, isPrimaryOnly = false, messageIndex) => {
+  const handleSend = async (event: React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>, isPrimaryOnly = false, messageIndex?: number) => {
     if (isGenerating) return;
 
     let inputText = chatInput;
@@ -199,7 +204,7 @@ export default function Home() {
             setMessages(prevMessages => {
               const updatedMessages = [...prevMessages];
               updatedMessages[newMessages.length - 1].llm[index].isGenerating = false;
-              const allResponsesComplete = updatedMessages[newMessages.length - 1].llm.every(response => !response.isGenerating);
+              const allResponsesComplete = updatedMessages[newMessages.length - 1].llm.every((response: any) => !response.isGenerating);
               if (allResponsesComplete) {
                 setIsGenerating(false);
               }
@@ -233,7 +238,7 @@ export default function Home() {
       setMessages(prevMessages => {
         return prevMessages.map(message => ({
           ...message,
-          llm: message.llm.map(response => ({ ...response, isGenerating: false }))
+          llm: message.llm.map((response: any) => ({ ...response, isGenerating: false }))
         }));
       });
     } else {
@@ -244,7 +249,7 @@ export default function Home() {
     }
   };
 
-  const handleStop = (messageIndex, responseIndex) => {
+  const handleStop = (messageIndex: number, responseIndex: number) => {
     const controller = abortControllers[responseIndex];
     if (controller) {
       controller.abort();
@@ -260,10 +265,10 @@ export default function Home() {
   const closeModal = () => setIsModalOpen(false);
 
   useEffect(() => {
-    let previousHeight = visualViewport.height;
+    let previousHeight = visualViewport?.height || window.innerHeight;
 
     const handleResize = () => {
-      const currentHeight = visualViewport.height;
+      const currentHeight = visualViewport?.height || window.innerHeight;
       document.body.style.setProperty('--actual-100dvh', `${currentHeight}px`);
       const heightDifference = previousHeight - currentHeight;
       if (heightDifference > 0) {
@@ -276,11 +281,11 @@ export default function Home() {
       previousHeight = currentHeight;
     };
 
-    visualViewport.addEventListener('resize', handleResize);
+    visualViewport?.addEventListener('resize', handleResize);
     handleResize();
 
-    const preventTouchMove = (event) => {
-      if (!event.target.closest('.model-select-area') && !event.target.closest('.responses-container') && !event.target.closest('.chat-input-area')) {
+    const preventTouchMove = (event: TouchEvent) => {
+      if (!event.target || (!(event.target as HTMLElement).closest('.model-select-area') && !(event.target as HTMLElement).closest('.responses-container') && !(event.target as HTMLElement).closest('.chat-input-area'))) {
         event.preventDefault();
       }
     };
@@ -288,7 +293,7 @@ export default function Home() {
     document.addEventListener('touchmove', preventTouchMove, { passive: false });
 
     return () => {
-      visualViewport.removeEventListener('resize', handleResize);
+      visualViewport?.removeEventListener('resize', handleResize);
       document.removeEventListener('touchmove', preventTouchMove);
     };
   }, []);
@@ -300,7 +305,7 @@ export default function Home() {
     setMessages([]);
   };
 
-  const handleRegenerate = async (messageIndex, responseIndex, model) => {
+  const handleRegenerate = async (messageIndex: number, responseIndex: number, model: string) => {
     const inputText = messages[messageIndex].user;
     const abortController = new AbortController();
     setAbortControllers([abortController]);
@@ -313,7 +318,7 @@ export default function Home() {
     }
   };
 
-  const handleResetAndRegenerate = async (messageIndex) => {
+  const handleResetAndRegenerate = async (messageIndex: number) => {
     setIsGenerating(true);
     setForceScroll(true);
 
@@ -324,7 +329,7 @@ export default function Home() {
         userDiv.classList.remove('edited');
         const contentEditableElement = userDiv.querySelector('[contenteditable]');
         if (contentEditableElement) {
-          contentEditableElement.blur();
+          (contentEditableElement as HTMLElement).blur();
         }
       }
     }
@@ -344,7 +349,7 @@ export default function Home() {
     const newAbortControllers = selectedModels.map(() => new AbortController());
     setAbortControllers(newAbortControllers);
 
-    newMessages[messageIndex].llm.forEach((response, index) => {
+    newMessages[messageIndex].llm.forEach((response: { model: string }, index: number) => {
       fetchChatResponse(response.model, messageIndex, index, newAbortControllers[index], userMessage);
     });
 
@@ -356,7 +361,7 @@ export default function Home() {
     <>
       <header>
         <div className="logo">
-          <Image src="/logo.png" width="40" height="40" alt="Logo" className="logo-img" />
+          <Image src="/logo.png" width={40} height={40} alt="Logo" className="logo-img" />
           <h1>Multi AI Chat<br />
             <small>OpenRouter Chat Client</small>
           </h1>

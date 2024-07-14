@@ -1,12 +1,44 @@
 import React, { useState, useEffect, useRef } from "react";
 
-export default function InputSection({ models, mainInput, chatInput, setChatInput, handleSend, handleStop, openModal, isGenerating, selectedModels, setSelectedModels, showResetButton, handleReset, isEditMode, messageIndex, handleResetAndRegenerate, handleSaveOnly, originalMessage, isInitialScreen }) {
+interface InputSectionProps {
+    models: string[];
+    mainInput: boolean;
+    chatInput: string;
+    setChatInput: (input: string) => void;
+    handleSend: (event: React.MouseEvent<HTMLButtonElement>, isPrimaryOnly: boolean) => void;
+    handleStop: () => void;
+    selectedModels: string[];
+    setSelectedModels: React.Dispatch<React.SetStateAction<string[]>>;
+    isEditMode: boolean;
+    messageIndex: number;
+    handleResetAndRegenerate: (messageIndex: number) => void;
+    handleSaveOnly: (messageIndex: number) => void;
+    originalMessage: string;
+    isInitialScreen: boolean;
+}
+
+export default function InputSection({
+    models,
+    mainInput,
+    chatInput,
+    setChatInput,
+    handleSend,
+    handleStop,
+    selectedModels,
+    setSelectedModels,
+    isEditMode,
+    messageIndex,
+    handleResetAndRegenerate,
+    handleSaveOnly,
+    originalMessage,
+    isInitialScreen,
+}: InputSectionProps) {
     const [isComposing, setIsComposing] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [suggestionIndex, setSuggestionIndex] = useState(0);
     const [filteredModels, setFilteredModels] = useState(models);
-    const inputRef = useRef(null);
-    const sectionRef = useRef(null);
+    const inputRef = useRef<HTMLTextAreaElement>(null);
+    const sectionRef = useRef<HTMLElement>(null);
 
     useEffect(() => {
         if (sectionRef.current) {
@@ -21,14 +53,18 @@ export default function InputSection({ models, mainInput, chatInput, setChatInpu
         }
 
         const handleFocus = () => {
-            document.body.dataset.inputFocused = 'true';
+            if (document.body.dataset) {
+                document.body.dataset.inputFocused = 'true';
+            }
             if (sectionRef.current) {
                 sectionRef.current.classList.add('focused');
             }
         };
 
         const handleBlur = () => {
-            document.body.dataset.inputFocused = 'false';
+            if (document.body.dataset) {
+                document.body.dataset.inputFocused = 'false';
+            }
             if (sectionRef.current) {
                 sectionRef.current.classList.remove('focused');
             }
@@ -47,8 +83,8 @@ export default function InputSection({ models, mainInput, chatInput, setChatInpu
         };
     }, []);
 
-    const handleKeyDown = (event) => {
-        if (document.body.dataset.softwareKeyboard === 'false') {
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (document.body.dataset && document.body.dataset.softwareKeyboard === 'false') {
             if (event.key === 'Enter' && !isComposing) {
                 if (event.shiftKey) {
                     return; // Shift+Enterで改行
@@ -57,7 +93,7 @@ export default function InputSection({ models, mainInput, chatInput, setChatInpu
                 if (isEditMode) {
                     handleResetAndRegenerate(messageIndex);
                 } else {
-                    handleSend(event, event.metaKey || event.ctrlKey);
+                    handleSend(event as unknown as React.MouseEvent<HTMLButtonElement>, event.metaKey || event.ctrlKey);
                 }
             } else if (event.key === 'ArrowDown') {
                 if (showSuggestions) {
@@ -79,17 +115,16 @@ export default function InputSection({ models, mainInput, chatInput, setChatInpu
         }
     };
 
-
     const handleCompositionStart = () => {
         setIsComposing(true);
     };
 
-    const handleCompositionEnd = (event) => {
+    const handleCompositionEnd = (event: React.CompositionEvent<HTMLTextAreaElement>) => {
         setIsComposing(false);
-        setChatInput(event.target.value);
+        setChatInput(event.currentTarget.value);
     };
 
-    const onChange = (e) => {
+    const onChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const text = e.target.value;
         setChatInput(text);
         if (sectionRef.current) {
@@ -113,16 +148,18 @@ export default function InputSection({ models, mainInput, chatInput, setChatInpu
         }
     };
 
-    const selectSuggestion = (index) => {
+    const selectSuggestion = (index: number) => {
         const selectedModel = filteredModels[index];
         const inputElement = inputRef.current;
-        // 入力フィールドの値から最後の「@」に続く文字列を選択されたモデル名に置き換える
-        const text = inputElement.value.replace(/@[^@]*$/, `@${selectedModel.split('/')[1]} `);
-        inputElement.value = text;
+        if (inputElement) {
+            // 入力フィールドの値から最後の「@」に続く文字列を選択されたモデル名に置き換える
+            const text = inputElement.value.replace(/@[^@]*$/, `@${selectedModel.split('/')[1]} `);
+            inputElement.value = text;
 
-        setShowSuggestions(false);
-        setSuggestionIndex(0);
-        setChatInput(text);
+            setShowSuggestions(false);
+            setSuggestionIndex(0);
+            setChatInput(text);
+        }
     };
 
     useEffect(() => {
@@ -132,8 +169,8 @@ export default function InputSection({ models, mainInput, chatInput, setChatInpu
     }, [chatInput]);
 
     useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (inputRef.current && !inputRef.current.contains(event.target)) {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (inputRef.current && !inputRef.current.contains(event.target as Node)) {
                 setShowSuggestions(false);
             }
         };
@@ -144,7 +181,7 @@ export default function InputSection({ models, mainInput, chatInput, setChatInpu
         };
     }, []);
 
-    const handleModelChange = (model) => {
+    const handleModelChange = (model: string) => {
         const wasInputFocused = document.activeElement === inputRef.current;
         setSelectedModels((prevSelectedModels) => {
             let newSelectedModels;
@@ -160,7 +197,7 @@ export default function InputSection({ models, mainInput, chatInput, setChatInpu
             return newSelectedModels;
         });
         if (wasInputFocused && inputRef.current) {
-            setTimeout(() => inputRef.current.focus(), 0);
+            setTimeout(() => inputRef.current?.focus(), 0);
         }
     };
 
@@ -203,8 +240,6 @@ export default function InputSection({ models, mainInput, chatInput, setChatInpu
         }
     }, [chatInput]);
 
-
-
     return (
         <section className={`input-section ${isInitialScreen ? 'initial-screen' : ''} ${mainInput ? 'full-input' : ''}`} ref={sectionRef}>
             <div className="input-container chat-input-area">
@@ -217,7 +252,7 @@ export default function InputSection({ models, mainInput, chatInput, setChatInpu
                     onCompositionEnd={handleCompositionEnd}
                     className="chat-input"
                     placeholder={isEditMode ? "Edit your message here..." : "Type your message here…"}
-                    fieldSizing="content"
+                    data-fieldsizing="content"
                 />
                 {showSuggestions && (
                     <ul className="suggestions-list">

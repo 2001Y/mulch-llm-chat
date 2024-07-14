@@ -1,7 +1,14 @@
 import React, { useState } from "react";
 
-export default function ModelInputModal({ models, setModels, isModalOpen, closeModal }) {
-    const [newModel, setNewModel] = useState('');
+interface ModelInputModalProps {
+    models: string[];
+    setModels: React.Dispatch<React.SetStateAction<string[]>>;
+    isModalOpen: boolean;
+    closeModal: () => void;
+}
+
+export default function ModelInputModal({ models, setModels, isModalOpen, closeModal }: ModelInputModalProps) {
+    const [newModel, setNewModel] = useState<string>('');
 
     const handleAddModel = () => {
         if (newModel && !models.includes(newModel)) {
@@ -15,7 +22,7 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
             <div className="modal-overlay">
                 <div className="modal-content">
                     <span className="close" onClick={closeModal}>&times;</span>
-                    <h2>Settings</h2>
+                    <h2>設定</h2>
                     <ul>
                         {models.map((model, index) => (
                             <li key={index}>{model}</li>
@@ -24,12 +31,12 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
                     <input
                         type="text"
                         value={newModel}
-                        onChange={(e) => setNewModel(e.target.value)}
-                        placeholder="Add new model"
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewModel(e.target.value)}
+                        placeholder="新しいモデルを追加"
                     />
-                    <button onClick={handleAddModel}>Add Model</button>
+                    <button onClick={handleAddModel}>モデルを追加</button>
                 </div>
             </div>
         )
     );
-};
+}

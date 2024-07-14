@@ -12,7 +12,7 @@ export default function useAccessToken() {
     }, [accessToken, previousAccessToken]);
 
     useEffect(() => {
-        const fetchAccessToken = async (code) => {
+        const fetchAccessToken = async (code: string) => {
             try {
                 const response = await fetch('https://openrouter.ai/api/v1/auth/keys', {
                     method: 'POST',
@@ -24,12 +24,16 @@ export default function useAccessToken() {
                 const data = await response.json();
                 setAccessToken(data.key);
 
-                const url = new URL(window.location);
+                const url = new URL(window.location.href);
                 url.searchParams.delete('code');
                 window.history.replaceState({}, document.title, url.toString());
             } catch (error) {
                 console.error('Error fetching access token:', error);
-                alert(`Failed to fetch access token: ${error.message}`);
+                if (error instanceof Error) {
+                    alert(`Failed to fetch access token: ${error.message}`);
+                } else {
+                    alert('Failed to fetch access token: Unknown error');
+                }
             }
         };
 
@@ -44,10 +48,12 @@ export default function useAccessToken() {
 
             if (ssnb) {
                 const newAccessToken = process.env.NEXT_PUBLIC_SSNB;
-                setAccessToken(newAccessToken);
+                if (typeof newAccessToken === 'string') {
+                    setAccessToken(newAccessToken);
+                }
             }
         }
-    }, [accessToken]);
+    }, [accessToken, setAccessToken]);
 
-    return [accessToken, setAccessToken, previousAccessToken];
-};
+    return [accessToken, setAccessToken, previousAccessToken] as const;
+}

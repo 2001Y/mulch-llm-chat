@@ -1,12 +1,61 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import InputSection from "/_components/InputSection";
+import InputSection from "../_components/InputSection";
 
-export default function Responses({ messages = [], updateMessage, forceScroll, handleRegenerate, handleResetAndRegenerate, handleStop, handleSend, models, chatInput, setChatInput, openModal, isGenerating, selectedModels, setSelectedModels, showResetButton, handleReset }) {
-    const containerRef = useRef(null);
+interface Message {
+    user: string;
+    originalUser?: string;
+    llm: {
+        role: string;
+        model: string;
+        text: string;
+        selected: boolean;
+        selectedOrder?: number;
+        isGenerating: boolean;
+    }[];
+}
+
+interface ResponsesProps {
+    messages: Message[];
+    updateMessage: (messageIndex: number, responseIndex: number | null, text: string | undefined, selectedIndex?: number, toggleSelected?: boolean, saveOnly?: boolean, isEditing?: boolean) => void;
+    forceScroll: boolean;
+    handleRegenerate: (messageIndex: number, responseIndex: number, model: string) => void;
+    handleResetAndRegenerate: (messageIndex: number) => void;
+    handleStop: (messageIndex: number, responseIndex: number) => void;
+    handleSend: (event: React.MouseEvent<HTMLButtonElement>, isPrimaryOnly: boolean, messageIndex: number) => void;
+    models: string[];
+    chatInput: string;
+    setChatInput: (input: string) => void;
+    openModal: () => void;
+    isGenerating: boolean;
+    selectedModels: string[];
+    setSelectedModels: React.Dispatch<React.SetStateAction<string[]>>;
+    showResetButton: boolean;
+    handleReset: () => void;
+}
+
+export default function Responses({
+    messages = [],
+    updateMessage,
+    forceScroll,
+    handleRegenerate,
+    handleResetAndRegenerate,
+    handleStop,
+    handleSend,
+    models,
+    chatInput,
+    setChatInput,
+    openModal,
+    isGenerating,
+    selectedModels,
+    setSelectedModels,
+    showResetButton,
+    handleReset
+}: ResponsesProps) {
+    const containerRef = useRef<HTMLDivElement>(null);
     const [isAutoScroll, setIsAutoScroll] = useState(true);
     const [lastManualScrollTop, setLastManualScrollTop] = useState(0);
     const [lastAutoScrollTop, setLastAutoScrollTop] = useState(0);
-    const [expandedMessages, setExpandedMessages] = useState({});
+    const [expandedMessages, setExpandedMessages] = useState<{ [key: number]: boolean }>({});
     const isAutoScrollingRef = useRef(false);
 
     useEffect(() => {
@@ -27,11 +76,13 @@ export default function Responses({ messages = [], updateMessage, forceScroll, h
         };
     }, [messages, expandedMessages, selectedModels]);
 
-    const updateResponseHeights = (messageIndex) => {
+    const updateResponseHeights = (messageIndex: number) => {
         const messageBlock = document.querySelector(`.message-block:nth-child(${messageIndex + 1})`);
         if (!messageBlock) return;
 
         const scrollArea = messageBlock.querySelector('.scroll_area');
+        if (!scrollArea || !(scrollArea instanceof HTMLElement)) return;
+
         const responses = messageBlock.querySelectorAll('.response');
 
         if (responses.length === 0) {
@@ -39,7 +90,7 @@ export default function Responses({ messages = [], updateMessage, forceScroll, h
             return;
         }
 
-        const responseHeights = Array.from(responses).map(response => response.offsetHeight);
+        const responseHeights = Array.from(responses).map(response => (response instanceof HTMLElement) ? response.offsetHeight : 0);
         const minHeight = Math.min(...responseHeights);
         const maxHeight = Math.max(...responseHeights);
         const totalHeight = responseHeights.reduce((sum, height) => sum + height, 0);
@@ -56,19 +107,21 @@ export default function Responses({ messages = [], updateMessage, forceScroll, h
             } else {
                 scrollArea.style.maxHeight = `${minHeight}px`;
                 responses.forEach((response, index) => {
-                    if (responseHeights[index] > minHeight) {
-                        response.style.maxHeight = `${minHeight}px`;
-                        response.style.overflow = 'hidden';
-                    } else {
-                        response.style.maxHeight = 'none';
-                        response.style.overflow = 'visible';
+                    if (response instanceof HTMLElement) {
+                        if (responseHeights[index] > minHeight) {
+                            response.style.maxHeight = `${minHeight}px`;
+                            response.style.overflow = 'hidden';
+                        } else {
+                            response.style.maxHeight = 'none';
+                            response.style.overflow = 'visible';
+                        }
                     }
                 });
             }
         }
     };
 
-    const toggleExpand = (messageIndex) => {
+    const toggleExpand = (messageIndex: number) => {
         setExpandedMessages(prev => ({
             ...prev,
             [messageIndex]: !prev[messageIndex]
@@ -82,12 +135,10 @@ export default function Responses({ messages = [], updateMessage, forceScroll, h
             const { scrollTop, scrollHeight, clientHeight } = container;
             const isScrolledToBottom = scrollHeight - scrollTop - clientHeight < 1;
 
-            // ユーザーが上にスクロールした場合、自動スクロールを無効にする
             if (scrollTop < lastManualScrollTop && !isScrolledToBottom) {
                 setIsAutoScroll(false);
             }
 
-            // 最下部までスクロールした場合、自動スクロールを有効にする
             if (isScrolledToBottom) {
                 setIsAutoScroll(true);
             }
@@ -105,8 +156,8 @@ export default function Responses({ messages = [], updateMessage, forceScroll, h
     }, [lastManualScrollTop]);
 
     useEffect(() => {
-        let scrollInterval;
-        const scrollIntervalTime = 300; // スクロール更新の間隔（ミリ秒）
+        let scrollInterval: NodeJS.Timeout | undefined;
+        const scrollIntervalTime = 300;
 
         const scrollToBottom = () => {
             if ((isAutoScroll || forceScroll) && containerRef.current) {
@@ -123,11 +174,9 @@ export default function Responses({ messages = [], updateMessage, forceScroll, h
             }
         };
 
-        // ストリーミング中は定期的にスクロールを実行
         if (isGenerating) {
-            scrollInterval = setInterval(scrollToBottom, scrollIntervalTime);
+            scrollInterval = setInterval(scrollToBottom, scrollIntervalTime) as unknown as NodeJS.Timeout;
         } else {
-            // ストリーミングが終了したら最後に一度スクロール
             scrollToBottom();
         }
 
@@ -138,29 +187,35 @@ export default function Responses({ messages = [], updateMessage, forceScroll, h
         };
     }, [messages, isAutoScroll, lastAutoScrollTop, forceScroll, isGenerating]);
 
-    const handleEdit = (messageIndex, responseIndex, newContent) => {
+    const handleEdit = (messageIndex: number, responseIndex: number | null, newContent: string) => {
         if (responseIndex === null) {
-            // ユーザーメッセージの編集
             updateMessage(messageIndex, null, newContent);
         } else {
-            // AIの応答の編集
             updateMessage(messageIndex, responseIndex, newContent);
         }
     };
 
-    const handleSelectResponse = useCallback((messageIndex, responseIndex) => {
-        updateMessage(messageIndex, responseIndex, undefined, null, true);
+    const handleSelectResponse = useCallback((messageIndex: number, responseIndex: number) => {
+        updateMessage(messageIndex, responseIndex, undefined, undefined, true);
     }, [updateMessage]);
 
-    const handleSaveOnly = (messageIndex) => {
+    const handleSaveOnly = (messageIndex: number) => {
         const currentMessage = messages[messageIndex];
-        updateMessage(messageIndex, null, currentMessage.user, null, false, true);
+        updateMessage(messageIndex, null, currentMessage.user, undefined, false, true);
     };
+
+    const handleStopForInputSection = useCallback(() => {
+        if (messages.length > 0) {
+            const lastMessageIndex = messages.length - 1;
+            const lastResponseIndex = messages[lastMessageIndex].llm.length - 1;
+            handleStop(lastMessageIndex, lastResponseIndex);
+        }
+    }, [messages, handleStop]);
 
     return (
         <div className={`responses-container ${messages.length === 0 ? 'initial-screen' : ''}`} ref={containerRef} translate="no">
             {messages.map((message, messageIndex) => {
-                const selectedResponses = message.llm.filter(r => r.selected).sort((a, b) => a.selectedOrder - b.selectedOrder);
+                const selectedResponses = message.llm.filter(r => r.selected).sort((a, b) => (a.selectedOrder || 0) - (b.selectedOrder || 0));
                 const hasSelectedResponse = selectedResponses.length > 0;
                 const isExpanded = expandedMessages[messageIndex];
                 return (
@@ -168,20 +223,18 @@ export default function Responses({ messages = [], updateMessage, forceScroll, h
                         <InputSection
                             models={models}
                             chatInput={message.user}
-                            setChatInput={(newInput) => updateMessage(messageIndex, null, newInput)}
-                            handleSend={(event, isPrimaryOnly) => handleSend(event, isPrimaryOnly, messageIndex)}
-                            handleStop={handleStop}
-                            openModal={openModal}
-                            isGenerating={isGenerating}
+                            setChatInput={(newInput: string) => updateMessage(messageIndex, null, newInput)}
+                            handleSend={(event: React.MouseEvent<HTMLButtonElement>, isPrimaryOnly: boolean) => handleSend(event, isPrimaryOnly, messageIndex)}
+                            handleStop={handleStopForInputSection}
                             selectedModels={selectedModels}
                             setSelectedModels={setSelectedModels}
-                            showResetButton={showResetButton}
-                            handleReset={handleReset}
                             isEditMode={true}
                             messageIndex={messageIndex}
                             handleResetAndRegenerate={handleResetAndRegenerate}
                             handleSaveOnly={handleSaveOnly}
                             originalMessage={message.originalUser || message.user}
+                            mainInput={false}
+                            isInitialScreen={false}
                         />
                         <div className="scroll_area">
                             {Array.isArray(message.llm) && message.llm.map((response, responseIndex) => (
@@ -221,7 +274,7 @@ export default function Responses({ messages = [], updateMessage, forceScroll, h
                                     <div
                                         className="markdown-content"
                                         contentEditable
-                                        onBlur={(e) => handleEdit(messageIndex, responseIndex, e.target.innerHTML)}
+                                        onBlur={(e) => handleEdit(messageIndex, responseIndex, (e.target as HTMLDivElement).innerHTML)}
                                         dangerouslySetInnerHTML={{ __html: response.text }}
                                     />
                                 </div>
@@ -237,24 +290,22 @@ export default function Responses({ messages = [], updateMessage, forceScroll, h
                     </div>
                 );
             })}
-            {/* {messages.length === 0 && ( */}
             <InputSection
                 mainInput={true}
                 models={models}
                 chatInput={chatInput}
                 setChatInput={setChatInput}
-                handleSend={(event, isPrimaryOnly) => handleSend(event, isPrimaryOnly, messages.length - 1)}
-                handleStop={handleStop}
-                openModal={openModal}
-                isGenerating={isGenerating}
+                handleSend={(event: React.MouseEvent<HTMLButtonElement>, isPrimaryOnly: boolean) => handleSend(event, isPrimaryOnly, messages.length - 1)}
+                handleStop={handleStopForInputSection}
                 selectedModels={selectedModels}
                 setSelectedModels={setSelectedModels}
-                showResetButton={showResetButton}
-                handleReset={handleReset}
                 isEditMode={false}
+                messageIndex={0}
+                handleResetAndRegenerate={() => { }}
+                handleSaveOnly={() => { }}
+                originalMessage=""
                 isInitialScreen={messages.length === 0}
             />
-            {/* {)}} */}
         </div >
     );
 };

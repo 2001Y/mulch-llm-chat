@@ -1,8 +1,10 @@
-export default function handler(req, res) {
+import { NextResponse } from 'next/server';
+
+export async function GET(req: Request) {
     const manifest = {
         name: "Mulch AI Chat",
         short_name: "Mulch AI Chat",
-        start_url: req.query.url || '/',
+        start_url: '/',
         display: "standalone",
         background_color: "#000000",
         theme_color: "#000000",
@@ -16,6 +18,5 @@ export default function handler(req, res) {
         ]
     };
 
-    res.setHeader('Content-Type', 'application/json');
-    res.status(200).json(manifest);
+    return NextResponse.json(manifest);
 }
