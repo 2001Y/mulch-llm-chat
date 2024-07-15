@@ -1,5 +1,4 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
-import { FixedSizeList as List } from 'react-window';
 import InputSection from "../_components/InputSection";
 
 interface Message {
@@ -59,6 +58,7 @@ export default function Responses({
     const [lastManualScrollTop, setLastManualScrollTop] = useState(0);
     const [lastAutoScrollTop, setLastAutoScrollTop] = useState(0);
     const [expandedMessages, setExpandedMessages] = useState<{ [key: number]: boolean }>({});
+    const [showExpandButton, setShowExpandButton] = useState<{ [key: number]: boolean }>({});
     const isAutoScrollingRef = useRef(false);
     const MemoizedInputSection = useMemo(() => React.memo(InputSection), []);
 
@@ -82,7 +82,7 @@ export default function Responses({
         return () => {
             window.removeEventListener('resize', handleResize);
         };
-    }, [messages, selectedModels]);
+    }, [messages, selectedModels, expandedMessages]);
 
     const updateResponseHeights = useCallback((messageIndex: number) => {
         const messageBlock = document.querySelector(`.message-block:nth-child(${messageIndex + 1})`);
@@ -92,50 +92,69 @@ export default function Responses({
         if (!scrollArea || !(scrollArea instanceof HTMLElement)) return;
 
         const responses = messageBlock.querySelectorAll('.response');
-
-        if (responses.length === 0) {
-            scrollArea.style.maxHeight = '70vh';
-            return;
-        }
-
-        const responseHeights = Array.from(responses).map(response => (response instanceof HTMLElement) ? response.offsetHeight : 0);
-        const minHeight = Math.min(...responseHeights);
-        const maxHeight = Math.max(...responseHeights);
+        const responseHeights = Array.from(responses).map(response => (response as HTMLElement).scrollHeight);
         const totalHeight = responseHeights.reduce((sum, height) => sum + height, 0);
 
-        const isShort = totalHeight <= 300 || maxHeight <= 300;
+        const isExpanded = expandedMessages[messageIndex] || false;
 
-        if (isShort) {
+        if (totalHeight <= 300) {
             scrollArea.style.maxHeight = 'none';
-            setExpandedMessages(prev => ({ ...prev, [messageIndex]: true }));
+            responses.forEach(response => {
+                if (response instanceof HTMLElement) {
+                    response.style.maxHeight = 'none';
+                    response.style.overflow = 'visible';
+                }
+            });
+            setShowExpandButton(prev => ({ ...prev, [messageIndex]: false }));
         } else {
-            const isExpanded = expandedMessages[messageIndex];
             if (isExpanded) {
                 scrollArea.style.maxHeight = 'none';
-            } else {
-                scrollArea.style.maxHeight = `${minHeight}px`;
-                responses.forEach((response, index) => {
+                responses.forEach(response => {
                     if (response instanceof HTMLElement) {
-                        if (responseHeights[index] > minHeight) {
-                            response.style.maxHeight = `${minHeight}px`;
-                            response.style.overflow = 'hidden';
-                        } else {
-                            response.style.maxHeight = 'none';
-                            response.style.overflow = 'visible';
+                        response.style.maxHeight = 'none';
+                        response.style.overflow = 'visible';
+                    }
+                });
+            } else {
+                const averageHeight = totalHeight / responses.length;
+                const sortedHeights = [...responseHeights].sort((a, b) => a - b);
+                const medianHeight = sortedHeights[Math.floor(sortedHeights.length / 2)];
+                const limitHeight = Math.min(averageHeight, medianHeight);
+
+                let currentHeight = 0;
+                let maxHeight = 0;
+
+                for (const response of responses) {
+                    if (response instanceof HTMLElement) {
+                        currentHeight += response.scrollHeight;
+                        if (currentHeight >= limitHeight) {
+                            maxHeight = currentHeight;
+                            break;
                         }
+                    }
+                }
+
+                scrollArea.style.maxHeight = `${Math.max(300, maxHeight)}px`;
+                responses.forEach((response) => {
+                    if (response instanceof HTMLElement) {
+                        response.style.maxHeight = 'none';
+                        response.style.overflow = 'visible';
                     }
                 });
             }
+            setShowExpandButton(prev => ({ ...prev, [messageIndex]: true }));
         }
     }, [expandedMessages]);
 
-    const toggleExpand = (messageIndex: number) => {
-        setExpandedMessages(prev => ({
-            ...prev,
-            [messageIndex]: !prev[messageIndex]
-        }));
-        setTimeout(() => updateResponseHeights(messageIndex), 0);
-    };
+    const expandMessage = useCallback((messageIndex: number) => {
+        setExpandedMessages(prev => ({ ...prev, [messageIndex]: true }));
+        updateResponseHeights(messageIndex);
+    }, [updateResponseHeights]);
+
+    const collapseMessage = useCallback((messageIndex: number) => {
+        setExpandedMessages(prev => ({ ...prev, [messageIndex]: false }));
+        updateResponseHeights(messageIndex);
+    }, [updateResponseHeights]);
 
     const handleScroll = () => {
         const container = containerRef.current;
@@ -290,10 +309,13 @@ export default function Responses({
                                 </div>
                             ))}
                         </div>
-                        {!isExpanded && message.llm.length > 0 && (
+                        {message.llm.length > 0 && showExpandButton[messageIndex] && (
                             <div className="expand-control">
-                                <button onClick={() => toggleExpand(messageIndex)}>
-                                    すべて表示
+                                <button
+                                    className={expandedMessages[messageIndex] ? 'folded' : ""}
+                                    onClick={() => expandedMessages[messageIndex] ? collapseMessage(messageIndex) : expandMessage(messageIndex)}
+                                >
+                                    {expandedMessages[messageIndex] ? '折りたたむ' : 'すべて表示'}
                                 </button>
                             </div>
                         )}
@@ -301,7 +323,6 @@ export default function Responses({
                 );
             })}
             <InputSection
-                fixed={true}
                 mainInput={true}
                 models={models}
                 chatInput={chatInput}
