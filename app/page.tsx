@@ -39,6 +39,7 @@ export default function Home() {
   const [showResetButton, setShowResetButton] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [storedMessages, setStoredMessages, isStoredMessagesLoaded] = useLocalStorage<any[]>('chatMessages', []);
+  const [functionCalls, setFunctionCalls] = useLocalStorage<FunctionCall[]>('functionCalls', []);
   const router = useRouter();
 
   useEffect(() => {
@@ -78,15 +79,19 @@ export default function Home() {
       const newMessages = JSON.parse(JSON.stringify(prevMessages));
       if (responseIndex === null) {
         if (text !== undefined) {
-          if (saveOnly) {
-            newMessages[messageIndex].originalUser = text;
-            newMessages[messageIndex].user = text;
-          } else {
-            if (!newMessages[messageIndex].originalUser) {
-              newMessages[messageIndex].originalUser = newMessages[messageIndex].user;
-            }
-            newMessages[messageIndex].user = text;
-          }
+          newMessages[messageIndex].user = text;
+          const isEdited = storedMessages[messageIndex]?.user !== text;
+          newMessages[messageIndex].edited = isEdited;
+
+          // if (saveOnly) {
+          //   newMessages[messageIndex].originalUser = text;
+          //   newMessages[messageIndex].user = text;
+          // } else {
+          //   if (!newMessages[messageIndex].originalUser) {
+          //     newMessages[messageIndex].originalUser = newMessages[messageIndex].user;
+          //   }
+          //   newMessages[messageIndex].user = text;
+          // }
         }
       } else if (newMessages[messageIndex]?.llm[responseIndex] !== undefined) {
         if (text !== undefined) {
@@ -109,7 +114,9 @@ export default function Home() {
           }
         }
       }
-      setStoredMessages(newMessages);
+      if (saveOnly) {
+        setStoredMessages(newMessages);
+      }
       return newMessages;
     });
   }, [setMessages, setStoredMessages]);
@@ -137,6 +144,11 @@ export default function Home() {
       });
 
       console.log('モデルに送信する過去の会話:', pastMessages);
+      
+      let result = '';
+      let toolCallAccumulator = '';
+      let toolCallId: string | null = null;
+  
       const stream = await openai?.chat.completions.create({
         model,
         messages: [
@@ -144,21 +156,69 @@ export default function Home() {
           { role: 'user', content: inputText }
         ],
         stream: true,
+        tool_choice: "auto",
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "get_current_weather",
+              description: "現在の天気を取得する",
+              parameters: {
+                type: "object",
+                properties: {
+                  location: {
+                    type: "string",
+                    description: "場所（例：東京）",
+                  },
+                  unit: {
+                    type: "string",
+                    enum: ["celsius", "fahrenheit"],
+                    description: "温度の単位",
+                    default: "celsius"
+                  }
+                },
+                required: ["location"],
+              },
+            },
+          },
+        ],
       }, {
         signal: abortController.signal,
       });
-
+  
       if (stream) {
-        let result = '';
         for await (const part of stream) {
           if (abortController.signal.aborted) {
             throw new DOMException('Aborted', 'AbortError');
           }
           const content = part.choices[0]?.delta?.content || '';
-          result += content;
+          const toolCalls = part.choices[0]?.delta?.tool_calls;
+  
+          if (toolCalls) {
+            for (const tc of toolCalls) {
+              if (tc.id) {
+                toolCallId = tc.id;
+              }
+              toolCallAccumulator += tc.function?.arguments || '';
+  
+              try {
+                const funcArgs = JSON.parse(toolCallAccumulator);
+                const functionName = tc.function?.name || 'get_current_weather';
+                const weatherInfo = getCurrentWeather(funcArgs.location, funcArgs.unit);
+                result += `\n天気情報:\n場所: ${weatherInfo.location}\n温度: ${weatherInfo.temperature}${weatherInfo.unit === 'celsius' ? '°C' : '°F'}\n天気: ${weatherInfo.weather}\n`;
+                toolCallAccumulator = '';
+              } catch (error) {
+                // JSONが不完全な場合は続けて蓄積
+              }
+            }
+          } else {
+            result += content;
+          }
+  
           const markedResult = await marked(result);
           updateMessage(messageIndex, responseIndex, markedResult, undefined, false, false, false);
         }
+  
         setIsAutoScroll(false);
       } else {
         console.error('ストリームの作成に失敗しました');
@@ -168,8 +228,9 @@ export default function Home() {
     } catch (error: any) {
       if (error.name !== 'AbortError') {
         console.error('Error fetching response from model:', model, error);
-        updateMessage(messageIndex, responseIndex, `Error: ${error.message}`, undefined, false, false, false);
-        console.log(messages);
+        console.log('エラーレスポンス:', error);
+        console.log('エラーメッセージ:', error.message);
+        updateMessage(messageIndex, responseIndex, `エラー: ${error.message}`, undefined, false, false, false);
       }
     } finally {
       setMessages(prevMessages => {
@@ -189,6 +250,43 @@ export default function Home() {
       });
     }
   }, [messages, openai, updateMessage, setStoredMessages]);
+
+  const handleToolCalls = async (toolCalls: any[], model: string, messageIndex: number, responseIndex: number, abortController: AbortController) => {
+    let result = '';
+    for (const toolCall of toolCalls) {
+      console.log(`ツールコール (モデル: ${model}):`, toolCall);
+      if (toolCall.function && toolCall.function.name === 'get_current_weather') {
+        try {
+          const args = JSON.parse(toolCall.function.arguments);
+          const { location } = args;
+          const weatherResult = getCurrentWeather(location);
+          result += `\n天気情報:\n場所: ${weatherResult.location}\n温度: ${weatherResult.temperature}°C\n天気: ${weatherResult.weather}\n`;
+        } catch (error) {
+          console.error("天気情報取得エラー:", error);
+          result += "\nエラー: 天気情報の取得に失敗しました。\n";
+        }
+      }
+    }
+    return result;
+  };
+
+  function getCurrentWeather(location: string = "Tokyo", unit: string = "celsius") {
+    const randomTemperature = () => (Math.random() * 40 - 10).toFixed(1);
+    const randomWeather = () => {
+      const weatherConditions = ["晴れ", "曇り", "雨", "雪"];
+      return weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
+    };
+  
+    const temperature = randomTemperature();
+    const weather = randomWeather();
+  
+    return {
+      location,
+      temperature: unit === "fahrenheit" ? (parseFloat(temperature) * 9/5 + 32).toFixed(1) : temperature,
+      unit,
+      weather
+    };
+  }
 
   const handleSend = async (event: React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>, isPrimaryOnly = false, messageIndex?: number) => {
     if (isGenerating) return;
@@ -233,7 +331,7 @@ export default function Home() {
       if (currentMessages.length === 0) {
         setShowResetButton(true);
       }
-
+      setStoredMessages(newMessages);
       return newMessages;
     });
     setChatInput('');
@@ -330,6 +428,10 @@ export default function Home() {
 
     try {
       await fetchChatResponse(model, messageIndex, responseIndex, abortController, inputText);
+      setMessages(prevMessages => {
+        setStoredMessages(prevMessages);
+        return prevMessages;
+      });
     } finally {
       setIsGenerating(false);
     }

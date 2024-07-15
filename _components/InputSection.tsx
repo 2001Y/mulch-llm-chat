@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import useLocalStorage from "_hooks/useLocalStorage";
 
 interface InputSectionProps {
     models: string[];
@@ -6,14 +7,12 @@ interface InputSectionProps {
     chatInput: string;
     setChatInput: (input: string) => void;
     handleSend: (event: React.MouseEvent<HTMLButtonElement>, isPrimaryOnly: boolean) => void;
-    handleStop: () => void;
     selectedModels: string[];
     setSelectedModels: React.Dispatch<React.SetStateAction<string[]>>;
     isEditMode: boolean;
     messageIndex: number;
     handleResetAndRegenerate: (messageIndex: number) => void;
     handleSaveOnly: (messageIndex: number) => void;
-    originalMessage: string;
     isInitialScreen: boolean;
     handleReset: () => void;
     handleStopAllGeneration: () => void;
@@ -25,24 +24,24 @@ export default function InputSection({
     chatInput,
     setChatInput,
     handleSend,
-    handleStop,
     selectedModels,
     setSelectedModels,
     isEditMode,
     messageIndex,
     handleResetAndRegenerate,
     handleSaveOnly,
-    originalMessage,
     isInitialScreen,
     handleReset,
     handleStopAllGeneration
 }: InputSectionProps) {
+    const [storedMessages, setStoredMessages, isStoredMessagesLoaded] = useLocalStorage<any[]>('chatMessages', []);
     const [isComposing, setIsComposing] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [suggestionIndex, setSuggestionIndex] = useState(0);
     const [filteredModels, setFilteredModels] = useState(models);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const sectionRef = useRef<HTMLElement>(null);
+    const originalMessage = storedMessages[messageIndex]?.user || '';
 
     useEffect(() => {
         if (sectionRef.current) {
@@ -327,7 +326,7 @@ export default function InputSection({
                             </span>
                         </button>
 
-                        <span className="linebreak shortcut-area">
+                        <span className="line-break shortcut-area">
                             Line break
                             <span className="shortcut">⇧⏎</span>
                         </span>

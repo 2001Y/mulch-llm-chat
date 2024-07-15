@@ -244,7 +244,6 @@ export default function Responses({
             {messages.map((message, messageIndex) => {
                 const selectedResponses = message.llm.filter(r => r.selected).sort((a, b) => (a.selectedOrder || 0) - (b.selectedOrder || 0));
                 const hasSelectedResponse = selectedResponses.length > 0;
-                const isExpanded = expandedMessages[messageIndex];
                 return (
                     <div key={messageIndex} className="message-block" >
                         <MemoizedInputSection
@@ -252,14 +251,12 @@ export default function Responses({
                             chatInput={message.user}
                             setChatInput={(newInput: string) => updateMessage(messageIndex, null, newInput)}
                             handleSend={(event, isPrimaryOnly) => handleSendForInputSection(event, isPrimaryOnly, messageIndex)}
-                            handleStop={handleStopForInputSection}
                             selectedModels={selectedModels}
                             setSelectedModels={setSelectedModels}
                             isEditMode={true}
                             messageIndex={messageIndex}
                             handleResetAndRegenerate={handleResetAndRegenerate}
                             handleSaveOnly={handleSaveOnly}
-                            originalMessage={message.originalUser || message.user}
                             mainInput={false}
                             isInitialScreen={false}
                             handleReset={handleReset}
@@ -315,7 +312,7 @@ export default function Responses({
                                     className={expandedMessages[messageIndex] ? 'folded' : ""}
                                     onClick={() => expandedMessages[messageIndex] ? collapseMessage(messageIndex) : expandMessage(messageIndex)}
                                 >
-                                    {expandedMessages[messageIndex] ? '折りたたむ' : 'すべて表示'}
+                                    {expandedMessages[messageIndex] ? 'Collapse' : 'Show All'}
                                 </button>
                             </div>
                         )}
@@ -328,14 +325,12 @@ export default function Responses({
                 chatInput={chatInput}
                 setChatInput={setChatInput}
                 handleSend={(event: React.MouseEvent<HTMLButtonElement>, isPrimaryOnly: boolean) => handleSend(event, isPrimaryOnly, messages.length - 1)}
-                handleStop={handleStopForInputSection}
                 selectedModels={selectedModels}
                 setSelectedModels={setSelectedModels}
                 isEditMode={false}
                 messageIndex={0}
                 handleResetAndRegenerate={() => { }}
                 handleSaveOnly={() => { }}
-                originalMessage=""
                 isInitialScreen={messages.length === 0}
                 handleReset={handleReset}
                 handleStopAllGeneration={handleStopAllGeneration}
