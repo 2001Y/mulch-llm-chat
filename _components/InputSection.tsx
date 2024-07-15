@@ -16,6 +16,7 @@ interface InputSectionProps {
     originalMessage: string;
     isInitialScreen: boolean;
     handleReset: () => void;
+    handleStopAllGeneration: () => void;
 }
 
 export default function InputSection({
@@ -33,7 +34,8 @@ export default function InputSection({
     handleSaveOnly,
     originalMessage,
     isInitialScreen,
-    handleReset
+    handleReset,
+    handleStopAllGeneration
 }: InputSectionProps) {
     const [isComposing, setIsComposing] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
@@ -109,7 +111,10 @@ export default function InputSection({
                 }
             } else if (event.key === 'Escape') {
                 setShowSuggestions(false);
-            } else if ((event.key === 'Backspace' || event.key === 'Delete') && (event.metaKey || event.ctrlKey)) {
+            } else if ((event.metaKey || event.ctrlKey) && event.key === 'Backspace') {
+                event.preventDefault();
+                handleStopAllGeneration();
+            } else if ((event.metaKey || event.ctrlKey) && event.key === 'n') {
                 event.preventDefault();
                 handleReset();
             }
@@ -242,7 +247,7 @@ export default function InputSection({
     }, [chatInput]);
 
     return (
-        <section className={`input-section ${isInitialScreen ? 'initial-screen' : ''} ${mainInput ? 'full-input' : ''}`} ref={sectionRef}>
+        <section className={`input-section ${isInitialScreen ? 'initial-screen' : ''} ${mainInput ? 'full-input' : ''} `} ref={sectionRef}>
             <div className="input-container chat-input-area">
                 <textarea
                     ref={inputRef}

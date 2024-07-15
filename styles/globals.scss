@@ -490,6 +490,13 @@ header {
     display: none;
   }
 
+  &.fixed {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    padding: $padding 0;
+  }
+
   &.full-input {
 
     .input-actions,

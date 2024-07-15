@@ -1,4 +1,5 @@
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
+import { FixedSizeList as List } from 'react-window';
 import InputSection from "../_components/InputSection";
 
 interface Message {
@@ -31,6 +32,7 @@ interface ResponsesProps {
     setSelectedModels: React.Dispatch<React.SetStateAction<string[]>>;
     showResetButton: boolean;
     handleReset: () => void;
+    handleStopAllGeneration: () => void;
 }
 
 export default function Responses({
@@ -49,7 +51,8 @@ export default function Responses({
     selectedModels,
     setSelectedModels,
     showResetButton,
-    handleReset
+    handleReset,
+    handleStopAllGeneration
 }: ResponsesProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [isAutoScroll, setIsAutoScroll] = useState(true);
@@ -57,6 +60,11 @@ export default function Responses({
     const [lastAutoScrollTop, setLastAutoScrollTop] = useState(0);
     const [expandedMessages, setExpandedMessages] = useState<{ [key: number]: boolean }>({});
     const isAutoScrollingRef = useRef(false);
+    const MemoizedInputSection = useMemo(() => React.memo(InputSection), []);
+
+    const handleSendForInputSection = useCallback((event: React.MouseEvent<HTMLButtonElement>, isPrimaryOnly: boolean, messageIndex: number) => {
+        handleSend(event, isPrimaryOnly, messageIndex);
+    }, [handleSend]);
 
     useEffect(() => {
         messages.forEach((_, index) => {
@@ -220,11 +228,11 @@ export default function Responses({
                 const isExpanded = expandedMessages[messageIndex];
                 return (
                     <div key={messageIndex} className="message-block" >
-                        <InputSection
+                        <MemoizedInputSection
                             models={models}
                             chatInput={message.user}
                             setChatInput={(newInput: string) => updateMessage(messageIndex, null, newInput)}
-                            handleSend={(event: React.MouseEvent<HTMLButtonElement>, isPrimaryOnly: boolean) => handleSend(event, isPrimaryOnly, messageIndex)}
+                            handleSend={(event, isPrimaryOnly) => handleSendForInputSection(event, isPrimaryOnly, messageIndex)}
                             handleStop={handleStopForInputSection}
                             selectedModels={selectedModels}
                             setSelectedModels={setSelectedModels}
@@ -236,6 +244,7 @@ export default function Responses({
                             mainInput={false}
                             isInitialScreen={false}
                             handleReset={handleReset}
+                            handleStopAllGeneration={handleStopAllGeneration}
                         />
                         <div className="scroll_area">
                             {Array.isArray(message.llm) && message.llm.map((response, responseIndex) => (
@@ -292,6 +301,7 @@ export default function Responses({
                 );
             })}
             <InputSection
+                fixed={true}
                 mainInput={true}
                 models={models}
                 chatInput={chatInput}
@@ -307,6 +317,7 @@ export default function Responses({
                 originalMessage=""
                 isInitialScreen={messages.length === 0}
                 handleReset={handleReset}
+                handleStopAllGeneration={handleStopAllGeneration}
             />
         </div >
     );

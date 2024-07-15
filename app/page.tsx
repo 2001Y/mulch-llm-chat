@@ -241,28 +241,28 @@ export default function Home() {
     setTimeout(() => setForceScroll(false), 100);
   };
 
-  const handleReset = () => {
-    if (isGenerating) {
-      abortControllers.forEach(controller => {
-        try {
-          controller.abort();
-        } catch (error) {
-          console.error('Error while aborting:', error);
-        }
-      });
-      setIsGenerating(false);
-      setMessages(prevMessages => {
-        return prevMessages.map(message => ({
-          ...message,
-          llm: message.llm.map((response: any) => ({ ...response, isGenerating: false }))
-        }));
-      });
-    } else {
-      if (window.confirm('Are you sure you want to clear your chat history? This operation cannot be undone.')) {
-        setMessages([]);
-        setStoredMessages([]);
-        setShowResetButton(false);
+  const handleStopAllGeneration = () => {
+    abortControllers.forEach(controller => {
+      try {
+        controller.abort();
+      } catch (error) {
+        console.error('Error while aborting:', error);
       }
+    });
+    setIsGenerating(false);
+    setMessages(prevMessages => {
+      return prevMessages.map(message => ({
+        ...message,
+        llm: message.llm.map((response: any) => ({ ...response, isGenerating: false }))
+      }));
+    });
+  };
+
+  const handleReset = () => {
+    if (window.confirm('チャット履歴をクリアしてもよろしいですか？この操作は元に戻せません。')) {
+      setMessages([]);
+      setStoredMessages([]);
+      setShowResetButton(false);
     }
   };
 
@@ -403,24 +403,34 @@ export default function Home() {
         {!isLoggedIn && <div className="free-version">Free Version</div>}
       </header>
       {(showResetButton || isGenerating) && (
-        <button className={`reset-button ${isGenerating ? 'generating' : 'newThread'}`} onClick={handleReset}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            {isGenerating ? (
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-            ) : (
-              <>
+        <>
+          {isGenerating ? (
+            <button className="reset-button generating" onClick={handleStopAllGeneration}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              </svg>
+              <span className="shortcut-area">
+                Stop All Generations
+                <span className="shortcut">
+                  ⌘⌫
+                </span>
+              </span>
+            </button>
+          ) : showResetButton && (
+            <button className="reset-button newThread" onClick={handleReset}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
-              </>
-            )}
-          </svg>
-          <span className="shortcut-area">{isGenerating ? (<>
-            Stop generation
-            <span className="shortcut">
-              ⌘⌫
-            </span>
-          </>) : 'New thread'}</span>
-        </button>
+              </svg>
+              <span className="shortcut-area">
+                New Thread
+                <span className="shortcut">
+                  ⌘N
+                </span>
+              </span>
+            </button>
+          )}
+        </>
       )}
       <Responses
         messages={messages}
@@ -439,6 +449,7 @@ export default function Home() {
         setSelectedModels={setSelectedModels}
         showResetButton={showResetButton}
         handleReset={handleReset}
+        handleStopAllGeneration={handleStopAllGeneration}
       />
       <ModelInputModal
         models={isLoggedIn ? models : demoModels}
