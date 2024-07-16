@@ -10,7 +10,13 @@ interface ModelInputModalProps {
 
 interface FunctionCall {
     title: string;
-    code: string;
+    code: {
+        name: string;
+        description: string;
+        parameters: any;
+        function: string;
+        resultTemplate: string;
+    };
 }
 
 export default function ModelInputModal({ models, setModels, isModalOpen, closeModal }: ModelInputModalProps) {
@@ -18,29 +24,29 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
     const [newFunctionCall, setNewFunctionCall] = useState<FunctionCall>({ title: '', code: '' });
     const [functionCalls, setFunctionCalls] = useLocalStorage<FunctionCall[]>('functionCalls', [
         {
-            title:"get_current_weather",
-            code:`{
-                "name": "get_current_weather",
-                "description": "現在の天気を取得する",
-                "parameters": {
-                  "type": "object",
-                  "properties": {
-                    "location": {
-                      "type": "string",
-                      "description": "場所（例：東京）"
+            title: "get_current_weather",
+            code: {
+                name: "get_current_weather",
+                description: "現在の天気を取得する",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        location: {
+                            type: "string",
+                            description: "場所（例：東京）"
+                        },
+                        unit: {
+                            type: "string",
+                            enum: ["celsius", "fahrenheit"],
+                            description: "温度の単位",
+                            default: "celsius"
+                        }
                     },
-                    "unit": {
-                      "type": "string",
-                      "enum": ["celsius", "fahrenheit"],
-                      "description": "温度の単位",
-                      "default": "celsius"
-                    }
-                  },
-                  "required": ["location"]
+                    required: ["location"]
                 },
-                "function": "function getCurrentWeather(location, unit = 'celsius') {\n  // ここに天気を取得するロジックを記述\n  // 例：\n  return {\n    location,\n    temperature: 20,\n    unit,\n    weather: '晴れ'\n  };\n}",
-                "resultTemplate": "{{location}}の現在の天気:\n気温: {{temperature}}{{#if unit == 'celsius'}}°C{{else}}°F{{/if}}\n天気: {{weather}}"
-              }`
+                function: "function getCurrentWeather(location, unit = 'celsius') {\n  // ここに天気を取得するロジックを記述\n  // 例：\n  return {\n    location,\n    temperature: 20,\n    unit,\n    weather: '晴れ'\n  };\n}",
+                resultTemplate: "{{location}}の現在の天気:\n気温: {{temperature}}{{#if unit == 'celsius'}}°C{{else}}°F{{/if}}\n天気: {{weather}}"
+            }
         }
     ]);
     const [draggedModel, setDraggedModel] = useState<string | null>(null);
@@ -58,8 +64,18 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
 
     const handleAddFunctionCall = () => {
         if (newFunctionCall.title && newFunctionCall.code) {
-            setFunctionCalls([...functionCalls, newFunctionCall]);
-            setNewFunctionCall({ title: '', code: '' });
+            try {
+                // 入力されたコードが有効なJSONかチェック
+                const parsedCode = JSON.parse(newFunctionCall.code);
+                setFunctionCalls([...functionCalls, {
+                    title: newFunctionCall.title,
+                    code: parsedCode
+                }]);
+                setNewFunctionCall({ title: '', code: '' });
+            } catch (error) {
+                console.error('Invalid JSON:', error);
+                alert('入力されたコードが有効なJSONではありません。');
+            }
         }
     };
 

@@ -13,16 +13,20 @@ export default function useLocalStorage<T>(key: string, initialValue: T): [T, (v
                     if (item) {
                         setStoredValue(JSON.parse(item));
                         console.log(`ローカルストレージからキー「${key}」の値を読み込みました:`, JSON.parse(item));
+                    } else {
+                        // ローカルストレージにデータがない場合、initialValueを保存
+                        localStorage.setItem(key, JSON.stringify(initialValue));
+                        console.log(`ローカルストレージにキー「${key}」の初期値を保存しました:`, initialValue);
                     }
                 } catch (error) {
-                    console.error('ローカルストレージからの読み込みエラー:', error);
+                    console.error('ローカルストレージの操作エラー:', error);
                 } finally {
                     setIsLoaded(true);
                 }
             }
             isInitialized.current = true;
         }
-    }, [key]);
+    }, [key, initialValue]);
 
     const setValue = (value: T | ((val: T) => T)) => {
         try {
