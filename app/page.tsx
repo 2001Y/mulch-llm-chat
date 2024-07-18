@@ -39,8 +39,8 @@ export default function Home() {
   const [showResetButton, setShowResetButton] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [storedMessages, setStoredMessages, isStoredMessagesLoaded] = useLocalStorage<any[]>('chatMessages', []);
-  const [functionCalls, setFunctionCalls] = useLocalStorage<FunctionCall[]>('functionCalls', [{
-    jsonSchema: {
+  const [tools, setTools] = useLocalStorage<any[]>('tools', [
+    {
       type: "function",
       function: {
         name: "get_current_weather",
@@ -63,8 +63,12 @@ export default function Home() {
         },
       },
     },
-    jsFunction: `
-    const getCurrentWeather = (location: string = "Tokyo", unit: string = "celsius") => {
+    // 他のツールをここに追加
+  ]);
+
+  const [toolFunctions, setToolFunctions] = useLocalStorage<Record<string, Function>>('toolFunctions', {
+    get_current_weather: (args: any) => {
+      const { location = "Tokyo", unit = "celsius" } = args;
       const randomTemperature = () => (Math.random() * 40 - 10).toFixed(1);
       const randomWeather = () => {
         const weatherConditions = ["晴れ", "曇り", "雨", "雪"];
@@ -80,9 +84,9 @@ export default function Home() {
         unit,
         weather
       };
-    }
-    `
-  }]);
+    },
+    // 他のツール関数をここに追加
+  });
   const router = useRouter();
 
   useEffect(() => {
@@ -154,59 +158,6 @@ export default function Home() {
     });
   }, [setMessages, setStoredMessages]);
 
-
-  // ツールの定義を配列に変更
-  const tools = [
-    {
-      type: "function",
-      function: {
-        name: "get_current_weather",
-        description: "現在の天気を取得する",
-        parameters: {
-          type: "object",
-          properties: {
-            location: {
-              type: "string",
-              description: "場所（例：東京）",
-            },
-            unit: {
-              type: "string",
-              enum: ["celsius", "fahrenheit"],
-              description: "温度の単位",
-              default: "celsius"
-            }
-          },
-          required: ["location"],
-        },
-      },
-    },
-    // 他のツールをここに追加
-  ];
-
-  // ツール関数のマッピング
-  const toolFunctions = {
-    get_current_weather: (args: any) => {
-      const { location = "Tokyo", unit = "celsius" } = args;
-      const randomTemperature = () => (Math.random() * 40 - 10).toFixed(1);
-      const randomWeather = () => {
-        const weatherConditions = ["晴れ", "曇り", "雨", "雪"];
-        return weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
-      };
-
-      const temperature = randomTemperature();
-      const weather = randomWeather();
-
-      return {
-        location,
-        temperature: unit === "fahrenheit" ? (parseFloat(temperature) * 9 / 5 + 32).toFixed(1) : temperature,
-        unit,
-        weather
-      };
-    },
-    // 他のツール関数をここに追加
-  };
-
-
   const fetchChatResponse = useCallback(async (model: string, messageIndex: number, responseIndex: number, abortController: AbortController, inputText: string) => {
     try {
       setMessages(prevMessages => {
@@ -232,8 +183,11 @@ export default function Home() {
       console.log('モデルに送信する過去の会話:', pastMessages);
 
       let result = '';
-      let toolCallAccumulator = '';
-      let currentToolCall: any = null;
+      let fc = {
+        name: "",
+        arguments: ""
+      };
+      let functionCallExecuted = false;
 
       const stream = await openai?.chat.completions.create({
         model,
@@ -248,25 +202,6 @@ export default function Home() {
         signal: abortController.signal,
       });
 
-      // 実行されるfunctionCall関数（JavaScript）
-      const getCurrentWeather = (location: string = "Tokyo", unit: string = "celsius") => {
-        const randomTemperature = () => (Math.random() * 40 - 10).toFixed(1);
-        const randomWeather = () => {
-          const weatherConditions = ["晴れ", "曇り", "雨", "雪"];
-          return weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
-        };
-
-        const temperature = randomTemperature();
-        const weather = randomWeather();
-
-        return {
-          location,
-          temperature: unit === "fahrenheit" ? (parseFloat(temperature) * 9 / 5 + 32).toFixed(1) : temperature,
-          unit,
-          weather
-        };
-      }
-
       if (stream) {
         for await (const part of stream) {
           if (abortController.signal.aborted) {
@@ -277,31 +212,91 @@ export default function Home() {
 
           if (toolCalls) {
             for (const tc of toolCalls) {
-              toolCallAccumulator += tc.function?.arguments || '';
-
-              try {
-                // streamを有効にしたままでも、functionCallが動作する
-                result += (() => {
-                  const funcArgs = JSON.parse(toolCallAccumulator);
-                  const weatherInfo = getCurrentWeather(funcArgs.location, funcArgs.unit);
-                  return `\n天気情報:\n場所: ${weatherInfo.location}\n温度: ${weatherInfo.temperature}${weatherInfo.unit === 'celsius' ? '°C' : '°F'}\n天気: ${weatherInfo.weather}\n`;
-                })();
-                toolCallAccumulator = '';
-
-                // streamを有効にしたままだと、functionCallが動作しない
-                // const funcArgs = JSON.parse(toolCallAccumulator);
-                // const functionName = tc.function?.name || '';
-                // if (toolFunctions[functionName]) {
-                //   const functionResult = toolFunctions[functionName](funcArgs);
-                //   result += `\n天気情報:\n場所: ${functionResult.location}\n温度: ${functionResult.temperature}${functionResult.unit === 'celsius' ? '°C' : '°F'}\n天気: ${functionResult.weather}\n`;
-                // }
-                // toolCallAccumulator = '';
-              } catch (error) {
-                // JSONが不完全な場合は続けて蓄積
+              // Gemini
+              // @ts-ignore
+              if (tc.name) {
+                fc.name += tc;
+                // @ts-ignore
+                fc.arguments += tc.arguments;
               }
+
+              // Gemini以外のその他モデル
+              if (tc.function?.name) {
+                fc.name += tc.function?.name;
+              }
+              if (tc.function?.arguments) {
+                fc.arguments += tc.function?.arguments;
+              }
+
+              // try {
+              //   // 結果を表示するステップ
+              //   result += (() => {
+              //     if (toolFunctions[fc.name]) {
+              //       const functionResult = toolFunctions[fc.name](fc.arguments);
+              //       return `\n\n関数実行結果:\n${JSON.stringify(functionResult, null, 2)}\n`;
+              //     }
+              //     return '';
+              //   })();
+              //   toolCallAccumulator = '';
+
+              //   // streamを有効にしたままでも、functionCallが動作する
+              //   // const getCurrentWeather = (location: string = "Tokyo", unit: string = "celsius") => {
+              //   //   const randomTemperature = () => (Math.random() * 40 - 10).toFixed(1);
+              //   //   const randomWeather = () => {
+              //   //     const weatherConditions = ["晴れ", "曇り", "雨", "雪"];
+              //   //     return weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
+              //   //   };
+
+              //   //   const temperature = randomTemperature();
+              //   //   const weather = randomWeather();
+
+              //   //   return {
+              //   //     location,
+              //   //     temperature: unit === "fahrenheit" ? (parseFloat(temperature) * 9 / 5 + 32).toFixed(1) : temperature,
+              //   //     unit,
+              //   //     weather
+              //   //   };
+              //   // }
+              //   // result += (() => {
+              //   //   const funcArgs = JSON.parse(toolCallAccumulator);
+              //   //   const functionName = tc.function?.name || '';
+              //   //   console.log(model, '関数名:', functionName);
+              //   //   console.log(model, '関数引数:', funcArgs);
+              //   //   console.log(model, tc.function);
+              //   //   const weatherInfo = getCurrentWeather(funcArgs.location, funcArgs.unit);
+              //   //   return `\n天気情報:\n場所: ${weatherInfo.location}\n温度: ${weatherInfo.temperature}${weatherInfo.unit === 'celsius' ? '°C' : '°F'}\n天気: ${weatherInfo.weather}\n`;
+              //   // })();
+              //   // toolCallAccumulator = '';
+
+              //   // streamを有効にしたままだと、functionCallが動作しない
+              //   // const funcArgs = JSON.parse(toolCallAccumulator);
+              //   // const functionName = tc.function?.name || '';
+              //   // if (toolFunctions[functionName]) {
+              //   //   const functionResult = toolFunctions[functionName](funcArgs);
+              //   //   result += `\n天気情報:\n場所: ${functionResult.location}\n温度: ${functionResult.temperature}${functionResult.unit === 'celsius' ? '°C' : '°F'}\n天気: ${functionResult.weather}\n`;
+              //   // }
+              //   // toolCallAccumulator = '';
+              // } catch (error) {
+              //   // JSONが不完全な場合は続けて蓄積
+              // }
             }
           } else {
             result += content;
+          }
+
+          // ファンクションコールの結果を1回だけ追加
+          if (fc.name && fc.arguments && !functionCallExecuted) {
+            try {
+              const args = JSON.parse(fc.arguments);
+              if (toolFunctions[fc.name]) {
+                const functionResult = toolFunctions[fc.name](args);
+                const functionResultText = `\n\n関数実行結果:\n${JSON.stringify(functionResult, null, 2)}\n`;
+                result += functionResultText;
+                functionCallExecuted = true;
+              }
+            } catch (error) {
+              console.error('ファンクションコールの実行エラー:', error);
+            }
           }
 
           const markedResult = await marked(result);
@@ -610,6 +605,10 @@ export default function Home() {
         setModels={isLoggedIn ? setModels : () => { }}
         isModalOpen={isModalOpen}
         closeModal={closeModal}
+        tools={tools}
+        setTools={setTools}
+        toolFunctions={toolFunctions}
+        setToolFunctions={setToolFunctions}
       />
     </>
   );

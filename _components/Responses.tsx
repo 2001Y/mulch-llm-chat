@@ -124,15 +124,24 @@ export default function Responses({
                 let currentHeight = 0;
                 let maxHeight = 0;
 
-                for (const response of responses) {
+                Array.from(responses).forEach((response) => {
                     if (response instanceof HTMLElement) {
                         currentHeight += response.scrollHeight;
                         if (currentHeight >= limitHeight) {
                             maxHeight = currentHeight;
-                            break;
                         }
                     }
-                }
+                });
+
+                // for (const response of responses) {
+                //     if (response instanceof HTMLElement) {
+                //         currentHeight += response.scrollHeight;
+                //         if (currentHeight >= limitHeight) {
+                //             maxHeight = currentHeight;
+                //             break;
+                //         }
+                //     }
+                // }
 
                 scrollArea.style.maxHeight = `${Math.max(300, maxHeight)}px`;
                 responses.forEach((response) => {
