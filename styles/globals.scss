@@ -924,7 +924,9 @@ header {
   padding: 2em;
   border-radius: $border-radius;
   max-width: 90%;
-  width: 400px;
+  max-height: 90vh;
+  overflow-y: auto;
+  width: 30rem;
   position: relative;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
 
@@ -953,12 +955,21 @@ header {
     }
   }
 
+  .tool-input-area,
+  .function-call-list {
+
+    textarea {
+      min-width: 100%;
+      min-height: 10em;
+      white-space: nowrap;
+    }
+  }
+
   .model-list,
   .function-call-list {
     list-style: none;
     padding: 0;
     margin-bottom: 1em;
-    max-height: 23em;
     overflow-y: auto;
 
     &:empty {
@@ -978,6 +989,46 @@ header {
           justify-content: center;
           width: 1.5em;
           height: 1.5em;
+        }
+
+        .model-edit-buttons {
+          display: flex;
+          gap: 1em;
+
+          // button {
+          //   display: flex;
+          //   align-items: center;
+          //   padding: 0.5em 1em;
+          //   border: none;
+          //   border-radius: 4px;
+          //   cursor: pointer;
+          //   transition: background-color 0.3s, color 0.3s;
+          //   font-size: 0.9em;
+
+          //   svg {
+          //     width: 1.2em;
+          //     height: 1.2em;
+          //     margin-right: 0.5em;
+          //   }
+
+          //   &.save-button {
+          //     background-color: $accent-color;
+          //     color: #fff;
+
+          //     &:hover {
+          //       background-color: darken($accent-color, 10%);
+          //     }
+          //   }
+
+          //   &.cancel-button {
+          //     background-color: rgba(255, 255, 255, 0.1);
+          //     color: #fff;
+
+          //     &:hover {
+          //       background-color: rgba(255, 255, 255, 0.2);
+          //     }
+          //   }
+          // }
         }
       }
     }
@@ -1027,109 +1078,22 @@ header {
         display: flex;
         gap: 0.5em;
 
-        button {
-          background: none;
-          border: none;
-          cursor: pointer;
-          transition: color 0.3s;
+        // button {
+        //   background: none;
+        //   border: none;
+        //   cursor: pointer;
+        //   transition: color 0.3s;
 
-          &:hover {
-            color: $accent-color;
-          }
+        //   &:hover {
+        //     color: $accent-color;
+        //   }
 
-          svg {
-            width: 1.2em;
-            height: 1.2em;
-          }
-        }
+        //   // svg {
+        //   //   width: 1.2em;
+        //   //   height: 1.2em;
+        //   // }
+        // }
       }
-
-      .function-edit {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5em;
-        width: 100%;
-
-        .function-input {
-          width: 100%;
-          padding: 0.5em;
-          background: rgba(255, 255, 255, 0.1);
-          border: none;
-          border-radius: 4px;
-          color: #fff;
-
-          &::placeholder {
-            color: rgba(255, 255, 255, 0.5);
-          }
-
-          &:focus {
-            outline: none;
-            background: rgba(255, 255, 255, 0.2);
-          }
-        }
-
-        textarea.function-input {
-          min-height: 100px;
-          resize: vertical;
-        }
-
-        .function-edit-buttons {
-          display: flex;
-          justify-content: flex-end;
-          gap: 0.5em;
-
-          button {
-            padding: 0.5em 1em;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-
-            &.save-button {
-              background-color: $accent-color;
-              color: #fff;
-
-              &:hover {
-                background-color: darken($accent-color, 10%);
-              }
-            }
-
-            &.cancel-button {
-              background-color: rgba(255, 255, 255, 0.1);
-              color: #fff;
-
-              &:hover {
-                background-color: rgba(255, 255, 255, 0.2);
-              }
-            }
-          }
-        }
-      }
-    }
-
-    .drag-over-line {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 5px;
-      background-color: $accent-color;
-      z-index: 1;
-    }
-  }
-
-  .function-call-list {
-    list-style: none;
-    padding: 0;
-    margin-bottom: 1em;
-    max-height: 23em;
-    overflow-y: auto;
-
-    li {
-      margin-bottom: 0.5em;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 4px;
-      overflow: hidden;
 
       .function-edit {
         padding: 0.7em;
@@ -1163,35 +1127,137 @@ header {
           justify-content: flex-end;
           gap: 0.5em;
 
-          button {
-            padding: 0.5em 1em;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.3s;
+          // button {
+          //   padding: 0.5em 1em;
+          //   border: none;
+          //   border-radius: 4px;
+          //   cursor: pointer;
+          //   transition: background-color 0.3s;
 
-            &.save-button {
-              background-color: $accent-color;
-              color: #fff;
+          //   &.save-button {
+          //     background-color: $accent-color;
+          //     color: #fff;
 
-              &:hover {
-                background-color: darken($accent-color, 10%);
-              }
-            }
+          //     &:hover {
+          //       background-color: darken($accent-color, 10%);
+          //     }
+          //   }
 
-            &.cancel-button {
-              background-color: rgba(255, 255, 255, 0.1);
-              color: #fff;
+          //   &.cancel-button {
+          //     background-color: rgba(255, 255, 255, 0.1);
+          //     color: #fff;
 
-              &:hover {
-                background-color: rgba(255, 255, 255, 0.2);
-              }
-            }
+          //     &:hover {
+          //       background-color: rgba(255, 255, 255, 0.2);
+          //     }
+          //   }
+          // }
+        }
+      }
+    }
+
+    .drag-over-line {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 5px;
+      background-color: $accent-color;
+      z-index: 1;
+    }
+  }
+
+  .function-call-list {
+    list-style: none;
+    padding: 0;
+    margin-bottom: 1em;
+    overflow-y: auto;
+
+    li {
+      margin-bottom: 0.5em;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      overflow: hidden;
+
+      .tool-edit {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 1em;
+
+        >* {
+          display: block;
+        }
+
+        .tool-edit-buttons {
+          display: flex;
+          justify-content: flex-end;
+          gap: .5em;
+        }
+      }
+
+      .function-edit {
+        padding: 0.7em;
+
+        .function-input {
+          width: 100%;
+          padding: 0.5em;
+          background: rgba(255, 255, 255, 0.1);
+          border: none;
+          border-radius: 4px;
+          color: #fff;
+          margin-bottom: 0.5em;
+
+          &::placeholder {
+            color: rgba(255, 255, 255, 0.5);
           }
+
+          &:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.2);
+          }
+        }
+
+        textarea.function-input {
+          min-height: 100px;
+          resize: vertical;
+        }
+
+        .function-edit-buttons {
+          display: flex;
+          justify-content: flex-end;
+          gap: 0.5em;
+
+          // button {
+          //   padding: 0.5em 1em;
+          //   border: none;
+          //   border-radius: 4px;
+          //   cursor: pointer;
+          //   transition: background-color 0.3s;
+
+          //   &.save-button {
+          //     background-color: $accent-color;
+          //     color: #fff;
+
+          //     &:hover {
+          //       background-color: darken($accent-color, 10%);
+          //     }
+          //   }
+
+          //   &.cancel-button {
+          //     background-color: rgba(255, 255, 255, 0.1);
+          //     color: #fff;
+
+          //     &:hover {
+          //       background-color: rgba(255, 255, 255, 0.2);
+          //     }
+          //   }
+          // }
         }
       }
     }
   }
+
 
   .function-input-area {
     background: rgba(255, 255, 255, 0.05);
@@ -1224,69 +1290,122 @@ header {
       resize: vertical;
     }
 
-    .add-button {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      padding: 0.7em;
-      background: $accent-color;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: background-color 0.3s;
-      margin-top: 0.5em;
+    // .add-button {
+    //   display: flex;
+    //   align-items: center;
+    //   justify-content: center;
+    //   width: 100%;
+    //   padding: 0.7em;
+    //   background: $accent-color;
+    //   color: #fff;
+    //   border: none;
+    //   border-radius: 4px;
+    //   cursor: pointer;
+    //   transition: background-color 0.3s;
+    //   margin-top: 0.5em;
 
-      svg {
-        width: 1.2em;
-        height: 1.2em;
-        margin-right: 0.5em;
-      }
+    //   svg {
+    //     width: 1.2em;
+    //     height: 1.2em;
+    //     margin-right: 0.5em;
+    //   }
 
-      &:hover {
-        background-color: darken($accent-color, 10%);
-      }
-    }
+    //   &:hover {
+    //     background-color: darken($accent-color, 10%);
+    //   }
+    // }
   }
 
   .input-area {
     display: flex;
     gap: 0.5em;
+  }
 
-    .model-input {
-      flex-grow: 1;
-      padding: 0.7em;
-      background: rgba(255, 255, 255, 0.1);
-      border: none;
-      border-radius: 4px;
-      color: #fff;
-      transition: background 0.3s;
 
-      &::placeholder {
-        color: rgba(255, 255, 255, 0.5);
+  .model-input,
+  .tool-input {
+    flex-grow: 1;
+    padding: 0.7em;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 4px;
+    color: #fff;
+    transition: background 0.3s;
+
+    &::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    &:focus {
+      background: rgba(255, 255, 255, 0.2);
+      outline: none;
+    }
+  }
+
+  .model-buttons {
+    display:flex;
+  }
+
+  button {
+    padding: 0.5em 1em;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s, color 0.3s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5em;
+
+          svg {
+        width: 1.2em;
+        height: 1.2em;
       }
 
-      &:focus {
-        background: rgba(255, 255, 255, 0.2);
-        outline: none;
+    &.close-button {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 1.5em;
+      background: none;
+      color: #fff;
+
+      &:hover {
+        color: $accent-color;
       }
     }
 
-    .add-button {
-      padding: 0.7em 1em;
+    &.save-button {
+      background-color: $accent-color;
+      color: #fff;
+
+      &:hover {
+        background-color: darken($accent-color, 10%);
+      }
+    }
+
+    &.cancel-button {
+      background-color: rgba(255, 255, 255, 0.1);
+      color: #fff;
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+      }
+    }
+
+    &.add-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
       background: $accent-color;
       color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: background-color 0.3s;
 
       &:hover {
         background-color: darken($accent-color, 10%);
       }
     }
   }
+
 }
 
 .markdown-editor {

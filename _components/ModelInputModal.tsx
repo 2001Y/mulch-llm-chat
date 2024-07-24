@@ -1,5 +1,4 @@
 import React, { useState, useRef } from "react";
-import useLocalStorage from "_hooks/useLocalStorage";
 
 interface ModelInputModalProps {
     models: string[];
@@ -23,73 +22,13 @@ interface Tool {
 
 export default function ModelInputModal({ models, setModels, isModalOpen, closeModal, tools, setTools, toolFunctions, setToolFunctions }: ModelInputModalProps) {
     const [newModel, setNewModel] = useState<string>('');
-    const [newTool, setNewTool] = useState<Tool>({
-        type: "function",
-        function: {
-            name: "",
-            description: "",
-            parameters: {}
-        }
-    });
-    // const [tools, setTools] = useLocalStorage<Tool[]>('tools', [
-    //     {
-    //         type: "function",
-    //         function: {
-    //             name: "get_current_weather",
-    //             description: "現在の天気を取得する",
-    //             parameters: {
-    //                 type: "object",
-    //                 properties: {
-    //                     location: {
-    //                         type: "string",
-    //                         description: "場所（例：東京）"
-    //                     },
-    //                     unit: {
-    //                         type: "string",
-    //                         enum: ["celsius", "fahrenheit"],
-    //                         description: "温度の単位",
-    //                         default: "celsius"
-    //                     }
-    //                 },
-    //                 required: ["location"]
-    //             }
-    //         }
-    //     }
-    // ]);
-    // const [toolFunctions, setToolFunctions] = useLocalStorage<Record<string, Function>>('toolFunctions', {
-    //     get_current_weather: (args: any) => {
-    //         const { location = "Tokyo", unit = "celsius" } = args;
-    //         const randomTemperature = () => (Math.random() * 40 - 10).toFixed(1);
-    //         const randomWeather = () => {
-    //             const weatherConditions = ["晴れ", "曇り", "雨", "雪"];
-    //             return weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
-    //         };
-
-    //         const temperature = randomTemperature();
-    //         const weather = randomWeather();
-
-    //         return {
-    //             location,
-    //             temperature: unit === "fahrenheit" ? (parseFloat(temperature) * 9 / 5 + 32).toFixed(1) : temperature,
-    //             unit,
-    //             weather
-    //         };
-    //     }
-    // });
-    const [draggedModel, setDraggedModel] = useState<string | null>(null);
-    const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-    const dragOverLineRef = useRef<HTMLDivElement>(null);
+    const [newTools, setNewTools] = useState('');
+    const [newToolFunctions, setNewToolFunctions] = useState('');
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
-    const [editingTool, setEditingTool] = useState<Tool>({
-        type: "function",
-        function: {
-            name: "",
-            description: "",
-            parameters: {}
-        }
-    });
     const [editingModelIndex, setEditingModelIndex] = useState<number | null>(null);
     const [editingModel, setEditingModel] = useState<string>('');
+    const [editingToolDefinition, setEditingToolDefinition] = useState('');
+    const [editingToolFunction, setEditingToolFunction] = useState('');
 
     const handleAddModel = () => {
         if (newModel && !models.includes(newModel)) {
@@ -97,6 +36,26 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
             setNewModel('');
         }
     };
+
+    const handleAddNewTool = () => {
+        const newTool: Tool = {
+            type: "function",
+            function: {
+                name: "new_function",
+                description: "新しい関数の説明",
+                parameters: {}
+            }
+        };
+        setTools([...tools, newTool]);
+        setToolFunctions({
+            ...toolFunctions,
+            new_function: () => console.log("新しい関数")
+        });
+        setEditingIndex(tools.length);
+        setEditingToolDefinition(JSON.stringify(newTool, null, 2));
+        setEditingToolFunction("() => console.log(\"新しい関数\")");
+    };
+
     const handleEditModel = (index: number) => {
         setEditingModelIndex(index);
         setEditingModel(models[index]);
@@ -115,20 +74,6 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
     const handleCancelModelEdit = () => {
         setEditingModelIndex(null);
         setEditingModel('');
-    };
-
-    const handleAddTool = () => {
-        if (newTool.function.name && newTool.function.description) {
-            setTools([...tools, newTool]);
-            setNewTool({
-                type: "function",
-                function: {
-                    name: "",
-                    description: "",
-                    parameters: {}
-                }
-            });
-        }
     };
 
     const handleDeleteModel = (modelToDelete: string) => {
@@ -156,65 +101,50 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
         }
     };
 
-    const handleDragStart = (e: React.DragEvent<HTMLLIElement>, model: string) => {
-        setDraggedModel(model);
-    };
-
-    const handleDragOver = (e: React.DragEvent<HTMLLIElement>, index: number) => {
-        e.preventDefault();
-        setDragOverIndex(index);
-    };
-
-    const handleDragLeave = () => {
-        setDragOverIndex(null);
-    };
-
-    const handleDrop = (e: React.DragEvent<HTMLLIElement>, targetModel: string) => {
-        e.preventDefault();
-        if (draggedModel) {
-            const draggedIndex = models.indexOf(draggedModel);
-            const targetIndex = models.indexOf(targetModel);
-            const updatedModels = [...models];
-            updatedModels.splice(draggedIndex, 1);
-            updatedModels.splice(targetIndex, 0, draggedModel);
-            setModels(updatedModels);
-            setDraggedModel(null);
-            setDragOverIndex(null);
-        }
-    };
-
     const handleEditTool = (index: number) => {
         setEditingIndex(index);
-        setEditingTool(tools[index]);
+        const tool = tools[index];
+        setEditingToolDefinition(JSON.stringify(tool, null, 2));
+        // toolFunctions[tool.function.name]が存在しない場合のチェックを追加
+        const functionString = toolFunctions[tool.function.name]
+            ? toolFunctions[tool.function.name].toString()
+            : '() => {}';
+        setEditingToolFunction(functionString);
     };
-
     const handleSaveEditedTool = () => {
         if (editingIndex !== null) {
-            const updatedTools = [...tools];
-            updatedTools[editingIndex] = editingTool;
-            setTools(updatedTools);
-            setEditingIndex(null);
-            setEditingTool({
-                type: "function",
-                function: {
-                    name: "",
-                    description: "",
-                    parameters: {}
+            try {
+                const parsedTool = JSON.parse(editingToolDefinition);
+
+                // ツール定義の構造を検証
+                if (!parsedTool.type || !parsedTool.function || !parsedTool.function.name || !parsedTool.function.description || !parsedTool.function.parameters) {
+                    throw new Error("ツール定義の構造が不正です。");
                 }
-            });
+
+                let parsedFunction;
+                try {
+                    parsedFunction = new Function(`return ${editingToolFunction}`)();
+                } catch (functionError) {
+                    throw new Error("ツール関数の構文が不正です: " + functionError.message);
+                }
+
+                if (typeof parsedFunction !== 'function') {
+                    throw new Error("ツール関数が有効な関数ではありません。");
+                }
+
+                // ... 既存のコード（更新処理） ...
+
+            } catch (error) {
+                console.error('ツールの編集エラー:', error);
+                alert(`ツールの編集に失敗しました: ${error.message}`);
+            }
         }
     };
 
     const handleCancelEdit = () => {
         setEditingIndex(null);
-        setEditingTool({
-            type: "function",
-            function: {
-                name: "",
-                description: "",
-                parameters: {}
-            }
-        });
+        setEditingToolDefinition('');
+        setEditingToolFunction('');
     };
 
     if (!isModalOpen) return null;
@@ -231,9 +161,9 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
                 <h2>Model Settings</h2>
                 <ul className="model-list">
                     {models.map((model, index) => (
-                        <li key={index}>
+                        <li key={index} className={editingModelIndex === index ? "model-edit" : ""}>
                             {editingModelIndex === index ? (
-                                <div className="model-edit">
+                                <>
                                     <input
                                         type="text"
                                         value={editingModel}
@@ -247,7 +177,6 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
                                                 <polyline points="17 21 17 13 7 13 7 21"></polyline>
                                                 <polyline points="7 3 7 8 15 8"></polyline>
                                             </svg>
-                                            保存
                                         </button>
                                         <button onClick={handleCancelModelEdit} className="cancel-button">
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -255,10 +184,9 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
                                                 <line x1="15" y1="9" x2="9" y2="15"></line>
                                                 <line x1="9" y1="9" x2="15" y2="15"></line>
                                             </svg>
-                                            キャンセル
                                         </button>
                                     </div>
-                                </div>
+                                </>
                             ) : (
                                 <>
                                     <span className="model-name">{model}</span>
@@ -300,35 +228,35 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
                         <li key={index}>
                             {editingIndex === index ? (
                                 <div className="tool-edit">
-                                    <input
-                                        type="text"
-                                        value={editingTool.function.name}
-                                        onChange={(e) => setEditingTool({ ...editingTool, function: { ...editingTool.function, name: e.target.value } })}
+                                    <textarea
+                                        value={editingToolDefinition}
+                                        onChange={(e) => setEditingToolDefinition(e.target.value)}
                                         className="tool-input"
-                                        placeholder="Tool name"
+                                        placeholder="ツール定義 (JSON形式)"
                                     />
                                     <textarea
-                                        value={editingTool.function.description}
-                                        onChange={(e) => setEditingTool({ ...editingTool, function: { ...editingTool.function, description: e.target.value } })}
+                                        value={editingToolFunction}
+                                        onChange={(e) => setEditingToolFunction(e.target.value)}
                                         className="tool-input"
-                                        placeholder="Tool description"
-                                    />
-                                    <textarea
-                                        value={JSON.stringify(editingTool.function.parameters, null, 2)}
-                                        onChange={(e) => {
-                                            try {
-                                                const parsedParameters = JSON.parse(e.target.value);
-                                                setEditingTool({ ...editingTool, function: { ...editingTool.function, parameters: parsedParameters } });
-                                            } catch (error) {
-                                                console.error('Invalid JSON:', error);
-                                            }
-                                        }}
-                                        className="tool-input"
-                                        placeholder="Tool parameters (JSON)"
+                                        placeholder="ツール関数 (JavaScript関数)"
                                     />
                                     <div className="tool-edit-buttons">
-                                        <button onClick={handleSaveEditedTool} className="save-button">保存</button>
-                                        <button onClick={handleCancelEdit} className="cancel-button">キャンセル</button>
+                                        <button onClick={handleSaveEditedTool} className="save-button">
+                                            Save
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                                <polyline points="7 3 7 8 15 8"></polyline>
+                                            </svg>
+                                        </button>
+                                        <button onClick={handleCancelEdit} className="cancel-button">
+                                            Cancel
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <line x1="15" y1="9" x2="9" y2="15"></line>
+                                                <line x1="9" y1="9" x2="15" y2="15"></line>
+                                            </svg>
+                                        </button>
                                     </div>
                                 </div>
                             ) : (
@@ -347,40 +275,33 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
                         </li>
                     ))}
                 </ul>
-                {editingIndex === null && (
+                <button onClick={handleAddNewTool} className="add-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    新しいツールを追加
+                </button>
+                {/* {editingIndex === null && (
                     <div className="tool-input-area">
-                        <input
-                            type="text"
-                            value={newTool.function.name}
-                            onChange={(e) => setNewTool({ ...newTool, function: { ...newTool.function, name: e.target.value } })}
-                            placeholder="Tool Name"
-                            className="function-input"
+                        <h3>Add New Tool</h3>
+                        <textarea
+                            value={newTools}
+                            onChange={(e) => setNewTools(e.target.value)}
+                            placeholder="Tool Definition (JSON format)"
+                            className="tool-input"
                         />
                         <textarea
-                            value={newTool.function.description}
-                            onChange={(e) => setNewTool({ ...newTool, function: { ...newTool.function, description: e.target.value } })}
-                            placeholder="Tool Description"
-                            className="function-input"
-                        />
-                        <textarea
-                            value={JSON.stringify(newTool.function.parameters, null, 2)}
-                            onChange={(e) => {
-                                try {
-                                    const parsedParameters = JSON.parse(e.target.value);
-                                    setNewTool({ ...newTool, function: { ...newTool.function, parameters: parsedParameters } });
-                                } catch (error) {
-                                    console.error('Invalid JSON:', error);
-                                }
-                            }}
-                            placeholder="Tool Parameters (JSON)"
+                            value={newToolFunctions}
+                            onChange={(e) => setNewToolFunctions(e.target.value)}
+                            placeholder="Tool Function (JavaScript function)"
                             className="tool-input"
                         />
                         <button onClick={handleAddTool} className="add-button">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                             Add Tool
                         </button>
                     </div>
-                )}
+                )} */}
             </div>
         </div >
     );

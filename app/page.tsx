@@ -23,7 +23,7 @@ marked.use(
 );
 
 export default function Home() {
-  const [models, setModels] = useLocalStorage<string[]>('models', ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'cohere/command-r-plus', "meta-llama/llama-3-70b-instruct"]);
+  const [models, setModels] = useLocalStorage<string[]>('models', ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'cohere/command-r-plus', "meta-llama/llama-3-70b-instruct", "meta-llama/llama-3.1-405b-instruct"]);
   const [demoModels] = useState<string[]>(['google/gemma-2-9b-it:free', "google/gemma-7b-it:free", "meta-llama/llama-3-8b-instruct:free", "openchat/openchat-7b:free"]);
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<any[]>([]);
@@ -67,10 +67,10 @@ export default function Home() {
   ]);
 
   const [toolFunctions, setToolFunctions] = useLocalStorage<Record<string, Function>>('toolFunctions', {
-    get_current_weather: (args: any) => {
+    get_current_weather: function (args) {
       const { location = "Tokyo", unit = "celsius" } = args;
-      const randomTemperature = () => (Math.random() * 40 - 10).toFixed(1);
-      const randomWeather = () => {
+      const randomTemperature = function () { return (Math.random() * 40 - 10).toFixed(1); };
+      const randomWeather = function () {
         const weatherConditions = ["晴れ", "曇り", "雨", "雪"];
         return weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
       };
@@ -79,10 +79,10 @@ export default function Home() {
       const weather = randomWeather();
 
       return {
-        location,
+        location: location,
         temperature: unit === "fahrenheit" ? (parseFloat(temperature) * 9 / 5 + 32).toFixed(1) : temperature,
-        unit,
-        weather
+        unit: unit,
+        weather: weather
       };
     },
     // 他のツール関数をここに追加
