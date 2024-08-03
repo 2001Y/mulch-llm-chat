@@ -23,7 +23,7 @@ marked.use(
 );
 
 export default function Home() {
-  const [models, setModels] = useLocalStorage<string[]>('models', ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'cohere/command-r-plus', "meta-llama/llama-3-70b-instruct", "meta-llama/llama-3.1-405b-instruct"]);
+  const [models, setModels] = useLocalStorage<string[]>('models', ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'google/gemini-1.5-pro-exp-0801', 'cohere/command-r-plus', "meta-llama/llama-3-70b-instruct", "meta-llama/llama-3.1-405b-instruct"]);
   const [demoModels] = useState<string[]>(['google/gemma-2-9b-it:free', "google/gemma-7b-it:free", "meta-llama/llama-3-8b-instruct:free", "openchat/openchat-7b:free"]);
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<any[]>([]);
@@ -66,8 +66,8 @@ export default function Home() {
     // 他のツールをここに追加
   ]);
 
-  const [toolFunctions, setToolFunctions] = useLocalStorage<Record<string, Function>>('toolFunctions', {
-    get_current_weather: function (args) {
+  const [toolFunctions, setToolFunctions] = useLocalStorage<Record<string, string>>('toolFunctions', {
+    get_current_weather: `function (args) {
       const { location = "Tokyo", unit = "celsius" } = args;
       const randomTemperature = function () { return (Math.random() * 40 - 10).toFixed(1); };
       const randomWeather = function () {
@@ -84,7 +84,7 @@ export default function Home() {
         unit: unit,
         weather: weather
       };
-    },
+    }`,
     // 他のツール関数をここに追加
   });
   const router = useRouter();
@@ -227,58 +227,7 @@ export default function Home() {
               if (tc.function?.arguments) {
                 fc.arguments += tc.function?.arguments;
               }
-
-              // try {
-              //   // 結果を表示するステップ
-              //   result += (() => {
-              //     if (toolFunctions[fc.name]) {
-              //       const functionResult = toolFunctions[fc.name](fc.arguments);
-              //       return `\n\n関数実行結果:\n${JSON.stringify(functionResult, null, 2)}\n`;
-              //     }
-              //     return '';
-              //   })();
-              //   toolCallAccumulator = '';
-
-              //   // streamを有効にしたままでも、functionCallが動作する
-              //   // const getCurrentWeather = (location: string = "Tokyo", unit: string = "celsius") => {
-              //   //   const randomTemperature = () => (Math.random() * 40 - 10).toFixed(1);
-              //   //   const randomWeather = () => {
-              //   //     const weatherConditions = ["晴れ", "曇り", "雨", "雪"];
-              //   //     return weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
-              //   //   };
-
-              //   //   const temperature = randomTemperature();
-              //   //   const weather = randomWeather();
-
-              //   //   return {
-              //   //     location,
-              //   //     temperature: unit === "fahrenheit" ? (parseFloat(temperature) * 9 / 5 + 32).toFixed(1) : temperature,
-              //   //     unit,
-              //   //     weather
-              //   //   };
-              //   // }
-              //   // result += (() => {
-              //   //   const funcArgs = JSON.parse(toolCallAccumulator);
-              //   //   const functionName = tc.function?.name || '';
-              //   //   console.log(model, '関数名:', functionName);
-              //   //   console.log(model, '関数引数:', funcArgs);
-              //   //   console.log(model, tc.function);
-              //   //   const weatherInfo = getCurrentWeather(funcArgs.location, funcArgs.unit);
-              //   //   return `\n天気情報:\n場所: ${weatherInfo.location}\n温度: ${weatherInfo.temperature}${weatherInfo.unit === 'celsius' ? '°C' : '°F'}\n天気: ${weatherInfo.weather}\n`;
-              //   // })();
-              //   // toolCallAccumulator = '';
-
-              //   // streamを有効にしたままだと、functionCallが動作しない
-              //   // const funcArgs = JSON.parse(toolCallAccumulator);
-              //   // const functionName = tc.function?.name || '';
-              //   // if (toolFunctions[functionName]) {
-              //   //   const functionResult = toolFunctions[functionName](funcArgs);
-              //   //   result += `\n天気情報:\n場所: ${functionResult.location}\n温度: ${functionResult.temperature}${functionResult.unit === 'celsius' ? '°C' : '°F'}\n天気: ${functionResult.weather}\n`;
-              //   // }
-              //   // toolCallAccumulator = '';
-              // } catch (error) {
-              //   // JSONが不完全な場合は続けて蓄積
-              // }
+              console.log('ツールコール引数:', model, fc.name, decodeURIComponent(String(fc.arguments)));
             }
           } else {
             result += content;
@@ -288,6 +237,7 @@ export default function Home() {
           if (fc.name && fc.arguments && !functionCallExecuted) {
             try {
               const args = JSON.parse(fc.arguments);
+              console.log(toolFunctions[fc.name]);
               if (toolFunctions[fc.name]) {
                 const functionResult = toolFunctions[fc.name](args);
                 const functionResultText = `\n\n関数実行結果:\n${JSON.stringify(functionResult, null, 2)}\n`;
@@ -295,7 +245,7 @@ export default function Home() {
                 functionCallExecuted = true;
               }
             } catch (error) {
-              console.error('ファンクションコールの実行エラー:', error);
+              // console.error('ファンクションコールの実行エラー:', error);
             }
           }
 

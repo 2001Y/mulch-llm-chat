@@ -1343,7 +1343,7 @@ header {
   }
 
   .model-buttons {
-    display:flex;
+    display: flex;
   }
 
   button {
@@ -1357,10 +1357,10 @@ header {
     align-items: center;
     gap: 0.5em;
 
-          svg {
-        width: 1.2em;
-        height: 1.2em;
-      }
+    svg {
+      width: 1.2em;
+      height: 1.2em;
+    }
 
     &.close-button {
       position: absolute;

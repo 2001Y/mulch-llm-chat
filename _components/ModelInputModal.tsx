@@ -22,8 +22,6 @@ interface Tool {
 
 export default function ModelInputModal({ models, setModels, isModalOpen, closeModal, tools, setTools, toolFunctions, setToolFunctions }: ModelInputModalProps) {
     const [newModel, setNewModel] = useState<string>('');
-    const [newTools, setNewTools] = useState('');
-    const [newToolFunctions, setNewToolFunctions] = useState('');
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [editingModelIndex, setEditingModelIndex] = useState<number | null>(null);
     const [editingModel, setEditingModel] = useState<string>('');
@@ -132,8 +130,18 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
                     throw new Error("ツール関数が有効な関数ではありません。");
                 }
 
-                // ... 既存のコード（更新処理） ...
+                // 更新処理
+                const updatedTools = [...tools];
+                updatedTools[editingIndex] = parsedTool;
+                setTools(updatedTools);
 
+                const updatedToolFunctions = { ...toolFunctions };
+                updatedToolFunctions[parsedTool.function.name] = parsedFunction;
+                setToolFunctions(updatedToolFunctions);
+
+                setEditingIndex(null);
+                setEditingToolDefinition('');
+                setEditingToolFunction('');
             } catch (error) {
                 console.error('ツールの編集エラー:', error);
                 alert(`ツールの編集に失敗しました: ${error.message}`);
