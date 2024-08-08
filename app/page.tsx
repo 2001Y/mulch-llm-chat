@@ -23,7 +23,7 @@ marked.use(
 );
 
 export default function Home() {
-  const [models, setModels] = useLocalStorage<string[]>('models', ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'google/gemini-1.5-pro-exp-0801', 'cohere/command-r-plus', "meta-llama/llama-3-70b-instruct", "meta-llama/llama-3.1-405b-instruct"]);
+  const [models, setModels] = useLocalStorage<string[]>('models', ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'google/gemini-1.5-pro-exp-0801', 'cohere/command-r-plus', "perplexity/llama-3.1-sonar-large-128k-online", "meta-llama/llama-3.1-405b-instruct"]);
   const [demoModels] = useState<string[]>(['google/gemma-2-9b-it:free', "google/gemma-7b-it:free", "meta-llama/llama-3-8b-instruct:free", "openchat/openchat-7b:free"]);
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<any[]>([]);
@@ -105,7 +105,7 @@ export default function Home() {
 
   useEffect(() => {
     if (accessToken !== previousAccessToken) {
-      setModels(['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'cohere/command-r-plus', "meta-llama/llama-3-70b-instruct"]);
+      setModels(['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'google/gemini-1.5-pro-exp-0801', 'cohere/command-r-plus', "perplexity/llama-3.1-sonar-large-128k-online", "meta-llama/llama-3.1-405b-instruct"]);
     }
   }, [accessToken, previousAccessToken, setModels]);
 
