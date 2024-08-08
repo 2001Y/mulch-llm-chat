@@ -69,8 +69,8 @@ export default function Home() {
   const [toolFunctions, setToolFunctions] = useLocalStorage<Record<string, Function>>('toolFunctions', {
     get_current_weather: (args: any) => {
       const { location = "Tokyo", unit = "celsius" } = args;
-      const randomTemperature = function () { return (Math.random() * 40 - 10).toFixed(1); };
-      const randomWeather = function () {
+      const randomTemperature = () => (Math.random() * 40 - 10).toFixed(1);
+      const randomWeather = () => {
         const weatherConditions = ["晴れ", "曇り", "雨", "雪"];
         return weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
       };
@@ -80,7 +80,7 @@ export default function Home() {
 
       return {
         location: location,
-        temperature: unit === "fahrenheit" ? (parseFloat(temperature) * 9 / 5 + 32).toFixed(1) : temperature,
+        temperature: unit === "fahrenheit" ? ((parseFloat(temperature) * 9 / 5) + 32).toFixed(1) : temperature,
         unit: unit,
         weather: weather
       };
@@ -228,6 +228,7 @@ export default function Home() {
                 fc.arguments += tc.function?.arguments;
               }
               console.log('ツールコール引数:', model, fc.name, decodeURIComponent(String(fc.arguments)));
+              // ツールコール引数: openai/gpt-4o get_current_weather {"location":"東京"}
             }
           } else {
             result += content;
@@ -237,15 +238,17 @@ export default function Home() {
           if (fc.name && fc.arguments && !functionCallExecuted) {
             try {
               const args = JSON.parse(fc.arguments);
-              console.log(toolFunctions[fc.name]);
+              // console.log(toolFunctions[fc.name]);
+
+              result += `\n\nFunction Call 実行中...: ${fc.name}(${fc.arguments})`;
               if (toolFunctions[fc.name]) {
                 const functionResult = toolFunctions[fc.name](args);
-                const functionResultText = `\n\n関数実行結果:\n${JSON.stringify(functionResult, null, 2)}\n`;
+                const functionResultText = `\n\n実行結果:\n${JSON.stringify(functionResult, null, 2)}\n`;
                 result += functionResultText;
                 functionCallExecuted = true;
               }
             } catch (error) {
-              // console.error('ファンクションコールの実行エラー:', error);
+              console.error('ファンクションコールの実行エラー:', error);
             }
           }
 
