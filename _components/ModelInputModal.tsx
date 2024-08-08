@@ -122,7 +122,7 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
                 let parsedFunction;
                 try {
                     parsedFunction = new Function(`return ${editingToolFunction}`)();
-                } catch (functionError) {
+                } catch (functionError: any) {
                     throw new Error("ツール関数の構文が不正です: " + functionError.message);
                 }
 
@@ -142,7 +142,7 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
                 setEditingIndex(null);
                 setEditingToolDefinition('');
                 setEditingToolFunction('');
-            } catch (error) {
+            } catch (error: any) {
                 console.error('ツールの編集エラー:', error);
                 alert(`ツールの編集に失敗しました: ${error.message}`);
             }

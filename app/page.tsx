@@ -66,8 +66,8 @@ export default function Home() {
     // 他のツールをここに追加
   ]);
 
-  const [toolFunctions, setToolFunctions] = useLocalStorage<Record<string, string>>('toolFunctions', {
-    get_current_weather: `function (args) {
+  const [toolFunctions, setToolFunctions] = useLocalStorage<Record<string, Function>>('toolFunctions', {
+    get_current_weather: (args: any) => {
       const { location = "Tokyo", unit = "celsius" } = args;
       const randomTemperature = function () { return (Math.random() * 40 - 10).toFixed(1); };
       const randomWeather = function () {
@@ -84,7 +84,7 @@ export default function Home() {
         unit: unit,
         weather: weather
       };
-    }`,
+    },
     // 他のツール関数をここに追加
   });
   const router = useRouter();
