@@ -235,7 +235,7 @@ export default function Home() {
           }
 
           // ファンクションコールの結果を1回だけ追加
-          if (fc.name && fc.arguments && !functionCallExecuted) {
+          if (fc.name && fc.arguments && !functionCallExecuted) {　
             try {
               const args = JSON.parse(fc.arguments);
               // console.log(toolFunctions[fc.name]);
