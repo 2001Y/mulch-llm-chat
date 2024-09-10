@@ -42,6 +42,7 @@ export default function InputSection({
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const sectionRef = useRef<HTMLElement>(null);
     const originalMessage = storedMessages[messageIndex]?.user || '';
+    const [isInputEmpty, setIsInputEmpty] = useState(true);
 
     useEffect(() => {
         if (sectionRef.current) {
@@ -51,40 +52,10 @@ export default function InputSection({
     }, [chatInput, originalMessage]);
 
     useEffect(() => {
-        if (inputRef.current) {
+        if (inputRef.current && mainInput) {
             inputRef.current.focus();
         }
-
-        const handleFocus = () => {
-            if (document.body.dataset) {
-                document.body.dataset.inputFocused = 'true';
-            }
-            if (sectionRef.current) {
-                sectionRef.current.classList.add('focused');
-            }
-        };
-
-        const handleBlur = () => {
-            if (document.body.dataset) {
-                document.body.dataset.inputFocused = 'false';
-            }
-            if (sectionRef.current) {
-                sectionRef.current.classList.remove('focused');
-            }
-        };
-
-        if (inputRef.current) {
-            inputRef.current.addEventListener('focus', handleFocus);
-            inputRef.current.addEventListener('blur', handleBlur);
-        }
-
-        return () => {
-            if (inputRef.current) {
-                inputRef.current.removeEventListener('focus', handleFocus);
-                inputRef.current.removeEventListener('blur', handleBlur);
-            }
-        };
-    }, []);
+    }, [mainInput]);
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (document.body.dataset && document.body.dataset.softwareKeyboard === 'false') {
@@ -96,7 +67,7 @@ export default function InputSection({
                 if (isEditMode) {
                     handleResetAndRegenerate(messageIndex);
                 } else {
-                    handleSend(event as unknown as React.MouseEvent<HTMLButtonElement>, event.metaKey || event.ctrlKey);
+                    handleSendAndResetInput(event as unknown as React.MouseEvent<HTMLButtonElement>, event.metaKey || event.ctrlKey);
                 }
             } else if (event.key === 'ArrowDown') {
                 if (showSuggestions) {
@@ -132,6 +103,7 @@ export default function InputSection({
     const onChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const text = e.target.value;
         setChatInput(text);
+        setIsInputEmpty(text.trim() === '');
         if (sectionRef.current) {
             const isEdited = text !== originalMessage;
             sectionRef.current.classList.toggle('edited', isEdited);
@@ -245,8 +217,28 @@ export default function InputSection({
         }
     }, [chatInput]);
 
+    // 新しい関数: 送信後に入力をリセットする
+    const handleSendAndResetInput = (event: React.MouseEvent<HTMLButtonElement>, isPrimaryOnly: boolean) => {
+        handleSend(event, isPrimaryOnly);
+        setChatInput('');
+        setIsInputEmpty(true);
+    };
+
     return (
-        <section className={`input-section ${isInitialScreen ? 'initial-screen' : ''} ${mainInput ? 'full-input' : ''} `} ref={sectionRef}>
+        <section className={`input-section ${isInitialScreen ? 'initial-screen' : ''} ${mainInput ? 'full-input fixed' : ''} `} ref={sectionRef}>
+
+            <div className="input-container input-actions">
+                <button
+                    onClick={handleReset}
+                    className={`action-button new-thread-button icon-button ${isInputEmpty ? 'active' : ''}`}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 5v14M5 12h14" />
+                    </svg>
+                    <span>New Thread<span className="shortcut">⌘N</span></span>
+                </button>
+            </div>
+
             <div className="input-container chat-input-area">
                 <textarea
                     ref={inputRef}
@@ -334,8 +326,8 @@ export default function InputSection({
                 ) : (
                     <>
                         <button
-                            onClick={(e) => handleSend(e, false)}
-                            className="action-button send-button icon-button"
+                            onClick={(e) => handleSendAndResetInput(e, false)}
+                            className={`action-button send-button icon-button ${!isInputEmpty ? 'active' : ''}`}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -344,8 +336,8 @@ export default function InputSection({
                             <span>Send<span className="shortcut">⏎</span></span>
                         </button>
                         <button
-                            onClick={(e) => handleSend(e, true)}
-                            className="action-button send-primary-button icon-button"
+                            onClick={(e) => handleSendAndResetInput(e, true)}
+                            className={`action-button send-primary-button icon-button ${!isInputEmpty ? 'active' : ''}`}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 interface ModelInputModalProps {
     models: string[];
@@ -20,6 +20,11 @@ interface Tool {
     };
 }
 
+interface OpenRouterModel {
+    id: string;
+    name: string;
+}
+
 export default function ModelInputModal({ models, setModels, isModalOpen, closeModal, tools, setTools, toolFunctions, setToolFunctions }: ModelInputModalProps) {
     const [newModel, setNewModel] = useState<string>('');
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -27,6 +32,49 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
     const [editingModel, setEditingModel] = useState<string>('');
     const [editingToolDefinition, setEditingToolDefinition] = useState('');
     const [editingToolFunction, setEditingToolFunction] = useState('');
+    const [suggestions, setSuggestions] = useState<OpenRouterModel[]>([]);
+    const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number>(-1);
+
+    const dragItem = useRef<number | null>(null);
+    const dragOverItem = useRef<number | null>(null);
+
+    useEffect(() => {
+        if (newModel.length > 0) {
+            fetchSuggestions(newModel);
+        } else {
+            setSuggestions([]);
+        }
+    }, [newModel]);
+
+    const fetchSuggestions = async (query: string) => {
+        try {
+            const response = await fetch('https://openrouter.ai/api/v1/models');
+            const data = await response.json();
+            const filteredModels = data.data.filter((model: OpenRouterModel) =>
+                model.id.toLowerCase().includes(query.toLowerCase())
+            );
+            setSuggestions(filteredModels);
+        } catch (error) {
+            console.error('モデルの取得に失敗しました:', error);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'ArrowDown') {
+            setActiveSuggestionIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : prev));
+        } else if (e.key === 'ArrowUp') {
+            setActiveSuggestionIndex(prev => (prev > 0 ? prev - 1 : -1));
+        } else if (e.key === 'Enter' && activeSuggestionIndex !== -1) {
+            e.preventDefault();
+            handleSelectSuggestion(suggestions[activeSuggestionIndex].id);
+        }
+    };
+
+    const handleSelectSuggestion = (modelId: string) => {
+        setNewModel(modelId);
+        setSuggestions([]);
+        setActiveSuggestionIndex(-1);
+    };
 
     const handleAddModel = () => {
         if (newModel && !models.includes(newModel)) {
@@ -93,10 +141,9 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
         }
     };
 
-    const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter') {
-            handleAddModel();
-        }
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        handleAddModel();
     };
 
     const handleEditTool = (index: number) => {
@@ -155,6 +202,47 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
         setEditingToolFunction('');
     };
 
+    const handleDragStart = (e: React.DragEvent<HTMLLIElement>, position: number) => {
+        dragItem.current = position;
+        e.currentTarget.classList.add('dragging');
+    };
+
+    const handleDragEnter = (e: React.DragEvent<HTMLLIElement>, position: number) => {
+        dragOverItem.current = position;
+        const listItems = document.querySelectorAll('.model-list li');
+        listItems.forEach((item, index) => {
+            if (index === position) {
+                const insertLine = document.createElement('div');
+                insertLine.className = 'insert-line';
+                if (position < (dragItem.current || 0)) {
+                    item.insertAdjacentElement('beforebegin', insertLine);
+                } else {
+                    item.insertAdjacentElement('afterend', insertLine);
+                }
+            }
+        });
+    };
+
+    const handleDragLeave = (e: React.DragEvent<HTMLLIElement>) => {
+        const insertLines = document.querySelectorAll('.insert-line');
+        insertLines.forEach(line => line.remove());
+    };
+
+    const handleDragEnd = (e: React.DragEvent<HTMLLIElement>) => {
+        e.currentTarget.classList.remove('dragging');
+        const insertLines = document.querySelectorAll('.insert-line');
+        insertLines.forEach(line => line.remove());
+        const copyListItems = [...models];
+        if (dragItem.current !== null && dragOverItem.current !== null) {
+            const draggedItemContent = copyListItems[dragItem.current];
+            copyListItems.splice(dragItem.current, 1);
+            copyListItems.splice(dragOverItem.current, 0, draggedItemContent);
+            dragItem.current = null;
+            dragOverItem.current = null;
+            setModels(copyListItems);
+        }
+    };
+
     if (!isModalOpen) return null;
 
     return (
@@ -169,7 +257,16 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
                 <h2>Model Settings</h2>
                 <ul className="model-list">
                     {models.map((model, index) => (
-                        <li key={index} className={editingModelIndex === index ? "model-edit" : ""}>
+                        <li
+                            key={model}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, index)}
+                            onDragEnter={(e) => handleDragEnter(e, index)}
+                            onDragLeave={handleDragLeave}
+                            onDragEnd={handleDragEnd}
+                            onDragOver={(e) => e.preventDefault()}
+                            className={editingModelIndex === index ? "model-edit" : ""}
+                        >
                             {editingModelIndex === index ? (
                                 <>
                                     <input
@@ -219,17 +316,30 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
                         </li>
                     ))}
                 </ul>
-                <div className="input-area">
+                <form onSubmit={handleSubmit} className="input-area">
                     <input
                         type="text"
                         value={newModel}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewModel(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        placeholder="Add new model"
+                        onKeyDown={handleKeyDown}
+                        placeholder="New models added"
                         className="model-input"
                     />
-                    <button onClick={handleAddModel} className="add-button">Add</button>
-                </div>
+                    <button type="submit" className="add-button">追加</button>
+                    {suggestions.length > 1 && (
+                        <ul className="suggestions-list">
+                            {suggestions.map((suggestion, index) => (
+                                <li
+                                    key={suggestion.id}
+                                    className={index === activeSuggestionIndex ? 'active' : ''}
+                                    onClick={() => handleSelectSuggestion(suggestion.id)}
+                                >
+                                    {suggestion.id}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </form>
                 <h2>Function Calls</h2>
                 <ul className="function-call-list">
                     {tools.map((tool, index) => (
@@ -290,26 +400,6 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
                     </svg>
                     新しいツールを追加
                 </button>
-                {/* {editingIndex === null && (
-                    <div className="tool-input-area">
-                        <h3>Add New Tool</h3>
-                        <textarea
-                            value={newTools}
-                            onChange={(e) => setNewTools(e.target.value)}
-                            placeholder="Tool Definition (JSON format)"
-                            className="tool-input"
-                        />
-                        <textarea
-                            value={newToolFunctions}
-                            onChange={(e) => setNewToolFunctions(e.target.value)}
-                            placeholder="Tool Function (JavaScript function)"
-                            className="tool-input"
-                        />
-                        <button onClick={handleAddTool} className="add-button">
-                            Add Tool
-                        </button>
-                    </div>
-                )} */}
             </div>
         </div >
     );

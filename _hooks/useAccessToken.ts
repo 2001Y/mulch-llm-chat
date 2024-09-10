@@ -1,8 +1,12 @@
+'use client';
 import { useState, useEffect } from "react";
-import useLocalStorage from "./useLocalStorage";
+// import useLocalStorage from "./useLocalStorage";
+import useStorageState from 'use-storage-state';
 
 export default function useAccessToken() {
-    const [accessToken, setAccessToken] = useLocalStorage('accessToken', '');
+    // const [accessToken, setAccessToken] = useLocalStorage('accessToken', '');
+    // const [accessToken, setAccessToken] = useStorageState('accessToken', '');
+    const [accessToken, setAccessToken] = useStorageState('accessToken', { defaultValue: '' });
     const [previousAccessToken, setPreviousAccessToken] = useState(accessToken);
 
     useEffect(() => {

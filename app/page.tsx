@@ -8,7 +8,8 @@ import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
 import Responses from "_components/Responses";
 import ModelInputModal from "_components/ModelInputModal";
-import useLocalStorage from "_hooks/useLocalStorage";
+// import useLocalStorage from "_hooks/useLocalStorage";
+import useStorageState from 'use-storage-state';
 import useAccessToken from "_hooks/useAccessToken";
 import { useOpenAI } from "_hooks/useOpenAI";
 
@@ -23,7 +24,11 @@ marked.use(
 );
 
 export default function Home() {
-  const [models, setModels] = useLocalStorage<string[]>('models', ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'google/gemini-1.5-pro-exp-0801', 'cohere/command-r-plus', "perplexity/llama-3.1-sonar-large-128k-online", "meta-llama/llama-3.1-405b-instruct"]);
+  // const [models, setModels] = useLocalStorage<string[]>('models', ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'google/gemini-1.5-pro-exp-0801', 'cohere/command-r-plus', "perplexity/llama-3.1-sonar-large-128k-online", "meta-llama/llama-3.1-405b-instruct"]);
+  // const [models, setModels] = useStorageState('models', ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'google/gemini-1.5-pro-exp-0801', 'cohere/command-r-plus', "perplexity/llama-3.1-sonar-large-128k-online", "meta-llama/llama-3.1-405b-instruct"]);
+  const [models, setModels] = useStorageState<string[]>('models', {
+    defaultValue: ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'google/gemini-1.5-pro-exp-0801', 'cohere/command-r-plus', "perplexity/llama-3.1-sonar-large-128k-online", "meta-llama/llama-3.1-405b-instruct"]
+  });
   const [demoModels] = useState<string[]>(['google/gemma-2-9b-it:free', "google/gemma-7b-it:free", "meta-llama/llama-3-8b-instruct:free", "openchat/openchat-7b:free"]);
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<any[]>([]);
@@ -38,70 +43,146 @@ export default function Home() {
   const [selectedModels, setSelectedModels] = useState<string[]>(models);
   const [showResetButton, setShowResetButton] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [storedMessages, setStoredMessages, isStoredMessagesLoaded] = useLocalStorage<any[]>('chatMessages', []);
-  const [tools, setTools] = useLocalStorage<any[]>('tools', [
-    {
-      type: "function",
-      function: {
-        name: "get_current_weather",
-        description: "現在の天気を取得する",
-        parameters: {
-          type: "object",
-          properties: {
-            location: {
-              type: "string",
-              description: "場所（例：東京）",
+  // const [storedMessages, setStoredMessages, isStoredMessagesLoaded] = useLocalStorage<any[]>('chatMessages', []);
+  const [storedMessages, setStoredMessages] = useStorageState<any[]>('chatMessages', {
+    defaultValue: []
+  });
+  // const [tools, setTools] = useLocalStorage<any[]>('tools', [
+  const [tools, setTools] = useStorageState('tools', {
+    defaultValue: [
+      {
+        type: "function",
+        function: {
+          name: "get_current_weather",
+          description: "現在の天気を取得する",
+          parameters: {
+            type: "object",
+            properties: {
+              location: {
+                type: "string",
+                description: "場所（例：東京）",
+              },
+              unit: {
+                type: "string",
+                enum: ["celsius", "fahrenheit"],
+                description: "温度の単位",
+                default: "celsius"
+              }
             },
-            unit: {
-              type: "string",
-              enum: ["celsius", "fahrenheit"],
-              description: "温度の単位",
-              default: "celsius"
-            }
+            required: ["location"],
           },
-          required: ["location"],
         },
       },
-    },
-    // 他のツールをここに追加
-  ]);
+      {
+        type: "function",
+        function: {
+          name: "transfer_funds",
+          description: "振込を行う",
+          parameters: {
+            type: "object",
+            properties: {
+              account_to: {
+                type: "string",
+                description: "送金先の口座番号",
+              },
+              amount: {
+                type: "number",
+                description: "送金額",
+              }
+            },
+            required: ["account_to", "amount"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "search_account",
+          description: "名前から口座名を検索する",
+          parameters: {
+            type: "object",
+            properties: {
+              name: {
+                type: "string",
+                description: "検索する名前（姓または名）",
+              },
+            },
+            required: ["name"],
+          },
+        },
+      },
+      // 他のツールをここに追加
+    ]
+  });
 
-  const [toolFunctions, setToolFunctions] = useLocalStorage<Record<string, Function>>('toolFunctions', {
-    get_current_weather: (args: any) => {
-      const { location = "Tokyo", unit = "celsius" } = args;
-      const randomTemperature = () => (Math.random() * 40 - 10).toFixed(1);
-      const randomWeather = () => {
-        const weatherConditions = ["晴れ", "曇り", "雨", "雪"];
-        return weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
-      };
+  // toolFunctions の型定義を追加
+  type ToolFunction = (args: any) => any;
 
-      const temperature = randomTemperature();
-      const weather = randomWeather();
+  // useStorageState の呼び出しを修正
+  const [toolFunctions, setToolFunctions] = useStorageState<Record<string, ToolFunction>>('toolFunctions', {
+    defaultValue: {
+      get_current_weather: (args: any) => {
+        const { location = "Tokyo", unit = "celsius" } = args;
+        const randomTemperature = () => (Math.random() * 40 - 10).toFixed(1);
+        const randomWeather = () => {
+          const weatherConditions = ["晴れ", "曇り", "雨", "雪"];
+          return weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
+        };
 
-      return {
-        location: location,
-        temperature: unit === "fahrenheit" ? ((parseFloat(temperature) * 9 / 5) + 32).toFixed(1) : temperature,
-        unit: unit,
-        weather: weather
-      };
-    },
-    // 他のツール関数をここに追加
+        const temperature = randomTemperature();
+        const weather = randomWeather();
+
+        return {
+          location: location,
+          temperature: unit === "fahrenheit" ? ((parseFloat(temperature) * 9 / 5) + 32).toFixed(1) : temperature,
+          unit: unit,
+          weather: weather
+        };
+      },
+      transfer_funds: (args: any) => {
+        const { account_to, amount } = args;
+        return {
+          status: "success",
+          message: `振込が成功しました: ${amount}円を送金しました。`
+        };
+      },
+      search_account: (args: any) => {
+        const { name } = args;
+        const accounts = [
+          { name: "田中太郎", account: "1234567890" },
+          { name: "田中花子", account: "2345678901" },
+          { name: "田中一郎", account: "3456789012" },
+          { name: "佐藤次郎", account: "4567890123" },
+          { name: "鈴木三郎", account: "5678901234" },
+        ];
+
+        const matchedAccounts = accounts.filter(account => account.name.includes(name));
+
+        if (matchedAccounts.length === 0) {
+          return { message: "該当する口座が見つかりませんでした。" };
+        }
+
+        return {
+          message: "以下の口座が見つかりました：",
+          accounts: matchedAccounts.map(account => `${account.name}: ${account.account}`)
+        };
+      },
+      // 他のツール関数をここに追加
+    }
   });
   const router = useRouter();
 
   useEffect(() => {
-    if (isStoredMessagesLoaded) {
-      if (storedMessages.length > 0) {
-        try {
-          console.log('以前のメッセージを復元:', storedMessages);
-          setMessages(storedMessages);
-          setShowResetButton(true);
-        } catch (error) {
-          console.error('メッセージの解析エラー:', error);
-        }
+    if (storedMessages.length > 0) {
+      try {
+        console.log('以前のメッセージを復元:', storedMessages);
+        setMessages(storedMessages);
+        setShowResetButton(true);
+      } catch (error) {
+        console.error('メッセージの解析エラー:', error);
       }
     }
-  }, [isStoredMessagesLoaded, storedMessages]);
+  }, [storedMessages]);
 
   useEffect(() => {
     if (accessToken !== previousAccessToken) {
@@ -127,7 +208,7 @@ export default function Home() {
       if (responseIndex === null) {
         if (text !== undefined) {
           newMessages[messageIndex].user = text;
-          const isEdited = storedMessages[messageIndex]?.user !== text;
+          const isEdited = (storedMessages[messageIndex] as any)?.user !== text;
           newMessages[messageIndex].edited = isEdited;
         }
       } else if (newMessages[messageIndex]?.llm[responseIndex] !== undefined) {
@@ -157,6 +238,10 @@ export default function Home() {
       return newMessages;
     });
   }, [setMessages, setStoredMessages]);
+
+  useEffect(() => {
+    console.log("toolFunctions:", toolFunctions);
+  }, [toolFunctions]);
 
   const fetchChatResponse = useCallback(async (model: string, messageIndex: number, responseIndex: number, abortController: AbortController, inputText: string) => {
     try {
@@ -197,6 +282,7 @@ export default function Home() {
         ],
         stream: true,
         tool_choice: "auto",
+        // @ts-ignore
         tools: tools,
       }, {
         signal: abortController.signal,
@@ -235,14 +321,15 @@ export default function Home() {
           }
 
           // ファンクションコールの結果を1回だけ追加
-          if (fc.name && fc.arguments && !functionCallExecuted) {　
+          if (fc.name && fc.arguments && !functionCallExecuted) {
             try {
               const args = JSON.parse(fc.arguments);
-              // console.log(toolFunctions[fc.name]);
+              // console.log("toolFunctions:", toolFunctions);
 
               result += `\n\nFunction Call 実行中...: ${fc.name}(${fc.arguments})`;
-              if (toolFunctions[fc.name]) {
-                const functionResult = toolFunctions[fc.name](args);
+              if (toolFunctions[fc.name as keyof typeof toolFunctions]) {
+                result += `\n\nFunction Call 完成`;
+                const functionResult = toolFunctions[fc.name as keyof typeof toolFunctions](args);
                 const functionResultText = `\n\n実行結果:\n${JSON.stringify(functionResult, null, 2)}\n`;
                 result += functionResultText;
                 functionCallExecuted = true;
@@ -286,7 +373,7 @@ export default function Home() {
         return prevMessages;
       });
     }
-  }, [messages, openai, updateMessage, setStoredMessages]);
+  }, [messages, openai, updateMessage, setStoredMessages, toolFunctions]);
 
   const handleSend = async (event: React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>, isPrimaryOnly = false, messageIndex?: number) => {
     if (isGenerating) return;
@@ -504,7 +591,7 @@ export default function Home() {
         </div>
         {!isLoggedIn && <div className="free-version">Free Version</div>}
       </header>
-      {(showResetButton || isGenerating) && (
+      {/* {(showResetButton || isGenerating) && (
         <>
           {isGenerating ? (
             <button className="reset-button generating" onClick={handleStopAllGeneration}>
@@ -533,7 +620,7 @@ export default function Home() {
             </button>
           )}
         </>
-      )}
+      )} */}
       <Responses
         messages={messages}
         updateMessage={updateMessage}
@@ -561,7 +648,7 @@ export default function Home() {
         tools={tools}
         setTools={setTools}
         toolFunctions={toolFunctions}
-        setToolFunctions={setToolFunctions}
+        setToolFunctions={setToolFunctions as unknown as (toolFunctions: Record<string, Function>) => void}
       />
     </>
   );

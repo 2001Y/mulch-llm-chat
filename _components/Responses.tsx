@@ -249,85 +249,88 @@ export default function Responses({
     }, [messages, handleStop]);
 
     return (
-        <div className={`responses-container ${messages.length === 0 ? 'initial-screen' : ''}`} ref={containerRef} translate="no">
-            {messages.map((message, messageIndex) => {
-                const selectedResponses = message.llm.filter(r => r.selected).sort((a, b) => (a.selectedOrder || 0) - (b.selectedOrder || 0));
-                const hasSelectedResponse = selectedResponses.length > 0;
-                return (
-                    <div key={messageIndex} className="message-block" >
-                        <MemoizedInputSection
-                            models={models}
-                            chatInput={message.user}
-                            setChatInput={(newInput: string) => updateMessage(messageIndex, null, newInput)}
-                            handleSend={(event, isPrimaryOnly) => handleSendForInputSection(event, isPrimaryOnly, messageIndex)}
-                            selectedModels={selectedModels}
-                            setSelectedModels={setSelectedModels}
-                            isEditMode={true}
-                            messageIndex={messageIndex}
-                            handleResetAndRegenerate={handleResetAndRegenerate}
-                            handleSaveOnly={handleSaveOnly}
-                            mainInput={false}
-                            isInitialScreen={false}
-                            handleReset={handleReset}
-                            handleStopAllGeneration={handleStopAllGeneration}
-                        />
-                        <div className="scroll_area">
-                            {Array.isArray(message.llm) && message.llm.map((response, responseIndex) => (
-                                <div key={responseIndex} className={`response ${response.role} ${hasSelectedResponse && !response.selected ? 'unselected' : ''}`}>
-                                    <div className="meta">
-                                        <small>{response.model}</small>
-                                        <div className="response-controls">
-                                            <button
-                                                className={response.isGenerating ? "stop-button" : "regenerate-button"}
-                                                onClick={() => response.isGenerating
-                                                    ? handleStop(messageIndex, responseIndex)
-                                                    : handleRegenerate(messageIndex, responseIndex, response.model)
-                                                }
-                                            >
-                                                {response.isGenerating ? (
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                                                        <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
-                                                    </svg>
-                                                ) : (
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
-                                                    </svg>
-                                                )}
-                                            </button>
-                                            <div
-                                                className={`response-select ${response.selected ? 'selected' : ''}`}
-                                                onClick={() => handleSelectResponse(messageIndex, responseIndex)}
-                                            >
-                                                {response.selected ? (
-                                                    selectedResponses.length > 1 ?
-                                                        (selectedResponses.findIndex(r => r === response) + 1) :
-                                                        '✓'
-                                                ) : ''}
+        <>
+            <div className={`responses-container ${messages.length === 0 ? 'initial-screen' : ''}`} ref={containerRef} translate="no">
+                {messages.map((message, messageIndex) => {
+                    const selectedResponses = message.llm.filter(r => r.selected).sort((a, b) => (a.selectedOrder || 0) - (b.selectedOrder || 0));
+                    const hasSelectedResponse = selectedResponses.length > 0;
+                    return (
+                        <div key={messageIndex} className="message-block" >
+                            <MemoizedInputSection
+                                models={models}
+                                chatInput={message.user}
+                                setChatInput={(newInput: string) => updateMessage(messageIndex, null, newInput)}
+                                handleSend={(event, isPrimaryOnly) => handleSendForInputSection(event, isPrimaryOnly, messageIndex)}
+                                selectedModels={selectedModels}
+                                setSelectedModels={setSelectedModels}
+                                isEditMode={true}
+                                messageIndex={messageIndex}
+                                handleResetAndRegenerate={handleResetAndRegenerate}
+                                handleSaveOnly={handleSaveOnly}
+                                mainInput={false}
+                                isInitialScreen={false}
+                                handleReset={handleReset}
+                                handleStopAllGeneration={handleStopAllGeneration}
+                            />
+                            <div className="scroll_area">
+                                {Array.isArray(message.llm) && message.llm.map((response, responseIndex) => (
+                                    <div key={responseIndex} className={`response ${response.role} ${hasSelectedResponse && !response.selected ? 'unselected' : ''}`}>
+                                        <div className="meta">
+                                            <small>{response.model}</small>
+                                            <div className="response-controls">
+                                                <button
+                                                    className={response.isGenerating ? "stop-button" : "regenerate-button"}
+                                                    onClick={() => response.isGenerating
+                                                        ? handleStop(messageIndex, responseIndex)
+                                                        : handleRegenerate(messageIndex, responseIndex, response.model)
+                                                    }
+                                                >
+                                                    {response.isGenerating ? (
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                                                            <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+                                                        </svg>
+                                                    ) : (
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
+                                                        </svg>
+                                                    )}
+                                                </button>
+                                                <div
+                                                    className={`response-select ${response.selected ? 'selected' : ''}`}
+                                                    onClick={() => handleSelectResponse(messageIndex, responseIndex)}
+                                                >
+                                                    {response.selected ? (
+                                                        selectedResponses.length > 1 ?
+                                                            (selectedResponses.findIndex(r => r === response) + 1) :
+                                                            '✓'
+                                                    ) : ''}
+                                                </div>
                                             </div>
                                         </div>
+                                        <div
+                                            className="markdown-content"
+                                            contentEditable
+                                            onBlur={(e) => handleEdit(messageIndex, responseIndex, (e.target as HTMLDivElement).innerHTML)}
+                                            dangerouslySetInnerHTML={{ __html: response.text }}
+                                        />
                                     </div>
-                                    <div
-                                        className="markdown-content"
-                                        contentEditable
-                                        onBlur={(e) => handleEdit(messageIndex, responseIndex, (e.target as HTMLDivElement).innerHTML)}
-                                        dangerouslySetInnerHTML={{ __html: response.text }}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                        {message.llm.length > 0 && showExpandButton[messageIndex] && (
-                            <div className="expand-control">
-                                <button
-                                    className={expandedMessages[messageIndex] ? 'folded' : ""}
-                                    onClick={() => expandedMessages[messageIndex] ? collapseMessage(messageIndex) : expandMessage(messageIndex)}
-                                >
-                                    {expandedMessages[messageIndex] ? 'Collapse' : 'Show All'}
-                                </button>
+                                ))}
                             </div>
-                        )}
-                    </div>
-                );
-            })}
+                            {message.llm.length > 0 && showExpandButton[messageIndex] && (
+                                <div className="expand-control">
+                                    <button
+                                        className={expandedMessages[messageIndex] ? 'folded' : ""}
+                                        onClick={() => expandedMessages[messageIndex] ? collapseMessage(messageIndex) : expandMessage(messageIndex)}
+                                    >
+                                        {expandedMessages[messageIndex] ? 'Collapse' : 'Show All'}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+            </div >
+
             <InputSection
                 mainInput={true}
                 models={models}
@@ -344,6 +347,6 @@ export default function Responses({
                 handleReset={handleReset}
                 handleStopAllGeneration={handleStopAllGeneration}
             />
-        </div >
+        </>
     );
 };

@@ -461,17 +461,26 @@ header {
         }
       }
 
-      &.send-button {
-        background-color: rgba(0, 255, 0, 0.2);
-        border: 1px solid rgba(0, 255, 0, 0.4);
-        color: #00ff00;
+      &.send-button,
+      &.new-thread-button {
         display: block;
+        transition: background-color 0.3s, border-color 0.3s, color 0.3s;
 
-        &:hover {
-          background-color: rgba(0, 255, 0, 0.3);
-          border-color: rgba(0, 255, 0, 0.6);
-          color: #ffffff;
+        &.active {
+          background-color: rgba(0, 255, 0, 0.2);
+          border: 1px solid rgba(0, 255, 0, 0.4);
+          color: #00ff00;
+
+          &:hover {
+            background-color: rgba(0, 255, 0, 0.3);
+            border-color: rgba(0, 255, 0, 0.6);
+            color: #ffffff;
+          }
         }
+      }
+
+      &.new-thread-button {
+        display: none;
       }
 
       &.save-only-button {
@@ -494,7 +503,8 @@ header {
   &.fixed {
     position: fixed;
     bottom: 0;
-    left: 0;
+    left: 50%;
+    transform: translateX(-50%);
     padding: $padding 0;
   }
 
@@ -503,6 +513,10 @@ header {
     .input-actions,
     .model-select-area {
       display: flex;
+
+      .new-thread-button {
+        display: block;
+      }
 
       .line-break {
         display: flex;
@@ -969,7 +983,9 @@ header {
   .function-call-list {
     list-style: none;
     padding: 0;
-    margin-bottom: 1em;
+    display: flex;
+    flex-direction: column;
+    gap: .05em;
     overflow-y: auto;
 
     &:empty {
@@ -977,7 +993,25 @@ header {
     }
 
     &.model-list {
+
+      .insert-line {
+        height: 2px;
+        background-color: $accent-color;
+      }
+
       li {
+        position: relative;
+        cursor: grab;
+        transition: opacity 0.3s;
+
+        &:active {
+          cursor: grabbing;
+        }
+
+        &.dragging {
+          opacity: 0.5;
+        }
+
         &::before {
           content: '≡';
           font-size: 1.2em;
@@ -994,343 +1028,184 @@ header {
         .model-edit-buttons {
           display: flex;
           gap: 1em;
-
-          // button {
-          //   display: flex;
-          //   align-items: center;
-          //   padding: 0.5em 1em;
-          //   border: none;
-          //   border-radius: 4px;
-          //   cursor: pointer;
-          //   transition: background-color 0.3s, color 0.3s;
-          //   font-size: 0.9em;
-
-          //   svg {
-          //     width: 1.2em;
-          //     height: 1.2em;
-          //     margin-right: 0.5em;
-          //   }
-
-          //   &.save-button {
-          //     background-color: $accent-color;
-          //     color: #fff;
-
-          //     &:hover {
-          //       background-color: darken($accent-color, 10%);
-          //     }
-          //   }
-
-          //   &.cancel-button {
-          //     background-color: rgba(255, 255, 255, 0.1);
-          //     color: #fff;
-
-          //     &:hover {
-          //       background-color: rgba(255, 255, 255, 0.2);
-          //     }
-          //   }
-          // }
         }
       }
     }
+  }
 
-    li {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: rgba(255, 255, 255, 0.1);
-      padding: 0.7em;
-      margin-bottom: 0.5em;
-      border-radius: 4px;
-      transition: background 0.3s;
-      position: relative;
+  li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.7em;
+    margin-bottom: 0.5em;
+    border-radius: 4px;
+    transition: background 0.3s;
+    position: relative;
 
-      svg {
-        width: 1em;
-        height: 1em;
-      }
+    svg {
+      width: 1em;
+      height: 1em;
+    }
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .model-name {
+      flex-grow: 1;
+    }
+
+    .delete-button {
+      background: none;
+      border: none;
+      color: #fff;
+      cursor: pointer;
+      transition: color 0.3s;
 
       &:hover {
-        background: rgba(255, 255, 255, 0.2);
-      }
-
-      .model-name {
-        flex-grow: 1;
-      }
-
-      .delete-button {
-        background: none;
-        border: none;
-        color: #fff;
-        cursor: pointer;
-        transition: color 0.3s;
-
-        &:hover {
-          color: $accent-color;
-        }
-      }
-
-      .function-title {
-        font-weight: bold;
-        margin-right: 1em;
-      }
-
-      .function-buttons {
-        display: flex;
-        gap: 0.5em;
-
-        // button {
-        //   background: none;
-        //   border: none;
-        //   cursor: pointer;
-        //   transition: color 0.3s;
-
-        //   &:hover {
-        //     color: $accent-color;
-        //   }
-
-        //   // svg {
-        //   //   width: 1.2em;
-        //   //   height: 1.2em;
-        //   // }
-        // }
-      }
-
-      .function-edit {
-        padding: 0.7em;
-
-        .function-input {
-          width: 100%;
-          padding: 0.5em;
-          background: rgba(255, 255, 255, 0.1);
-          border: none;
-          border-radius: 4px;
-          color: #fff;
-          margin-bottom: 0.5em;
-
-          &::placeholder {
-            color: rgba(255, 255, 255, 0.5);
-          }
-
-          &:focus {
-            outline: none;
-            background: rgba(255, 255, 255, 0.2);
-          }
-        }
-
-        textarea.function-input {
-          min-height: 100px;
-          resize: vertical;
-        }
-
-        .function-edit-buttons {
-          display: flex;
-          justify-content: flex-end;
-          gap: 0.5em;
-
-          // button {
-          //   padding: 0.5em 1em;
-          //   border: none;
-          //   border-radius: 4px;
-          //   cursor: pointer;
-          //   transition: background-color 0.3s;
-
-          //   &.save-button {
-          //     background-color: $accent-color;
-          //     color: #fff;
-
-          //     &:hover {
-          //       background-color: darken($accent-color, 10%);
-          //     }
-          //   }
-
-          //   &.cancel-button {
-          //     background-color: rgba(255, 255, 255, 0.1);
-          //     color: #fff;
-
-          //     &:hover {
-          //       background-color: rgba(255, 255, 255, 0.2);
-          //     }
-          //   }
-          // }
-        }
+        color: $accent-color;
       }
     }
 
-    .drag-over-line {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 5px;
-      background-color: $accent-color;
-      z-index: 1;
+    .function-title {
+      font-weight: bold;
+      margin-right: 1em;
     }
-  }
 
-  .function-call-list {
-    list-style: none;
-    padding: 0;
-    margin-bottom: 1em;
-    overflow-y: auto;
-
-    li {
-      margin-bottom: 0.5em;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 4px;
-      overflow: hidden;
-
-      .tool-edit {
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-        gap: 1em;
-
-        >* {
-          display: block;
-        }
-
-        .tool-edit-buttons {
-          display: flex;
-          justify-content: flex-end;
-          gap: .5em;
-        }
-      }
-
-      .function-edit {
-        padding: 0.7em;
-
-        .function-input {
-          width: 100%;
-          padding: 0.5em;
-          background: rgba(255, 255, 255, 0.1);
-          border: none;
-          border-radius: 4px;
-          color: #fff;
-          margin-bottom: 0.5em;
-
-          &::placeholder {
-            color: rgba(255, 255, 255, 0.5);
-          }
-
-          &:focus {
-            outline: none;
-            background: rgba(255, 255, 255, 0.2);
-          }
-        }
-
-        textarea.function-input {
-          min-height: 100px;
-          resize: vertical;
-        }
-
-        .function-edit-buttons {
-          display: flex;
-          justify-content: flex-end;
-          gap: 0.5em;
-
-          // button {
-          //   padding: 0.5em 1em;
-          //   border: none;
-          //   border-radius: 4px;
-          //   cursor: pointer;
-          //   transition: background-color 0.3s;
-
-          //   &.save-button {
-          //     background-color: $accent-color;
-          //     color: #fff;
-
-          //     &:hover {
-          //       background-color: darken($accent-color, 10%);
-          //     }
-          //   }
-
-          //   &.cancel-button {
-          //     background-color: rgba(255, 255, 255, 0.1);
-          //     color: #fff;
-
-          //     &:hover {
-          //       background-color: rgba(255, 255, 255, 0.2);
-          //     }
-          //   }
-          // }
-        }
-      }
+    .function-buttons {
+      display: flex;
+      gap: 0.5em;
     }
-  }
 
-
-  .function-input-area {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: $border-radius;
-    padding: 1em;
-    margin-top: 1em;
-
-    .function-input {
-      width: 100%;
+    .function-edit {
       padding: 0.7em;
-      background: rgba(255, 255, 255, 0.1);
-      border: none;
-      border-radius: 4px;
-      color: #fff;
-      transition: background 0.3s;
-      margin-bottom: 0.5em;
 
-      &::placeholder {
-        color: rgba(255, 255, 255, 0.5);
+      .function-input {
+        width: 100%;
+        padding: 0.5em;
+        background: rgba(255, 255, 255, 0.1);
+        border: none;
+        border-radius: 4px;
+        color: #fff;
+        margin-bottom: 0.5em;
+
+        &::placeholder {
+          color: rgba(255, 255, 255, 0.5);
+        }
+
+        &:focus {
+          outline: none;
+          background: rgba(255, 255, 255, 0.2);
+        }
       }
 
-      &:focus {
-        background: rgba(255, 255, 255, 0.2);
-        outline: none;
+      textarea.function-input {
+        min-height: 100px;
+        resize: vertical;
+      }
+
+      .function-edit-buttons {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5em;
+      }
+    }
+  }
+
+  .drag-over-line {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 5px;
+    background-color: $accent-color;
+    z-index: 1;
+  }
+}
+
+.function-call-list {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 1em;
+  overflow-y: auto;
+
+  li {
+    margin-bottom: 0.5em;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    overflow: hidden;
+
+    .tool-edit {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1em;
+
+      >* {
+        display: block;
+      }
+
+      .tool-edit-buttons {
+        display: flex;
+        justify-content: flex-end;
+        gap: .5em;
       }
     }
 
-    textarea.function-input {
-      min-height: 100px;
-      resize: vertical;
+    .function-edit {
+      padding: 0.7em;
+
+      .function-input {
+        width: 100%;
+        padding: 0.5em;
+        background: rgba(255, 255, 255, 0.1);
+        border: none;
+        border-radius: 4px;
+        color: #fff;
+        margin-bottom: 0.5em;
+
+        &::placeholder {
+          color: rgba(255, 255, 255, 0.5);
+        }
+
+        &:focus {
+          outline: none;
+          background: rgba(255, 255, 255, 0.2);
+        }
+      }
+
+      textarea.function-input {
+        min-height: 100px;
+        resize: vertical;
+      }
+
+      .function-edit-buttons {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5em;
+      }
     }
-
-    // .add-button {
-    //   display: flex;
-    //   align-items: center;
-    //   justify-content: center;
-    //   width: 100%;
-    //   padding: 0.7em;
-    //   background: $accent-color;
-    //   color: #fff;
-    //   border: none;
-    //   border-radius: 4px;
-    //   cursor: pointer;
-    //   transition: background-color 0.3s;
-    //   margin-top: 0.5em;
-
-    //   svg {
-    //     width: 1.2em;
-    //     height: 1.2em;
-    //     margin-right: 0.5em;
-    //   }
-
-    //   &:hover {
-    //     background-color: darken($accent-color, 10%);
-    //   }
-    // }
   }
-
-  .input-area {
-    display: flex;
-    gap: 0.5em;
-  }
+}
 
 
-  .model-input,
-  .tool-input {
-    flex-grow: 1;
+.function-input-area {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: $border-radius;
+  padding: 1em;
+  margin-top: 1em;
+
+  .function-input {
+    width: 100%;
     padding: 0.7em;
     background: rgba(255, 255, 255, 0.1);
     border: none;
     border-radius: 4px;
     color: #fff;
     transition: background 0.3s;
+    margin-bottom: 0.5em;
 
     &::placeholder {
       color: rgba(255, 255, 255, 0.5);
@@ -1342,70 +1217,135 @@ header {
     }
   }
 
-  .model-buttons {
-    display: flex;
+  textarea.function-input {
+    min-height: 100px;
+    resize: vertical;
   }
 
-  button {
-    padding: 0.5em 1em;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.3s, color 0.3s;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 0.5em;
+}
 
-    svg {
-      width: 1.2em;
-      height: 1.2em;
-    }
+.input-area {
+  display: flex;
+  gap: 0.5em;
+  position: relative;
 
-    &.close-button {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      font-size: 1.5em;
-      background: none;
-      color: #fff;
+  .suggestions-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 0 0 $border-radius $border-radius;
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    z-index: 10;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(5px);
 
-      &:hover {
-        color: $accent-color;
-      }
-    }
+    li {
+      padding: 0.7em 1em;
+      cursor: pointer;
+      transition: background-color 0.2s, color 0.2s;
 
-    &.save-button {
-      background-color: $accent-color;
-      color: #fff;
-
-      &:hover {
-        background-color: darken($accent-color, 10%);
-      }
-    }
-
-    &.cancel-button {
-      background-color: rgba(255, 255, 255, 0.1);
-      color: #fff;
-
-      &:hover {
+      &:hover,
+      &.active {
         background-color: rgba(255, 255, 255, 0.2);
+        color: #fff;
       }
-    }
 
-    &.add-button {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: $accent-color;
-      color: #fff;
-
-      &:hover {
-        background-color: darken($accent-color, 10%);
+      &:not(:last-child) {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
       }
     }
   }
+}
 
+
+.model-input,
+.tool-input {
+  flex-grow: 1;
+  padding: 0.7em;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  transition: background 0.3s;
+
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  &:focus {
+    background: rgba(255, 255, 255, 0.2);
+    outline: none;
+  }
+}
+
+.model-buttons {
+  display: flex;
+}
+
+button {
+  padding: 0.5em 1em;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s, color 0.3s;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5em;
+
+  svg {
+    width: 1.2em;
+    height: 1.2em;
+  }
+
+  &.close-button {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 1.5em;
+    background: none;
+    color: #fff;
+
+    &:hover {
+      color: $accent-color;
+    }
+  }
+
+  &.save-button {
+    background-color: $accent-color;
+    color: #fff;
+
+    &:hover {
+      background-color: darken($accent-color, 10%);
+    }
+  }
+
+  &.cancel-button {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.2);
+    }
+  }
+
+  &.add-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: $accent-color;
+    color: #fff;
+
+    &:hover {
+      background-color: darken($accent-color, 10%);
+    }
+  }
 }
 
 .markdown-editor {
