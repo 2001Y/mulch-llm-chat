@@ -215,6 +215,45 @@ export default function InputSection({
         setSelectedImage((prev) => prev ? prev.filter((_, i) => i !== index) : null);
     };
 
+    // Polyfill for unsupported browsers
+    useEffect(() => {
+        if (!CSS.supports('field-sizing: content')) {
+            const textarea = inputRef.current;
+            if (!textarea) return;
+
+            const adjustHeight = () => {
+                textarea.style.height = '1lh'; // 未入力時の高さを1lhに設定
+                textarea.style.height = `${Math.max(textarea.scrollHeight, parseFloat(getComputedStyle(textarea).lineHeight))}px`;
+                const computedStyle = window.getComputedStyle(textarea);
+                const maxHeight = parseInt(computedStyle.maxHeight);
+                if (textarea.scrollHeight > maxHeight) {
+                    textarea.style.height = `${maxHeight}px`;
+                    textarea.style.overflowY = 'auto';
+                } else {
+                    textarea.style.overflowY = 'hidden';
+                }
+            };
+
+            textarea.addEventListener('input', adjustHeight);
+            window.addEventListener('resize', adjustHeight);
+
+            // 初期高さを設定
+            adjustHeight();
+
+            // chatInputが変更されたときに高さを調整
+            if (chatInput === '') {
+                textarea.style.height = '1lh'; // 未入力時の高さを1lhに設定
+            } else {
+                adjustHeight();
+            }
+
+            return () => {
+                textarea.removeEventListener('input', adjustHeight);
+                window.removeEventListener('resize', adjustHeight);
+            };
+        }
+    }, [chatInput]);
+
     return (
         <section className={`input-section ${isInitialScreen ? 'initial-screen' : ''} ${mainInput ? 'full-input fixed' : ''} ${isEdited ? 'edited' : ''}`} ref={sectionRef}>
 
