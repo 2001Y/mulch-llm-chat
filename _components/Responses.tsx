@@ -32,7 +32,7 @@ interface ResponsesProps {
     showResetButton: boolean;
     handleReset: () => void;
     handleStopAllGeneration: () => void;
-    setSelectedImage: (image: string | null) => void;
+    setSelectedImage: React.Dispatch<React.SetStateAction<string[] | null>>;
 }
 
 export default function Responses({
