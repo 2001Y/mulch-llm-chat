@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useCallback, useMemo } from "react"
 import InputSection from "../_components/InputSection";
 
 interface Message {
-    user: string;
+    user: { type: string, text: string }[];
     originalUser?: string;
     llm: {
         role: string;
@@ -16,7 +16,7 @@ interface Message {
 
 interface ResponsesProps {
     messages: Message[];
-    updateMessage: (messageIndex: number, responseIndex: number | null, text: string | undefined, selectedIndex?: number, toggleSelected?: boolean, saveOnly?: boolean, isEditing?: boolean) => void;
+    updateMessage: (messageIndex: number, responseIndex: number | null, text: { type: string, text: string }[] | undefined, selectedIndex?: number, toggleSelected?: boolean, saveOnly?: boolean, isEditing?: boolean) => void;
     forceScroll: boolean;
     handleRegenerate: (messageIndex: number, responseIndex: number, model: string) => void;
     handleResetAndRegenerate: (messageIndex: number) => void;
@@ -32,6 +32,7 @@ interface ResponsesProps {
     showResetButton: boolean;
     handleReset: () => void;
     handleStopAllGeneration: () => void;
+    setSelectedImage: (image: string | null) => void;
 }
 
 export default function Responses({
@@ -51,7 +52,8 @@ export default function Responses({
     setSelectedModels,
     showResetButton,
     handleReset,
-    handleStopAllGeneration
+    handleStopAllGeneration,
+    setSelectedImage
 }: ResponsesProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [isAutoScroll, setIsAutoScroll] = useState(true);
@@ -65,105 +67,6 @@ export default function Responses({
     const handleSendForInputSection = useCallback((event: React.MouseEvent<HTMLButtonElement>, isPrimaryOnly: boolean, messageIndex: number) => {
         handleSend(event, isPrimaryOnly, messageIndex);
     }, [handleSend]);
-
-    useEffect(() => {
-        messages.forEach((_, index) => {
-            updateResponseHeights(index);
-        });
-
-        const handleResize = () => {
-            messages.forEach((_, index) => {
-                updateResponseHeights(index);
-            });
-        };
-
-        window.addEventListener('resize', handleResize);
-
-        return () => {
-            window.removeEventListener('resize', handleResize);
-        };
-    }, [messages, selectedModels, expandedMessages]);
-
-    const updateResponseHeights = useCallback((messageIndex: number) => {
-        const messageBlock = document.querySelector(`.message-block:nth-child(${messageIndex + 1})`);
-        if (!messageBlock) return;
-
-        const scrollArea = messageBlock.querySelector('.scroll_area');
-        if (!scrollArea || !(scrollArea instanceof HTMLElement)) return;
-
-        const responses = messageBlock.querySelectorAll('.response');
-        const responseHeights = Array.from(responses).map(response => (response as HTMLElement).scrollHeight);
-        const totalHeight = responseHeights.reduce((sum, height) => sum + height, 0);
-
-        const isExpanded = expandedMessages[messageIndex] || false;
-
-        if (totalHeight <= 300) {
-            scrollArea.style.maxHeight = 'none';
-            responses.forEach(response => {
-                if (response instanceof HTMLElement) {
-                    response.style.maxHeight = 'none';
-                    response.style.overflow = 'visible';
-                }
-            });
-            setShowExpandButton(prev => ({ ...prev, [messageIndex]: false }));
-        } else {
-            if (isExpanded) {
-                scrollArea.style.maxHeight = 'none';
-                responses.forEach(response => {
-                    if (response instanceof HTMLElement) {
-                        response.style.maxHeight = 'none';
-                        response.style.overflow = 'visible';
-                    }
-                });
-            } else {
-                const averageHeight = totalHeight / responses.length;
-                const sortedHeights = [...responseHeights].sort((a, b) => a - b);
-                const medianHeight = sortedHeights[Math.floor(sortedHeights.length / 2)];
-                const limitHeight = Math.min(averageHeight, medianHeight);
-
-                let currentHeight = 0;
-                let maxHeight = 0;
-
-                Array.from(responses).forEach((response) => {
-                    if (response instanceof HTMLElement) {
-                        currentHeight += response.scrollHeight;
-                        if (currentHeight >= limitHeight) {
-                            maxHeight = currentHeight;
-                        }
-                    }
-                });
-
-                // for (const response of responses) {
-                //     if (response instanceof HTMLElement) {
-                //         currentHeight += response.scrollHeight;
-                //         if (currentHeight >= limitHeight) {
-                //             maxHeight = currentHeight;
-                //             break;
-                //         }
-                //     }
-                // }
-
-                scrollArea.style.maxHeight = `${Math.max(300, maxHeight)}px`;
-                responses.forEach((response) => {
-                    if (response instanceof HTMLElement) {
-                        response.style.maxHeight = 'none';
-                        response.style.overflow = 'visible';
-                    }
-                });
-            }
-            setShowExpandButton(prev => ({ ...prev, [messageIndex]: true }));
-        }
-    }, [expandedMessages]);
-
-    const expandMessage = useCallback((messageIndex: number) => {
-        setExpandedMessages(prev => ({ ...prev, [messageIndex]: true }));
-        updateResponseHeights(messageIndex);
-    }, [updateResponseHeights]);
-
-    const collapseMessage = useCallback((messageIndex: number) => {
-        setExpandedMessages(prev => ({ ...prev, [messageIndex]: false }));
-        updateResponseHeights(messageIndex);
-    }, [updateResponseHeights]);
 
     const handleScroll = () => {
         const container = containerRef.current;
@@ -224,11 +127,8 @@ export default function Responses({
     }, [messages, isAutoScroll, lastAutoScrollTop, forceScroll, isGenerating]);
 
     const handleEdit = (messageIndex: number, responseIndex: number | null, newContent: string) => {
-        if (responseIndex === null) {
-            updateMessage(messageIndex, null, newContent);
-        } else {
-            updateMessage(messageIndex, responseIndex, newContent);
-        }
+        const newText = [{ type: 'text', text: newContent }];
+        updateMessage(messageIndex, responseIndex, newText);
     };
 
     const handleSelectResponse = useCallback((messageIndex: number, responseIndex: number) => {
@@ -258,8 +158,8 @@ export default function Responses({
                         <div key={messageIndex} className="message-block" >
                             <MemoizedInputSection
                                 models={models}
-                                chatInput={message.user}
-                                setChatInput={(newInput: string) => updateMessage(messageIndex, null, newInput)}
+                                chatInput={message.user.map((u) => u.text).join('')}
+                                setChatInput={(newInput: string) => updateMessage(messageIndex, null, [{ type: 'text', text: newInput }])}
                                 handleSend={(event, isPrimaryOnly) => handleSendForInputSection(event, isPrimaryOnly, messageIndex)}
                                 selectedModels={selectedModels}
                                 setSelectedModels={setSelectedModels}
@@ -271,6 +171,7 @@ export default function Responses({
                                 isInitialScreen={false}
                                 handleReset={handleReset}
                                 handleStopAllGeneration={handleStopAllGeneration}
+                                setSelectedImage={setSelectedImage}
                             />
                             <div className="scroll_area">
                                 {Array.isArray(message.llm) && message.llm.map((response, responseIndex) => (
@@ -316,16 +217,6 @@ export default function Responses({
                                     </div>
                                 ))}
                             </div>
-                            {message.llm.length > 0 && showExpandButton[messageIndex] && (
-                                <div className="expand-control">
-                                    <button
-                                        className={expandedMessages[messageIndex] ? 'folded' : ""}
-                                        onClick={() => expandedMessages[messageIndex] ? collapseMessage(messageIndex) : expandMessage(messageIndex)}
-                                    >
-                                        {expandedMessages[messageIndex] ? 'Collapse' : 'Show All'}
-                                    </button>
-                                </div>
-                            )}
                         </div>
                     );
                 })}
@@ -346,6 +237,7 @@ export default function Responses({
                 isInitialScreen={messages.length === 0}
                 handleReset={handleReset}
                 handleStopAllGeneration={handleStopAllGeneration}
+                setSelectedImage={setSelectedImage}
             />
         </>
     );

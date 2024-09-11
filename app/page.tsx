@@ -155,10 +155,12 @@ export default function Home() {
         accounts: matchedAccounts.map(account => `${account.name}: ${account.account}`)
       };
     },
-    // 他のツール関数をここに追加
+    // 他のー尔函数をここに追加
   }
   );
   const router = useRouter();
+
+  const [selectedImage, setSelectedImage] = useState<string[] | null>(null);
 
   useEffect(() => {
     if (storedMessages.length > 0) {
@@ -190,18 +192,18 @@ export default function Home() {
     setIsLoggedIn(!!accessToken);
   }, [accessToken]);
 
-  const updateMessage = useCallback((messageIndex: number, responseIndex: number | null, text: string | undefined, selectedIndex?: number | undefined, toggleSelected?: boolean, saveOnly?: boolean, isEditing?: boolean) => {
+  const updateMessage = useCallback((messageIndex: number, responseIndex: number | null, text: { type: string, text: string }[] | undefined, selectedIndex?: number | undefined, toggleSelected?: boolean, saveOnly?: boolean, isEditing?: boolean) => {
     setMessages(prevMessages => {
       const newMessages = JSON.parse(JSON.stringify(prevMessages));
       if (responseIndex === null) {
         if (text !== undefined) {
           newMessages[messageIndex].user = text;
-          const isEdited = (storedMessages[messageIndex] as any)?.user !== text;
+          const isEdited = JSON.stringify((storedMessages[messageIndex] as any)?.user) !== JSON.stringify(text);
           newMessages[messageIndex].edited = isEdited;
         }
       } else if (newMessages[messageIndex]?.llm[responseIndex] !== undefined) {
         if (text !== undefined) {
-          newMessages[messageIndex].llm[responseIndex].text = text;
+          newMessages[messageIndex].llm[responseIndex].text = text.map(t => t.text).join('');
         }
         if (toggleSelected) {
           const currentResponse = newMessages[messageIndex].llm[responseIndex];
@@ -240,6 +242,7 @@ export default function Home() {
         }
         return newMessages;
       });
+
       const pastMessages = messages.flatMap(msg => {
         const userMessage = { role: 'user', content: msg.user };
         const selectedResponses = msg.llm
@@ -247,15 +250,15 @@ export default function Home() {
           .sort((a: any, b: any) => a.selectedOrder - b.selectedOrder);
 
         const responseMessages = selectedResponses.length > 0
-          ? selectedResponses.map((llm: any) => ({ role: 'assistant', content: llm.text }))
-          : [{ role: 'assistant', content: msg.llm.find((llm: any) => llm.model === model)?.text || '' }];
+          ? selectedResponses.map((llm: any) => ({ role: 'assistant', content: [{ type: 'text', text: llm.text }] }))
+          : [{ role: 'assistant', content: [{ type: 'text', text: msg.llm.find((llm: any) => llm.model === model)?.text || '' }] }];
 
         return [userMessage, ...responseMessages];
       });
 
       console.log('モデルに送信する過去の会話:', pastMessages);
 
-      let result = '';
+      let result: { type: string, text: string }[] = [];
       let fc = {
         name: "",
         arguments: ""
@@ -266,12 +269,19 @@ export default function Home() {
         model,
         messages: [
           ...pastMessages,
-          { role: 'user', content: inputText }
+          {
+            role: 'user',
+            content: [
+              { type: "text", text: inputText },
+              ...(selectedImage ? selectedImage.map((imageUrl: string) => ({
+                type: 'image_url',
+                image_url: { url: imageUrl },
+              })) : [])
+            ],
+          },
         ],
         stream: true,
         tool_choice: "auto",
-        // @ts-ignore
-        tools: tools,
       }, {
         signal: abortController.signal,
       });
@@ -302,10 +312,10 @@ export default function Home() {
                 fc.arguments += tc.function?.arguments;
               }
               console.log('ツールコール引数:', model, fc.name, decodeURIComponent(String(fc.arguments)));
-              // ツールコール引数: openai/gpt-4o get_current_weather {"location":"東京"}
+              // ツールコール引数: openai/gpt-4o get_current_weather {"location":"東"}
             }
           } else {
-            result += content;
+            result.push({ type: 'text', text: content });
           }
 
           // ファンクションコールの結果を1回だけ追加
@@ -314,12 +324,12 @@ export default function Home() {
               const args = JSON.parse(fc.arguments);
               // console.log("toolFunctions:", toolFunctions);
 
-              result += `\n\nFunction Call 実行中...: ${fc.name}(${fc.arguments})`;
+              result.push({ type: 'text', text: `\n\nFunction Call 実行中...: ${fc.name}(${fc.arguments})` });
               if (toolFunctions[fc.name as keyof typeof toolFunctions]) {
-                result += `\n\nFunction Call 完成`;
+                result.push({ type: 'text', text: `\n\nFunction Call 完成` });
                 const functionResult = toolFunctions[fc.name as keyof typeof toolFunctions](args);
                 const functionResultText = `\n\n実行結果:\n${JSON.stringify(functionResult, null, 2)}\n`;
-                result += functionResultText;
+                result.push({ type: 'text', text: functionResultText });
                 functionCallExecuted = true;
               }
             } catch (error) {
@@ -327,14 +337,14 @@ export default function Home() {
             }
           }
 
-          const markedResult = await marked(result);
-          updateMessage(messageIndex, responseIndex, markedResult, undefined, false, false, false);
+          const markedResult = await marked(result.map(r => r.text).join(''));
+          updateMessage(messageIndex, responseIndex, result, undefined, false, false, false);
         }
 
         setIsAutoScroll(false);
       } else {
         console.error('ストリームの作成に失敗しました');
-        updateMessage(messageIndex, responseIndex, 'エラー: レスポンスの生成に失敗しました', undefined, false, false, false);
+        updateMessage(messageIndex, responseIndex, [{ type: 'text', text: 'エラー: レスポンスの生成に失敗しました' }], undefined, false, false, false);
       }
       setIsAutoScroll(false);
     } catch (error: any) {
@@ -342,7 +352,7 @@ export default function Home() {
         console.error('Error fetching response from model:', model, error);
         console.log('エラーレスポンス:', error);
         console.log('エラーメッセージ:', error.message);
-        updateMessage(messageIndex, responseIndex, `エラー: ${error.message}`, undefined, false, false, false);
+        updateMessage(messageIndex, responseIndex, [{ type: 'text', text: `エラー: ${error.message}` }], undefined, false, false, false);
       }
     } finally {
       setMessages(prevMessages => {
@@ -361,7 +371,7 @@ export default function Home() {
         return prevMessages;
       });
     }
-  }, [messages, openai, updateMessage, setStoredMessages, toolFunctions]);
+  }, [messages, openai, updateMessage, setStoredMessages, toolFunctions, selectedImage]);
 
   const handleSend = async (event: React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>, isPrimaryOnly = false, messageIndex?: number) => {
     if (isGenerating) return;
@@ -377,7 +387,13 @@ export default function Home() {
     setMessages(prevMessages => {
       const currentMessages = Array.isArray(prevMessages) ? prevMessages : [];
       const newMessage = {
-        user: inputText,
+        user: [
+          { type: 'text', text: inputText },
+          ...(selectedImage ? selectedImage.map(imageUrl => ({
+            type: 'image_url',
+            image_url: { url: imageUrl }
+          })) : [])
+        ],
         llm: modelsToUse.map((model, index) => ({
           role: 'assistant',
           model,
@@ -410,6 +426,7 @@ export default function Home() {
       return newMessages;
     });
     setChatInput('');
+    setSelectedImage(null); // 送信後に選択された画像をリセット
 
     setTimeout(() => setForceScroll(false), 100);
   };
@@ -579,36 +596,6 @@ export default function Home() {
         </div>
         {!isLoggedIn && <div className="free-version">Free Version</div>}
       </header>
-      {/* {(showResetButton || isGenerating) && (
-        <>
-          {isGenerating ? (
-            <button className="reset-button generating" onClick={handleStopAllGeneration}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              </svg>
-              <span className="shortcut-area">
-                Stop All Generations
-                <span className="shortcut">
-                  ⌘⌫
-                </span>
-              </span>
-            </button>
-          ) : showResetButton && (
-            <button className="reset-button newThread" onClick={handleReset}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              <span className="shortcut-area">
-                New Thread
-                <span className="shortcut">
-                  ⌘N
-                </span>
-              </span>
-            </button>
-          )}
-        </>
-      )} */}
       <Responses
         messages={messages}
         updateMessage={updateMessage}
@@ -627,6 +614,8 @@ export default function Home() {
         showResetButton={showResetButton}
         handleReset={handleReset}
         handleStopAllGeneration={handleStopAllGeneration}
+        selectedImage={selectedImage}
+        setSelectedImage={setSelectedImage}
       />
       <ModelInputModal
         models={isLoggedIn ? models : demoModels}

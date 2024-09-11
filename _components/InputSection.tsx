@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, ChangeEvent } from "react";
 import useLocalStorage from "_hooks/useLocalStorage";
+import { toast } from 'sonner';
 
 interface InputSectionProps {
     models: string[];
@@ -16,6 +17,8 @@ interface InputSectionProps {
     isInitialScreen: boolean;
     handleReset: () => void;
     handleStopAllGeneration: () => void;
+    setSelectedImage: React.Dispatch<React.SetStateAction<string[] | null>>;
+    selectedImage: string[] | null;
 }
 
 export default function InputSection({
@@ -32,7 +35,9 @@ export default function InputSection({
     handleSaveOnly,
     isInitialScreen,
     handleReset,
-    handleStopAllGeneration
+    handleStopAllGeneration,
+    setSelectedImage,
+    selectedImage
 }: InputSectionProps) {
     const [storedMessages, setStoredMessages, isStoredMessagesLoaded] = useLocalStorage<any[]>('chatMessages', []);
     const [isComposing, setIsComposing] = useState(false);
@@ -41,15 +46,39 @@ export default function InputSection({
     const [filteredModels, setFilteredModels] = useState(models);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const sectionRef = useRef<HTMLElement>(null);
-    const originalMessage = storedMessages[messageIndex]?.user || '';
-    const [isInputEmpty, setIsInputEmpty] = useState(true);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    const [isEdited, setIsEdited] = useState(false);
+
+    const originalMessage = storedMessages[messageIndex]?.user || null;
 
     useEffect(() => {
-        if (sectionRef.current) {
-            const isEdited = chatInput !== originalMessage;
-            sectionRef.current.classList.toggle('edited', isEdited);
+        if (storedMessages[messageIndex]) {
+            const userContent = storedMessages[messageIndex].user;
+            const storedImages = userContent.filter((content: any) => content.type === 'image_url').map((content: any) => content.image_url.url);
+            setImagePreviews(storedImages);
+            setSelectedImage(storedImages.length > 0 ? storedImages : null);
+        } else {
+            setImagePreviews([]);
+            setSelectedImage(null);
         }
-    }, [chatInput, originalMessage]);
+    }, [messageIndex, storedMessages, setSelectedImage]);
+
+    useEffect(() => {
+        if (originalMessage) {
+            const originalText = originalMessage.find((content: any) => content.type === 'text')?.text || '';
+            const originalImages = originalMessage.filter((content: any) => content.type === 'image_url').map((content: any) => content.image_url.url);
+
+            const isTextEdited = chatInput !== originalText;
+            const areImagesEdited = () => {
+                if (!originalImages || !selectedImage) return false;
+                if (originalImages.length !== selectedImage.length) return true;
+                return !originalImages.every((url: string, index: number) => url === selectedImage[index]);
+            };
+
+            setIsEdited(isTextEdited || areImagesEdited());
+        }
+    }, [chatInput, selectedImage, originalMessage]);
 
     useEffect(() => {
         if (inputRef.current && mainInput) {
@@ -59,61 +88,55 @@ export default function InputSection({
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (document.body.dataset && document.body.dataset.softwareKeyboard === 'false') {
-            if (event.key === 'Enter' && !isComposing) {
-                if (event.shiftKey) {
-                    return; // Shift+Enterで改行
+            const keyActions: { [key: string]: () => void } = {
+                'Enter': () => {
+                    if (!event.shiftKey && !isComposing) {
+                        event.preventDefault();
+                        isEditMode ? handleResetAndRegenerate(messageIndex) : handleSendAndResetInput(event as unknown as React.MouseEvent<HTMLButtonElement>, event.metaKey || event.ctrlKey);
+                    }
+                },
+                'ArrowDown': () => {
+                    if (showSuggestions) {
+                        event.preventDefault();
+                        setSuggestionIndex((prevIndex) => Math.min(prevIndex + 1, filteredModels.length - 1));
+                    }
+                },
+                'ArrowUp': () => {
+                    if (showSuggestions) {
+                        event.preventDefault();
+                        setSuggestionIndex((prevIndex) => Math.max(prevIndex - 1, 0));
+                    }
+                },
+                'Escape': () => setShowSuggestions(false),
+                'Backspace': () => {
+                    if (event.metaKey || event.ctrlKey) {
+                        event.preventDefault();
+                        handleStopAllGeneration();
+                    }
+                },
+                'n': () => {
+                    if (event.metaKey || event.ctrlKey) {
+                        event.preventDefault();
+                        handleReset();
+                    }
                 }
-                event.preventDefault();
-                if (isEditMode) {
-                    handleResetAndRegenerate(messageIndex);
-                } else {
-                    handleSendAndResetInput(event as unknown as React.MouseEvent<HTMLButtonElement>, event.metaKey || event.ctrlKey);
-                }
-            } else if (event.key === 'ArrowDown') {
-                if (showSuggestions) {
-                    event.preventDefault();
-                    setSuggestionIndex((prevIndex) => Math.min(prevIndex + 1, filteredModels.length - 1));
-                }
-            } else if (event.key === 'ArrowUp') {
-                if (showSuggestions) {
-                    event.preventDefault();
-                    setSuggestionIndex((prevIndex) => Math.max(prevIndex - 1, 0));
-                }
-            } else if (event.key === 'Escape') {
-                setShowSuggestions(false);
-            } else if ((event.metaKey || event.ctrlKey) && event.key === 'Backspace') {
-                event.preventDefault();
-                handleStopAllGeneration();
-            } else if ((event.metaKey || event.ctrlKey) && event.key === 'n') {
-                event.preventDefault();
-                handleReset();
-            }
+            };
+
+            const action = keyActions[event.key];
+            if (action) action();
         }
     };
 
-    const handleCompositionStart = () => {
-        setIsComposing(true);
-    };
-
-    const handleCompositionEnd = (event: React.CompositionEvent<HTMLTextAreaElement>) => {
-        setIsComposing(false);
-        setChatInput(event.currentTarget.value);
-    };
-
-    const onChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const text = e.target.value;
         setChatInput(text);
-        setIsInputEmpty(text.trim() === '');
-        if (sectionRef.current) {
-            const isEdited = text !== originalMessage;
-            sectionRef.current.classList.toggle('edited', isEdited);
-        }
-        // 複数の「@」に対応するため、最後の「@」以降の文字列をマッチさせる正規表現
+        updateSuggestions(text);
+    };
+
+    const updateSuggestions = (text: string) => {
         const mentionMatch = text.match(/@[^@]*$/);
         if (mentionMatch && mentionMatch[0]) {
             const searchText = mentionMatch[0].slice(1).toLowerCase();
-            console.log(searchText);
-            console.log(searchText.includes(' '));
             if (searchText.includes(' ') || searchText.length > 15) {
                 setShowSuggestions(false);
             } else {
@@ -127,110 +150,78 @@ export default function InputSection({
 
     const selectSuggestion = (index: number) => {
         const selectedModel = filteredModels[index];
-        const inputElement = inputRef.current;
-        if (inputElement) {
-            // 入力フィールドの値から最後の「@」に続く文字列を選択されたモデル名に置き換える
-            const text = inputElement.value.replace(/@[^@]*$/, `@${selectedModel.split('/')[1]} `);
-            inputElement.value = text;
-
+        if (inputRef.current) {
+            const text = inputRef.current.value.replace(/@[^@]*$/, `@${selectedModel.split('/')[1]} `);
+            inputRef.current.value = text;
             setShowSuggestions(false);
             setSuggestionIndex(0);
             setChatInput(text);
         }
     };
 
-    useEffect(() => {
-        if (chatInput === '' && inputRef.current) {
-            inputRef.current.value = '';
-        }
-    }, [chatInput]);
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (inputRef.current && !inputRef.current.contains(event.target as Node)) {
-                setShowSuggestions(false);
-            }
-        };
-
-        document.addEventListener('click', handleClickOutside);
-        return () => {
-            document.removeEventListener('click', handleClickOutside);
-        };
-    }, []);
-
     const handleModelChange = (model: string) => {
         const wasInputFocused = document.activeElement === inputRef.current;
         setSelectedModels((prevSelectedModels) => {
-            let newSelectedModels;
-            if (prevSelectedModels.includes(model)) {
-                newSelectedModels = prevSelectedModels.filter((m) => m !== model);
-            } else {
-                newSelectedModels = [model, ...prevSelectedModels.filter((m) => m !== model)];
-            }
-            // 選択されたモデルが1つもない場合、最初のモデルを選択状態にする
-            if (newSelectedModels.length === 0) {
-                newSelectedModels = [models[0]];
-            }
-            return newSelectedModels;
+            let newSelectedModels = prevSelectedModels.includes(model)
+                ? prevSelectedModels.filter((m) => m !== model)
+                : [model, ...prevSelectedModels.filter((m) => m !== model)];
+            return newSelectedModels.length === 0 ? [models[0]] : newSelectedModels;
         });
         if (wasInputFocused && inputRef.current) {
             setTimeout(() => inputRef.current?.focus(), 0);
         }
     };
 
-    // Polyfill for unsupported browsers
-    useEffect(() => {
-        if (!CSS.supports('field-sizing: content')) {
-            const textarea = inputRef.current;
-            if (!textarea) return;
-
-            const adjustHeight = () => {
-                textarea.style.height = '1lh'; // 未入力時の高さを1lhに設定
-                textarea.style.height = `${Math.max(textarea.scrollHeight, parseFloat(getComputedStyle(textarea).lineHeight))}px`;
-                const computedStyle = window.getComputedStyle(textarea);
-                const maxHeight = parseInt(computedStyle.maxHeight);
-                if (textarea.scrollHeight > maxHeight) {
-                    textarea.style.height = `${maxHeight}px`;
-                    textarea.style.overflowY = 'auto';
-                } else {
-                    textarea.style.overflowY = 'hidden';
-                }
-            };
-
-            textarea.addEventListener('input', adjustHeight);
-            window.addEventListener('resize', adjustHeight);
-
-            // 初期高さを設定
-            adjustHeight();
-
-            // chatInputが変更されたときに高さを調整
-            if (chatInput === '') {
-                textarea.style.height = '1lh'; // 未入力時の高さを1lhに設定
-            } else {
-                adjustHeight();
-            }
-
-            return () => {
-                textarea.removeEventListener('input', adjustHeight);
-                window.removeEventListener('resize', adjustHeight);
-            };
-        }
-    }, [chatInput]);
-
-    // 新しい関数: 送信後に入力をリセットする
     const handleSendAndResetInput = (event: React.MouseEvent<HTMLButtonElement>, isPrimaryOnly: boolean) => {
         handleSend(event, isPrimaryOnly);
         setChatInput('');
-        setIsInputEmpty(true);
+        setImagePreviews([]);
+        setSelectedImage(null);
+    };
+
+    const handleImageSelect = async (event: ChangeEvent<HTMLInputElement>) => {
+        const files = event.target.files;
+        if (files && files.length > 0) {
+            try {
+                const newPreviews = await Promise.all(
+                    Array.from(files).map((file) =>
+                        new Promise<string>((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result as string);
+                            reader.onerror = reject;
+                            reader.readAsDataURL(file);
+                        })
+                    )
+                );
+                setImagePreviews((prev) => [...prev, ...newPreviews]);
+                setSelectedImage((prev) => prev ? [...prev, ...newPreviews] : newPreviews);
+            } catch (error) {
+                toast.error('画像の読み込み中にエラーが発生しました', {
+                    description: '別の画像を選択してください',
+                    duration: 3000,
+                });
+            }
+        } else {
+            toast.error('画像が選択されませんでした', {
+                description: '画像を選択してください',
+                duration: 3000,
+            });
+        }
+        if (event.target) event.target.value = '';
+    };
+
+    const removeImage = (index: number) => {
+        setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+        setSelectedImage((prev) => prev ? prev.filter((_, i) => i !== index) : null);
     };
 
     return (
-        <section className={`input-section ${isInitialScreen ? 'initial-screen' : ''} ${mainInput ? 'full-input fixed' : ''} `} ref={sectionRef}>
+        <section className={`input-section ${isInitialScreen ? 'initial-screen' : ''} ${mainInput ? 'full-input fixed' : ''} ${isEdited ? 'edited' : ''}`} ref={sectionRef}>
 
             <div className="input-container input-actions">
                 <button
                     onClick={handleReset}
-                    className={`action-button new-thread-button icon-button ${isInputEmpty ? 'active' : ''}`}
+                    className={`action-button new-thread-button icon-button ${chatInput.trim() === '' ? 'active' : ''}`}
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M12 5v14M5 12h14" />
@@ -240,13 +231,28 @@ export default function InputSection({
             </div>
 
             <div className="input-container chat-input-area">
+                {imagePreviews.length > 0 && (
+                    <div className="image-previews">
+                        {imagePreviews.map((preview, index) => (
+                            <div key={index} className="image-preview">
+                                <img src={preview} alt={`選択された画像 ${index + 1}`} />
+                                <button onClick={() => removeImage(index)}>
+                                    ×
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
                 <textarea
                     ref={inputRef}
                     value={chatInput}
-                    onChange={onChange}
+                    onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={handleCompositionEnd}
+                    onCompositionStart={() => setIsComposing(true)}
+                    onCompositionEnd={(e) => {
+                        setIsComposing(false);
+                        setChatInput(e.currentTarget.value);
+                    }}
                     className="chat-input"
                     placeholder={isEditMode ? "Edit your message here..." : "Type your message here…"}
                     data-fieldsizing="content"
@@ -272,6 +278,24 @@ export default function InputSection({
                         ))}
                     </ul>
                 )}
+                <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="image-select-button icon-button"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                </button>
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleImageSelect}
+                    accept="image/png,image/jpeg,image/webp"
+                    style={{ display: 'none' }}
+                    multiple // 複数選択を許可
+                />
             </div>
 
             <div className="input-container model-select-area">
@@ -327,7 +351,7 @@ export default function InputSection({
                     <>
                         <button
                             onClick={(e) => handleSendAndResetInput(e, false)}
-                            className={`action-button send-button icon-button ${!isInputEmpty ? 'active' : ''}`}
+                            className={`action-button send-button icon-button ${chatInput.trim() !== '' ? 'active' : ''}`}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -337,7 +361,7 @@ export default function InputSection({
                         </button>
                         <button
                             onClick={(e) => handleSendAndResetInput(e, true)}
-                            className={`action-button send-primary-button icon-button ${!isInputEmpty ? 'active' : ''}`}
+                            className={`action-button send-primary-button icon-button ${chatInput.trim() !== '' ? 'active' : ''}`}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>

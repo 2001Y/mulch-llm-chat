@@ -1,3 +1,4 @@
+// @import 'sonner/dist/sonner.css';
 @import '~highlight.js/styles/github-dark.css';
 
 // SCSS変数宣言
@@ -220,6 +221,10 @@ header {
   font-size: 16px;
 }
 
+
+$image-preview-size: 100px;
+$image-preview-gap: 10px;
+
 .input-section {
   width: 100%;
   $chat-input-max-width: 50em;
@@ -360,6 +365,7 @@ header {
       font-size: 1rem;
       padding: 1em;
       margin: 0 $padding;
+      position: relative;
 
       .chat-input {
         width: 100%;
@@ -382,6 +388,51 @@ header {
         margin: .5em;
         background: mix(#fff, $accent-color, 10%);
         border-radius: calc($border-radius - .25em);
+      }
+
+      .image-previews {
+        position: absolute;
+        bottom: 80%;
+        right: 2%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: $image-preview-gap;
+        margin-bottom: $image-preview-gap;
+      }
+
+      .image-preview {
+        position: relative;
+        width: $image-preview-size;
+        height: $image-preview-size;
+
+        img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          border-radius: 5px;
+        }
+
+        button {
+          position: absolute;
+          top: -5px;
+          right: -5px;
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          background-color: rgba(0, 0, 0, 0.5);
+          color: white;
+          font-size: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          border: none;
+          padding: 0;
+
+          &:hover {
+            background-color: rgba(0, 0, 0, 0.7);
+          }
+        }
       }
     }
   }
@@ -500,12 +551,38 @@ header {
     display: none;
   }
 
+  &:not(.fixed) {
+    .chat-input-area {
+      margin-top: $image-preview-size;
+    }
+  }
+
   &.fixed {
     position: fixed;
     bottom: 0;
+    bottom: env(safe-area-inset-bottom);
     left: 50%;
     transform: translateX(-50%);
     padding: $padding 0;
+
+    pointer-events: none;
+
+    >*>* {
+      pointer-events: auto;
+    }
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba($bg_body, .85);
+      backdrop-filter: blur(20px);
+      mask: radial-gradient(circle at bottom, $bg_body 70%, transparent);
+      z-index: -1;
+    }
   }
 
   &.full-input {
@@ -648,7 +725,7 @@ header {
   min-height: 100svh;
   height: 100svh;
   max-height: 100svh;
-  padding: calc($height_header * 2 + env(safe-area-inset-top)) 0;
+  padding-top: calc($height_header * 2 + env(safe-area-inset-top));
   overflow: hidden;
   overflow-y: auto;
   overscroll-behavior-block: none;
@@ -665,8 +742,8 @@ header {
       // min-height: calc(100svh - $height_header*1.5);
 
       .scroll_area {
-        // padding-bottom: calc(8em + env(safe-area-inset-bottom)*1.5);
-        min-height: fit-content;
+        min-height: calc(100svh - $height_header*1.5 - calc($height_header * 2 + env(safe-area-inset-top)));
+        padding-bottom: calc($height_header * 4 + env(safe-area-inset-bottom));
         overflow-y: hidden;
       }
     }
@@ -1289,7 +1366,7 @@ header {
 }
 
 button {
-  padding: 0.5em 1em;
+  // padding: 0.5em 1em;
   border: none;
   border-radius: 4px;
   cursor: pointer;
