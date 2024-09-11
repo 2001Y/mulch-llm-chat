@@ -228,6 +228,8 @@ $image-preview-gap: 10px;
 .input-section {
   width: 100%;
   $chat-input-max-width: 50em;
+  $background-opacity: 0.8;
+  $blur-intensity: 10px;
   max-width: $chat-input-max-width;
   // padding: 0 $padding;
   // padding-bottom: calc(env(safe-area-inset-bottom) + $body-padding);
@@ -257,7 +259,8 @@ $image-preview-gap: 10px;
       height: $modal-button_height;
       padding: 0 1em;
       color: mix(#fff, #000, 70%);
-      background: mix(#fff, #000, 10%);
+      background: rgba(mix(#fff, #000, 10%), $background-opacity);
+      backdrop-filter: blur($blur-intensity);
       display: flex;
       align-items: center;
       gap: .5em;
@@ -324,7 +327,8 @@ $image-preview-gap: 10px;
           display: flex;
           align-items: center;
           padding: .6em;
-          background: mix(#fff, #000, 10%);
+          background: rgba(mix(#fff, #000, 10%), $background-opacity);
+          backdrop-filter: blur($blur-intensity);
           border-radius: $border-radius;
           box-shadow: $shadow;
           cursor: pointer;
@@ -359,7 +363,8 @@ $image-preview-gap: 10px;
       $maxHeight: calc(100svh - $height_header - $modal-button_height - $body-padding * 3 - env(safe-area-inset-top));
       max-height: $maxHeight;
       max-width: 100%;
-      background: mix(#fff, #000, 10%);
+      background: rgba(mix(#fff, #000, 10%), $background-opacity);
+      backdrop-filter: blur($blur-intensity);
       border-radius: $border-radius;
       box-shadow: $shadow;
       font-size: 1rem;
@@ -487,7 +492,8 @@ $image-preview-gap: 10px;
     }
 
     .action-button {
-      background-color: mix(#fff, #000, 10%);
+      background-color: rgba(mix(#fff, #000, 10%), $background-opacity);
+      backdrop-filter: blur($blur-intensity);
       border-radius: $border-radius;
       transition: background-color 0.3s, color 0.3s;
 
@@ -518,7 +524,8 @@ $image-preview-gap: 10px;
         transition: background-color 0.3s, border-color 0.3s, color 0.3s;
 
         &.active {
-          background-color: mix($bg_body, #00ff00, 80%);
+          background-color: rgba(mix($bg_body, #00ff00, 80%), $background-opacity);
+          backdrop-filter: blur($blur-intensity);
           border: 1px solid mix($bg_body, #00ff00, 60%);
           color: #00ff00;
 
@@ -537,6 +544,8 @@ $image-preview-gap: 10px;
       &.save-only-button {
         border: 1px solid rgba(255, 255, 255, 0.245);
         display: none;
+        background-color: rgba(mix(#fff, #000, 10%), $background-opacity);
+        backdrop-filter: blur($blur-intensity);
 
         &:hover {
           border-color: rgba(255, 255, 255, 0.6);
