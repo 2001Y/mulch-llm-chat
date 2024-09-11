@@ -6,10 +6,9 @@ import { useRouter } from "next/navigation";
 import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
-import Responses from "_components/Responses";
-import ModelInputModal from "_components/ModelInputModal";
+import Responses from "_components/ChatResponses";
+import ModelInputModal from "_components/SettingsModal";
 import useStorageState from "_hooks/useLocalStorage";
-// import useStorageState from 'use-storage-state';
 import useAccessToken from "_hooks/useAccessToken";
 import { useOpenAI } from "_hooks/useOpenAI";
 
@@ -165,7 +164,7 @@ export default function Home() {
   useEffect(() => {
     if (storedMessages.length > 0) {
       try {
-        console.log('以前のメッセージを復元:', storedMessages);
+        console.log('以前のメッ��ージを復元:', storedMessages);
         setMessages(storedMessages);
         setShowResetButton(true);
       } catch (error) {
@@ -227,7 +226,7 @@ export default function Home() {
       }
       return newMessages;
     });
-  }, [setMessages, setStoredMessages]);
+  }, [setMessages, setStoredMessages, storedMessages]);
 
   useEffect(() => {
     console.log("toolFunctions:", toolFunctions);

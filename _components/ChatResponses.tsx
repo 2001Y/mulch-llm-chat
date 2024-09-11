@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
-import InputSection from "../_components/InputSection";
+import InputSection from "./InputSection";
 
 interface Message {
     user: { type: string, text: string }[];
@@ -33,6 +33,7 @@ interface ResponsesProps {
     handleReset: () => void;
     handleStopAllGeneration: () => void;
     setSelectedImage: React.Dispatch<React.SetStateAction<string[] | null>>;
+    selectedImage: string[] | null;
 }
 
 export default function Responses({
@@ -53,7 +54,8 @@ export default function Responses({
     showResetButton,
     handleReset,
     handleStopAllGeneration,
-    setSelectedImage
+    setSelectedImage,
+    selectedImage
 }: ResponsesProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [isAutoScroll, setIsAutoScroll] = useState(true);
@@ -172,6 +174,7 @@ export default function Responses({
                                 handleReset={handleReset}
                                 handleStopAllGeneration={handleStopAllGeneration}
                                 setSelectedImage={setSelectedImage}
+                                selectedImage={selectedImage}
                             />
                             <div className="scroll_area">
                                 {Array.isArray(message.llm) && message.llm.map((response, responseIndex) => (
@@ -238,6 +241,7 @@ export default function Responses({
                 handleReset={handleReset}
                 handleStopAllGeneration={handleStopAllGeneration}
                 setSelectedImage={setSelectedImage}
+                selectedImage={selectedImage}
             />
         </>
     );
