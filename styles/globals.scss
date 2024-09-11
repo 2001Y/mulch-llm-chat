@@ -392,7 +392,7 @@ $image-preview-gap: 10px;
 
       .image-previews {
         position: absolute;
-        bottom: 80%;
+        bottom: 70%;
         right: 2%;
         display: flex;
         flex-wrap: wrap;
@@ -518,13 +518,13 @@ $image-preview-gap: 10px;
         transition: background-color 0.3s, border-color 0.3s, color 0.3s;
 
         &.active {
-          background-color: rgba(0, 255, 0, 0.2);
-          border: 1px solid rgba(0, 255, 0, 0.4);
+          background-color: mix($bg_body, #00ff00, 80%);
+          border: 1px solid mix($bg_body, #00ff00, 60%);
           color: #00ff00;
 
           &:hover {
-            background-color: rgba(0, 255, 0, 0.3);
-            border-color: rgba(0, 255, 0, 0.6);
+            background-color: mix($bg_body, #00ff00, 70%);
+            border-color: mix($bg_body, #00ff00, 40%);
             color: #ffffff;
           }
         }
@@ -564,23 +564,26 @@ $image-preview-gap: 10px;
     left: 50%;
     transform: translateX(-50%);
     padding: $padding 0;
-
     pointer-events: none;
 
     >*>* {
       pointer-events: auto;
     }
 
+    overflow: visible;
+
     &::before {
       content: '';
       position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
+      $blur-width: 200%;
+      $blur-height: 200%;
+      top: calc((100% - #{$blur-height}) / 2);
+      left: calc((100% - #{$blur-width}) / 2);
+      width: $blur-width;
+      height: $blur-height;
       background: rgba($bg_body, .85);
-      backdrop-filter: blur(20px);
-      mask: radial-gradient(circle at bottom, $bg_body 70%, transparent);
+      backdrop-filter: blur(10px);
+      mask: radial-gradient(ellipse at bottom, #000 40%, transparent, transparent);
       z-index: -1;
     }
   }
