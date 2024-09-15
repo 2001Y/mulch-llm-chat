@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/react'
 import '@/styles/globals.scss'
 import { ManifestLink } from '_components/ManifestLink'
+import { Toaster } from 'sonner';
 
 export const metadata: Metadata = {
     title: 'Multi AI Chat | OpenRouter Chat Client',
@@ -45,6 +46,7 @@ export default function RootLayout({
             <body>
                 {children}
                 <Analytics />
+                <Toaster />
             </body>
         </html>
     )

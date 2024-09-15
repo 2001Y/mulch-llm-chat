@@ -35,7 +35,7 @@ export default function InputSection({
     handleReset,
     handleStopAllGeneration,
 }: InputSectionProps) {
-    const [storedMessages, setStoredMessages, isStoredMessagesLoaded] = useLocalStorage<any[]>('chatMessages', []);
+    const [storedMessages] = useLocalStorage<any[]>('chatMessages', []);
     const [isComposing, setIsComposing] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [suggestionIndex, setSuggestionIndex] = useState(0);
@@ -55,8 +55,7 @@ export default function InputSection({
 
     useEffect(() => {
         if (originalMessage) {
-            const isContentEdited = JSON.stringify(chatInput) !== JSON.stringify(originalMessage);
-            setIsEdited(isContentEdited);
+            setIsEdited(JSON.stringify(chatInput) !== JSON.stringify(originalMessage));
         }
     }, [chatInput, originalMessage]);
 
@@ -67,72 +66,54 @@ export default function InputSection({
     }, [mainInput]);
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (document.body.dataset && document.body.dataset.softwareKeyboard === 'false') {
-            const keyActions: { [key: string]: () => void } = {
-                'Enter': () => {
-                    if (!event.shiftKey && !isComposing) {
-                        event.preventDefault();
-                        isEditMode ? handleResetAndRegenerate(messageIndex) : handleSendAndResetInput(event as unknown as React.MouseEvent<HTMLButtonElement>, event.metaKey || event.ctrlKey);
-                    }
-                },
-                'ArrowDown': () => {
-                    if (showSuggestions) {
-                        event.preventDefault();
-                        setSuggestionIndex((prevIndex) => Math.min(prevIndex + 1, filteredModels.length - 1));
-                    }
-                },
-                'ArrowUp': () => {
-                    if (showSuggestions) {
-                        event.preventDefault();
-                        setSuggestionIndex((prevIndex) => Math.max(prevIndex - 1, 0));
-                    }
-                },
-                'Escape': () => setShowSuggestions(false),
-                'Backspace': () => {
-                    if (event.metaKey || event.ctrlKey) {
-                        event.preventDefault();
-                        handleStopAllGeneration();
-                    }
-                },
-                'n': () => {
-                    if (event.metaKey || event.ctrlKey) {
-                        event.preventDefault();
-                        handleReset();
-                    }
-                }
-            };
-
-            const action = keyActions[event.key];
-            if (action) action();
+        if (document.body.dataset?.softwareKeyboard === 'false') {
+            if (event.key === 'Enter' && !event.shiftKey && !isComposing) {
+                event.preventDefault();
+                isEditMode
+                    ? handleResetAndRegenerate(messageIndex)
+                    : handleSendAndResetInput(event as unknown as React.MouseEvent<HTMLButtonElement>, event.metaKey || event.ctrlKey);
+            } else if (showSuggestions && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+                event.preventDefault();
+                setSuggestionIndex(prevIndex =>
+                    event.key === 'ArrowDown'
+                        ? Math.min(prevIndex + 1, filteredModels.length - 1)
+                        : Math.max(prevIndex - 1, 0)
+                );
+            } else if (event.key === 'Escape') {
+                setShowSuggestions(false);
+            } else if (event.key === 'Backspace' && (event.metaKey || event.ctrlKey)) {
+                event.preventDefault();
+                handleStopAllGeneration();
+            } else if (event.key === 'n' && (event.metaKey || event.ctrlKey)) {
+                event.preventDefault();
+                handleReset();
+            }
         }
     };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const text = e.target.value;
-        setChatInput(prevInput => {
-            const textItem = prevInput.find(item => item.type === 'text');
-            if (textItem) {
-                return prevInput.map(item => item.type === 'text' ? { ...item, text } : item);
-            } else {
-                return [{ type: 'text', text }, ...prevInput];
-            }
+        setChatInput(prev => {
+            const newInput = prev.length > 0 ? [...prev] : [{ type: 'text', text: '' }];
+            newInput[0] = { ...newInput[0], text };
+            return newInput;
         });
         updateSuggestions(text);
     };
 
     const updateSuggestions = (text: string) => {
         const mentionMatch = text.match(/@[^@]*$/);
-        if (mentionMatch && mentionMatch[0]) {
+        if (mentionMatch) {
             const searchText = mentionMatch[0].slice(1).toLowerCase();
-            if (searchText.includes(' ') || searchText.length > 15) {
-                setShowSuggestions(false);
-            } else {
+            if (!searchText.includes(' ') && searchText.length <= 15) {
                 const matchedModels = models.filter(model => model.toLowerCase().includes(searchText));
                 setFilteredModels(matchedModels);
                 setShowSuggestions(true);
                 setSelectedModels(matchedModels);
+                return;
             }
         }
+        setShowSuggestions(false);
     };
 
     const selectSuggestion = (index: number) => {
@@ -147,14 +128,16 @@ export default function InputSection({
     };
 
     const handleModelChange = (model: string) => {
-        const wasInputFocused = document.activeElement === inputRef.current;
-        setSelectedModels((prevSelectedModels) => {
-            let newSelectedModels = prevSelectedModels.includes(model)
-                ? prevSelectedModels.filter((m) => m !== model)
-                : [model, ...prevSelectedModels.filter((m) => m !== model)];
-            return newSelectedModels.length === 0 ? [models[0]] : newSelectedModels;
+        const wasFocused = document.activeElement === inputRef.current;
+        setSelectedModels(prev => {
+            const isSelected = prev.includes(model);
+            const newSelection = isSelected
+                ? prev.filter(m => m !== model)
+                : [model, ...prev];
+
+            return newSelection.length ? newSelection : [models[0]];
         });
-        if (wasInputFocused && inputRef.current) {
+        if (wasFocused) {
             setTimeout(() => inputRef.current?.focus(), 0);
         }
     };
@@ -166,11 +149,11 @@ export default function InputSection({
 
     const handleImageSelect = async (event: ChangeEvent<HTMLInputElement>) => {
         const files = event.target.files;
-        if (files && files.length > 0) {
+        if (files?.length) {
             try {
                 const newImages = await Promise.all(
-                    Array.from(files).map((file) =>
-                        new Promise<{ type: string, image_url: { url: string } }>((resolve, reject) => {
+                    Array.from(files).map(file =>
+                        new Promise<{ type: string; image_url: { url: string } }>((resolve, reject) => {
                             const reader = new FileReader();
                             reader.onloadend = () => resolve({ type: 'image_url', image_url: { url: reader.result as string } });
                             reader.onerror = reject;
@@ -178,8 +161,8 @@ export default function InputSection({
                         })
                     )
                 );
-                setChatInput(prevInput => [...prevInput, ...newImages]);
-            } catch (error) {
+                setChatInput(prev => [...prev, ...newImages]);
+            } catch {
                 toast.error('画像の読み込み中にエラーが発生しました', {
                     description: '別の画像を選択してください',
                     duration: 3000,
@@ -195,10 +178,9 @@ export default function InputSection({
     };
 
     const removeImage = (index: number) => {
-        setChatInput(prevInput => prevInput.filter((_, i) => i !== index));
+        setChatInput(prev => prev.filter((_, i) => i !== index));
     };
 
-    // Polyfill for unsupported browsers
     useEffect(() => {
         if (!CSS.supports('field-sizing: content')) {
             const textarea = inputRef.current;
@@ -207,27 +189,12 @@ export default function InputSection({
             const adjustHeight = () => {
                 textarea.style.height = '1lh';
                 textarea.style.height = `${Math.max(textarea.scrollHeight, parseFloat(getComputedStyle(textarea).lineHeight))}px`;
-                const computedStyle = window.getComputedStyle(textarea);
-                const maxHeight = parseInt(computedStyle.maxHeight);
-                if (textarea.scrollHeight > maxHeight) {
-                    textarea.style.height = `${maxHeight}px`;
-                    textarea.style.overflowY = 'auto';
-                } else {
-                    textarea.style.overflowY = 'hidden';
-                }
+                const maxHeight = parseInt(window.getComputedStyle(textarea).maxHeight);
+                textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
             };
             textarea.addEventListener('input', adjustHeight);
             window.addEventListener('resize', adjustHeight);
-
             adjustHeight();
-
-            const textContent = chatInput.find(item => item.type === 'text')?.text || '';
-            if (textContent === '') {
-                textarea.style.height = '1lh';
-            } else {
-                adjustHeight();
-            }
-
             return () => {
                 textarea.removeEventListener('input', adjustHeight);
                 window.removeEventListener('resize', adjustHeight);
@@ -235,18 +202,14 @@ export default function InputSection({
         }
     }, [chatInput]);
 
-    // chatInputが空の配列の場合に対応するヘルパー関数
-    const isInputEmpty = () => {
-        if (chatInput.length === 0) return true;
-        if (chatInput.length === 1) {
-            const firstItem = chatInput[0];
-            return firstItem.type === 'text' && (!firstItem.text || firstItem.text.trim() === '');
-        }
-        return false;
-    };
+    const isInputEmpty = () => !(chatInput[0]?.text?.trim());
 
     return (
-        <section className={`input-section ${isInitialScreen ? 'initial-screen' : ''} ${mainInput ? 'full-input fixed' : ''} ${isEdited ? 'edited' : ''}`} ref={sectionRef}>
+        <section
+            className={`input-section ${isInitialScreen ? 'initial-screen' : ''} ${mainInput ? 'full-input fixed' : ''
+                } ${isEdited ? 'edited' : ''}`}
+            ref={sectionRef}
+        >
             <div className="input-container input-actions">
                 <button
                     onClick={handleReset}
@@ -255,62 +218,62 @@ export default function InputSection({
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M12 5v14M5 12h14" />
                     </svg>
-                    <span>New Thread<span className="shortcut">⌘N</span></span>
+                    <span>
+                        New Thread<span className="shortcut">⌘N</span>
+                    </span>
                 </button>
             </div>
 
             <div className="input-container chat-input-area">
-                {chatInput.filter(item => item.type === 'image_url').length > 0 && (
+                {chatInput.slice(1).some(item => item.type === 'image_url') && (
                     <div className="image-previews">
-                        {chatInput.filter(item => item.type === 'image_url').map((image, index) => (
-                            <div key={index} className="image-preview">
-                                <img src={image.image_url?.url} alt={`選択された画像 ${index + 1}`} />
-                                <button onClick={() => removeImage(index)}>
-                                    ×
-                                </button>
-                            </div>
-                        ))}
+                        {chatInput
+                            .slice(1)
+                            .filter(item => item.type === 'image_url')
+                            .map((image, idx) => (
+                                <div key={idx} className="image-preview">
+                                    <img src={image.image_url?.url} alt={`選択された画像 ${idx + 1}`} />
+                                    <button onClick={() => removeImage(idx + 1)}>×</button>
+                                </div>
+                            ))}
                     </div>
                 )}
                 <textarea
                     ref={inputRef}
-                    value={chatInput.find(item => item.type === 'text')?.text || ''}
+                    value={chatInput[0]?.text || ''}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
                     onCompositionStart={() => setIsComposing(true)}
-                    onCompositionEnd={(e) => {
+                    onCompositionEnd={e => {
                         setIsComposing(false);
                         handleInputChange({ target: e.target } as React.ChangeEvent<HTMLTextAreaElement>);
                     }}
                     className="chat-input"
-                    placeholder={isEditMode ? "Edit your message here..." : "Type your message here…"}
+                    placeholder={isEditMode ? 'Edit your message here...' : 'Type your message here…'}
                     data-fieldsizing="content"
                 />
                 {showSuggestions && (
                     <ul className="suggestions-list">
-                        {filteredModels.map((model, index) => (
+                        {filteredModels.map((model, idx) => (
                             <li
                                 key={model}
-                                className={index === suggestionIndex ? 'active' : ''}
-                                onClick={() => selectSuggestion(index)}
+                                className={idx === suggestionIndex ? 'active' : ''}
+                                onClick={() => selectSuggestion(idx)}
                             >
                                 <input
                                     type="radio"
-                                    id={`suggestion-${index}`}
+                                    id={`suggestion-${idx}`}
                                     name="model-suggestion"
                                     value={model}
-                                    checked={index === suggestionIndex}
-                                    onChange={() => selectSuggestion(index)}
+                                    checked={idx === suggestionIndex}
+                                    onChange={() => selectSuggestion(idx)}
                                 />
-                                <label htmlFor={`suggestion-${index}`}>{model.split('/')[1]}</label>
+                                <label htmlFor={`suggestion-${idx}`}>{model.split('/')[1]}</label>
                             </li>
                         ))}
                     </ul>
                 )}
-                <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="image-select-button icon-button"
-                >
+                <button onClick={() => fileInputRef.current?.click()} className="image-select-button icon-button">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                         <circle cx="8.5" cy="8.5" r="1.5" />
@@ -328,18 +291,16 @@ export default function InputSection({
             </div>
 
             <div className="input-container model-select-area">
-                {models.map((model, index) => (
+                {models.map((model, idx) => (
                     <div className="model-radio" key={model}>
                         <input
                             type="checkbox"
-                            id={`model-${index}`}
+                            id={`model-${idx}`}
                             value={model}
                             checked={selectedModels.includes(model)}
                             onChange={() => handleModelChange(model)}
                         />
-                        <label htmlFor={`model-${index}`}>
-                            {model.split('/')[1]}
-                        </label>
+                        <label htmlFor={`model-${idx}`}>{model.split('/')[1]}</label>
                     </div>
                 ))}
             </div>
@@ -354,8 +315,9 @@ export default function InputSection({
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
                             </svg>
-
-                            <span>Regenerate<span className="shortcut">⏎</span></span>
+                            <span>
+                                Regenerate<span className="shortcut">⏎</span>
+                            </span>
                         </button>
                         <button
                             onClick={() => handleSaveOnly(messageIndex)}
@@ -366,30 +328,28 @@ export default function InputSection({
                                 <polyline points="17 21 17 13 7 13 7 21"></polyline>
                                 <polyline points="7 3 7 8 15 8"></polyline>
                             </svg>
-                            <span>
-                                Save
-                            </span>
+                            <span>Save</span>
                         </button>
-
                         <span className="line-break shortcut-area">
-                            Line break
-                            <span className="shortcut">⇧⏎</span>
+                            Line break<span className="shortcut">⇧⏎</span>
                         </span>
                     </>
                 ) : (
                     <>
                         <button
-                            onClick={(e) => handleSendAndResetInput(e, false)}
+                            onClick={e => handleSendAndResetInput(e, false)}
                             className={`action-button send-button icon-button ${!isInputEmpty() ? 'active' : ''}`}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <line x1="22" y1="2" x2="11" y2="13"></line>
                                 <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                             </svg>
-                            <span>Send<span className="shortcut">⏎</span></span>
+                            <span>
+                                Send<span className="shortcut">⏎</span>
+                            </span>
                         </button>
                         <button
-                            onClick={(e) => handleSendAndResetInput(e, true)}
+                            onClick={e => handleSendAndResetInput(e, true)}
                             className={`action-button send-primary-button icon-button ${!isInputEmpty() ? 'active' : ''}`}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -401,12 +361,11 @@ export default function InputSection({
                             </span>
                         </button>
                         <span className="line-break shortcut-area">
-                            Line break
-                            <span className="shortcut">⇧⏎</span>
+                            Line break<span className="shortcut">⇧⏎</span>
                         </span>
                     </>
                 )}
             </div>
         </section>
     );
-};
+}

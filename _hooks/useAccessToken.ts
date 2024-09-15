@@ -1,12 +1,8 @@
 'use client';
 import { useState, useEffect } from "react";
 import useStorageState from "./useLocalStorage";
-// import useStorageState from 'use-storage-state';
 
 export default function useAccessToken() {
-    // const [accessToken, setAccessToken] = useLocalStorage('accessToken', '');
-    // const [accessToken, setAccessToken] = useStorageState('accessToken', '');
-    // const [accessToken, setAccessToken] = useStorageState('accessToken', { defaultValue: '' });
     const [accessToken, setAccessToken] = useStorageState<string>('accessToken', '');
     const [previousAccessToken, setPreviousAccessToken] = useState(accessToken);
 
@@ -24,7 +20,7 @@ export default function useAccessToken() {
                     body: JSON.stringify({ code }),
                 });
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    throw new Error(`🚨 HTTPエラー! ステータス: ${response.status}`);
                 }
                 const data = await response.json();
                 setAccessToken(data.key);
@@ -33,11 +29,11 @@ export default function useAccessToken() {
                 url.searchParams.delete('code');
                 window.history.replaceState({}, document.title, url.toString());
             } catch (error) {
-                console.error('Error fetching access token:', error);
+                console.error('🔑 アクセストークンの取得エラー:', error);
                 if (error instanceof Error) {
-                    alert(`Failed to fetch access token: ${error.message}`);
+                    alert(`🚫 アクセストークンの取得に失敗しました: ${error.message}`);
                 } else {
-                    alert('Failed to fetch access token: Unknown error');
+                    alert('🚫 アクセストークンの取得に失敗しました: 不明なエラー');
                 }
             }
         };

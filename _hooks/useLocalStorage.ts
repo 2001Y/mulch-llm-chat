@@ -12,15 +12,16 @@ export default function useLocalStorage<T>(key: string, initialValue: T): [T, (v
                 try {
                     const item = localStorage.getItem(key);
                     if (item) {
-                        setStoredValue(JSON.parse(item));
-                        console.log(`ローカルストレージからキー「${key}」の値を読み込みました:`, JSON.parse(item));
+                        const parsedItem = JSON.parse(item);
+                        setStoredValue(parsedItem);
+                        console.log(`💾 [useLocalStorage] キー "${key}" の値を読み込みました:`, parsedItem);
                     } else {
                         // ローカルストレージにデータがない場合、initialValueを保存
                         localStorage.setItem(key, JSON.stringify(initialValue));
-                        console.log(`ローカルストレージにキー「${key}」の初期値を保存しました:`, initialValue);
+                        console.log(`📦 [useLocalStorage] キー "${key}" の初期値を保存しました:`, initialValue);
                     }
                 } catch (error) {
-                    console.error('ローカルストレージの操作エラー:', error);
+                    console.error(`🚨 [useLocalStorage] ローカルストレージの操作エラー:`, error);
                 } finally {
                     setIsLoaded(true);
                 }
@@ -35,10 +36,10 @@ export default function useLocalStorage<T>(key: string, initialValue: T): [T, (v
             setStoredValue(valueToStore);
             if (typeof window !== 'undefined') {
                 localStorage.setItem(key, JSON.stringify(valueToStore));
-                console.log(`ローカルストレージにキー「${key}」の値を保存しました:`, valueToStore);
+                console.log(`📝 [useLocalStorage] キー "${key}" の値を保存しました:`, valueToStore);
             }
         } catch (error) {
-            console.error('ローカルストレージへの書き込みエラー:', error);
+            console.error(`🚨 [useLocalStorage] ローカルストレージへの書き込みエラー:`, error);
         }
     };
 
