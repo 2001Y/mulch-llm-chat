@@ -3,42 +3,21 @@
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { marked } from "marked";
-import { markedHighlight } from "marked-highlight";
-import hljs from "highlight.js";
 import Responses from "_components/ChatResponses";
 import ModelInputModal from "_components/SettingsModal";
 import useStorageState from "_hooks/useLocalStorage";
 import useAccessToken from "_hooks/useAccessToken";
 import { useOpenAI } from "_hooks/useOpenAI";
 
-marked.use(
-  markedHighlight({
-    langPrefix: "hljs language-",
-    highlight(code, lang) {
-      const language = hljs.getLanguage(lang) ? lang : "plaintext";
-      return hljs.highlight(code, { language }).value;
-    }
-  })
-);
-
 export default function Home() {
   const [models, setModels] = useStorageState<string[]>('models', ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'cohere/command-r-plus']);
   const [demoModels] = useState<string[]>(['google/gemma-2-9b-it:free', "google/gemma-7b-it:free", "meta-llama/llama-3-8b-instruct:free", "openchat/openchat-7b:free"]);
-  const [chatInput, setChatInput] = useState('');
-  const [messages, setMessages] = useState<any[]>([]);
   const [accessToken, setAccessToken, previousAccessToken] = useAccessToken();
   const [demoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO || '');
   const openai = useOpenAI(accessToken || demoAccessToken);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isAutoScroll, setIsAutoScroll] = useState(true);
-  const [forceScroll, setForceScroll] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [abortControllers, setAbortControllers] = useState<AbortController[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>(models);
-  const [showResetButton, setShowResetButton] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [storedMessages, setStoredMessages] = useStorageState<any[]>('chatMessages', []);
   const [tools, setTools] = useStorageState('tools', [
     {
       type: "function",
@@ -159,20 +138,6 @@ export default function Home() {
   );
   const router = useRouter();
 
-  const [selectedImage, setSelectedImage] = useState<string[] | null>(null);
-
-  useEffect(() => {
-    if (storedMessages.length > 0) {
-      try {
-        console.log('以前のメッージを復元:', storedMessages);
-        setMessages(storedMessages);
-        setShowResetButton(true);
-      } catch (error) {
-        console.error('メッセージの解析エラー:', error);
-      }
-    }
-  }, [storedMessages]);
-
   useEffect(() => {
     if (accessToken !== previousAccessToken) {
       setModels(['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'cohere/command-r-plus']);
@@ -191,283 +156,6 @@ export default function Home() {
     setIsLoggedIn(!!accessToken);
   }, [accessToken]);
 
-  const updateMessage = useCallback((messageIndex: number, responseIndex: number | null, text: { type: string, text: string }[] | undefined, selectedIndex?: number | undefined, toggleSelected?: boolean, saveOnly?: boolean, isEditing?: boolean) => {
-    setMessages(prevMessages => {
-      const newMessages = JSON.parse(JSON.stringify(prevMessages));
-      if (responseIndex === null) {
-        if (text !== undefined) {
-          newMessages[messageIndex].user = text;
-          const isEdited = JSON.stringify((storedMessages[messageIndex] as any)?.user) !== JSON.stringify(text);
-          newMessages[messageIndex].edited = isEdited;
-        }
-      } else if (newMessages[messageIndex]?.llm[responseIndex] !== undefined) {
-        if (text !== undefined) {
-          newMessages[messageIndex].llm[responseIndex].text = text.map(t => t.text).join('');
-        }
-        if (toggleSelected) {
-          const currentResponse = newMessages[messageIndex].llm[responseIndex];
-          if (currentResponse.selected) {
-            currentResponse.selected = false;
-            delete currentResponse.selectedOrder;
-            newMessages[messageIndex].llm.forEach((response: any) => {
-              if (response.selected && response.selectedOrder > currentResponse.selectedOrder) {
-                response.selectedOrder--;
-              }
-            });
-          } else {
-            const selectedCount = newMessages[messageIndex].llm.filter((r: any) => r.selected).length;
-            currentResponse.selected = true;
-            currentResponse.selectedOrder = selectedCount + 1;
-          }
-        }
-      }
-      if (saveOnly) {
-        setStoredMessages(newMessages);
-      }
-      return newMessages;
-    });
-  }, [setMessages, setStoredMessages, storedMessages]);
-
-  useEffect(() => {
-    console.log("toolFunctions:", toolFunctions);
-  }, [toolFunctions]);
-
-  const fetchChatResponse = useCallback(async (model: string, messageIndex: number, responseIndex: number, abortController: AbortController, inputText: string) => {
-    try {
-      setMessages(prevMessages => {
-        const newMessages = [...prevMessages];
-        if (newMessages[messageIndex]?.llm[responseIndex] !== undefined) {
-          newMessages[messageIndex].llm[responseIndex].isGenerating = true;
-        }
-        return newMessages;
-      });
-
-      const pastMessages = messages.flatMap(msg => {
-        const userMessage = { role: 'user', content: msg.user };
-        const selectedResponses = msg.llm
-          .filter((llm: any) => llm.selected)
-          .sort((a: any, b: any) => a.selectedOrder - b.selectedOrder);
-
-        const responseMessages = selectedResponses.length > 0
-          ? selectedResponses.map((llm: any) => ({ role: 'assistant', content: [{ type: 'text', text: llm.text }] }))
-          : [{ role: 'assistant', content: [{ type: 'text', text: msg.llm.find((llm: any) => llm.model === model)?.text || '' }] }];
-
-        return [userMessage, ...responseMessages];
-      });
-
-      console.log('モデルに送信する過去の会話:', pastMessages);
-
-      let result: { type: string, text: string }[] = [];
-      let fc = {
-        name: "",
-        arguments: ""
-      };
-      let functionCallExecuted = false;
-
-      const stream = await openai?.chat.completions.create({
-        model,
-        messages: [
-          ...pastMessages,
-          {
-            role: 'user',
-            content: [
-              { type: "text", text: inputText },
-              ...(selectedImage ? selectedImage.map((imageUrl: string) => ({
-                type: 'image_url',
-                image_url: { url: imageUrl },
-              })) : [])
-            ],
-          },
-        ],
-        stream: true,
-        tool_choice: "auto",
-      }, {
-        signal: abortController.signal,
-      });
-
-      if (stream) {
-        for await (const part of stream) {
-          if (abortController.signal.aborted) {
-            throw new DOMException('Aborted', 'AbortError');
-          }
-          const content = part.choices[0]?.delta?.content || '';
-          const toolCalls = part.choices[0]?.delta?.tool_calls;
-
-          if (toolCalls) {
-            for (const tc of toolCalls) {
-              // Gemini
-              // @ts-ignore
-              if (tc.name) {
-                fc.name += tc;
-                // @ts-ignore
-                fc.arguments += tc.arguments;
-              }
-
-              // Gemini以外のその他モデル
-              if (tc.function?.name) {
-                fc.name += tc.function?.name;
-              }
-              if (tc.function?.arguments) {
-                fc.arguments += tc.function?.arguments;
-              }
-              console.log('ツールコール引数:', model, fc.name, decodeURIComponent(String(fc.arguments)));
-              // ツールコール引数: openai/gpt-4o get_current_weather {"location":"東"}
-            }
-          } else {
-            result.push({ type: 'text', text: content });
-          }
-
-          // ファンクションコールの結果を1回だけ追加
-          if (fc.name && fc.arguments && !functionCallExecuted) {
-            try {
-              const args = JSON.parse(fc.arguments);
-              // console.log("toolFunctions:", toolFunctions);
-
-              result.push({ type: 'text', text: `\n\nFunction Call 実行中...: ${fc.name}(${fc.arguments})` });
-              if (toolFunctions[fc.name as keyof typeof toolFunctions]) {
-                result.push({ type: 'text', text: `\n\nFunction Call 完成` });
-                const functionResult = toolFunctions[fc.name as keyof typeof toolFunctions](args);
-                const functionResultText = `\n\n実行結果:\n${JSON.stringify(functionResult, null, 2)}\n`;
-                result.push({ type: 'text', text: functionResultText });
-                functionCallExecuted = true;
-              }
-            } catch (error) {
-              console.error('ファンクションコールの実行エラー:', error);
-            }
-          }
-
-          const markedResult = await marked(result.map(r => r.text).join(''));
-          updateMessage(messageIndex, responseIndex, [{ type: 'text', text: markedResult }], undefined, false, false, false);
-        }
-
-        setIsAutoScroll(false);
-      } else {
-        console.error('ストリームの作成に失敗しました');
-        updateMessage(messageIndex, responseIndex, [{ type: 'text', text: 'エラー: レスポンスの生成に失敗しました' }], undefined, false, false, false);
-      }
-      setIsAutoScroll(false);
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
-        console.error('Error fetching response from model:', model, error);
-        console.log('エラーレスポンス:', error);
-        console.log('エラーメッセージ:', error.message);
-        updateMessage(messageIndex, responseIndex, [{ type: 'text', text: `エラー: ${error.message}` }], undefined, false, false, false);
-      }
-    } finally {
-      setMessages(prevMessages => {
-        const newMessages = [...prevMessages];
-        if (newMessages[messageIndex]?.llm[responseIndex] !== undefined) {
-          newMessages[messageIndex].llm[responseIndex].isGenerating = false;
-        }
-        setStoredMessages(newMessages);
-        return newMessages;
-      });
-      setMessages(prevMessages => {
-        const allResponsesComplete = prevMessages[messageIndex].llm.every((response: any) => !response.isGenerating);
-        if (allResponsesComplete) {
-          setIsGenerating(false);
-        }
-        return prevMessages;
-      });
-    }
-  }, [messages, openai, updateMessage, setStoredMessages, toolFunctions, selectedImage]);
-
-  const handleSend = async (event: React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>, isPrimaryOnly = false, messageIndex?: number) => {
-    if (isGenerating) return;
-
-    let inputText = chatInput;
-    const modelsToUse = isPrimaryOnly ? [selectedModels[0]] : selectedModels;
-
-    setIsGenerating(true);
-    setForceScroll(true);
-    const newAbortControllers = modelsToUse.map(() => new AbortController());
-    setAbortControllers(newAbortControllers);
-
-    setMessages(prevMessages => {
-      const currentMessages = Array.isArray(prevMessages) ? prevMessages : [];
-      const newMessage = {
-        user: [
-          { type: 'text', text: inputText },
-          ...(selectedImage ? selectedImage.map(imageUrl => ({
-            type: 'image_url',
-            image_url: { url: imageUrl }
-          })) : [])
-        ],
-        llm: modelsToUse.map((model, index) => ({
-          role: 'assistant',
-          model,
-          text: '',
-          selected: false,
-          isGenerating: true
-        }))
-      };
-      const newMessages = [...currentMessages, newMessage];
-      newMessage.llm.forEach((response, index) => {
-        fetchChatResponse(response.model, newMessages.length - 1, index, newAbortControllers[index], inputText)
-          .finally(() => {
-            setMessages(prevMessages => {
-              const updatedMessages = [...prevMessages];
-              updatedMessages[newMessages.length - 1].llm[index].isGenerating = false;
-              const allResponsesComplete = updatedMessages[newMessages.length - 1].llm.every((response: any) => !response.isGenerating);
-              if (allResponsesComplete) {
-                setIsGenerating(false);
-              }
-              return updatedMessages;
-            });
-          });
-      });
-      setIsAutoScroll(true);
-
-      if (currentMessages.length === 0) {
-        setShowResetButton(true);
-      }
-      setStoredMessages(newMessages);
-      return newMessages;
-    });
-    setChatInput('');
-    setSelectedImage(null); // 送信後に選択された画像をリセット
-
-    setTimeout(() => setForceScroll(false), 100);
-  };
-
-  const handleStopAllGeneration = () => {
-    abortControllers.forEach(controller => {
-      try {
-        controller.abort();
-      } catch (error) {
-        console.error('Error while aborting:', error);
-      }
-    });
-    setIsGenerating(false);
-    setMessages(prevMessages => {
-      return prevMessages.map(message => ({
-        ...message,
-        llm: message.llm.map((response: any) => ({ ...response, isGenerating: false }))
-      }));
-    });
-  };
-
-  const handleReset = () => {
-    if (window.confirm('チャット履歴をクリアしてもよろしいですか？この操作は元に戻せません。')) {
-      setMessages([]);
-      setStoredMessages([]);
-      setShowResetButton(false);
-    }
-  };
-
-  const handleStop = (messageIndex: number, responseIndex: number) => {
-    const controller = abortControllers[responseIndex];
-    if (controller) {
-      controller.abort();
-      setMessages(prevMessages => {
-        const newMessages = [...prevMessages];
-        newMessages[messageIndex].llm[responseIndex].isGenerating = false;
-        return newMessages;
-      });
-    }
-  };
-
-  const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
 
   useEffect(() => {
@@ -508,63 +196,7 @@ export default function Home() {
     setAccessToken(''); // 直接空文字列を設定
     setModels(demoModels);
     setSelectedModels(demoModels);
-    setMessages([]);
-  };
-
-  const handleRegenerate = async (messageIndex: number, responseIndex: number, model: string) => {
-    const inputText = messages[messageIndex].user;
-    const abortController = new AbortController();
-    setAbortControllers([abortController]);
-    setIsGenerating(true);
-
-    try {
-      await fetchChatResponse(model, messageIndex, responseIndex, abortController, inputText);
-      setMessages(prevMessages => {
-        setStoredMessages(prevMessages);
-        return prevMessages;
-      });
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleResetAndRegenerate = async (messageIndex: number) => {
-    setIsGenerating(true);
-    setForceScroll(true);
-
-    const messageBlock = document.querySelector(`.message-block:nth-child(${messageIndex + 1})`);
-    if (messageBlock) {
-      const userDiv = messageBlock.querySelector('.user');
-      if (userDiv) {
-        userDiv.classList.remove('edited');
-        const contentEditableElement = userDiv.querySelector('[contenteditable]');
-        if (contentEditableElement) {
-          (contentEditableElement as HTMLElement).blur();
-        }
-      }
-    }
-
-    const newMessages = [...messages];
-    const userMessage = newMessages[messageIndex].user;
-    newMessages.splice(messageIndex + 1);
-    newMessages[messageIndex].llm = selectedModels.map(model => ({
-      role: 'assistant',
-      model,
-      text: '',
-      selected: false
-    }));
-
-    setMessages(newMessages);
-
-    const newAbortControllers = selectedModels.map(() => new AbortController());
-    setAbortControllers(newAbortControllers);
-
-    newMessages[messageIndex].llm.forEach((response: { model: string }, index: number) => {
-      fetchChatResponse(response.model, messageIndex, index, newAbortControllers[index], userMessage);
-    });
-
-    setIsAutoScroll(true);
-    setTimeout(() => setForceScroll(false), 100);
+    // setMessages([]);
   };
 
   return (
@@ -596,25 +228,27 @@ export default function Home() {
         {!isLoggedIn && <div className="free-version">Free Version</div>}
       </header>
       <Responses
-        messages={messages}
-        updateMessage={updateMessage}
-        forceScroll={forceScroll}
-        handleRegenerate={handleRegenerate}
-        handleResetAndRegenerate={handleResetAndRegenerate}
-        handleStop={handleStop}
-        handleSend={handleSend}
+        // messages={messages}
+        // updateMessage={updateMessage}
+        // forceScroll={forceScroll}
+        // handleRegenerate={handleRegenerate}
+        // handleResetAndRegenerate={handleResetAndRegenerate}
+        // handleStop={handleStop}
+        // handleSend={handleSend}
+        // chatInput={chatInput}
+        // setChatInput={setChatInput}
+        // isGenerating={isGenerating}
+        // showResetButton={showResetButton}
+        // handleReset={handleReset}
+        // selectedImage={selectedImage}
+        // setSelectedImage={setSelectedImage}
+        // handleStopAllGeneration={handleStopAllGeneration}
+        // openModal={openModal}
+        openai={openai}
         models={isLoggedIn ? models : demoModels}
-        chatInput={chatInput}
-        setChatInput={setChatInput}
-        openModal={openModal}
-        isGenerating={isGenerating}
         selectedModels={selectedModels}
         setSelectedModels={setSelectedModels}
-        showResetButton={showResetButton}
-        handleReset={handleReset}
-        handleStopAllGeneration={handleStopAllGeneration}
-        selectedImage={selectedImage}
-        setSelectedImage={setSelectedImage}
+        toolFunctions={toolFunctions}
       />
       <ModelInputModal
         models={isLoggedIn ? models : demoModels}
