@@ -5,8 +5,8 @@ import { toast } from 'sonner';
 interface InputSectionProps {
     models: string[];
     mainInput: boolean;
-    chatInput: string;
-    setChatInput: (input: string) => void;
+    chatInput: { type: string, text?: string, image_url?: { url: string } }[];
+    setChatInput: (input: { type: string, text?: string, image_url?: { url: string } }[]) => void;
     handleSend: (event: React.MouseEvent<HTMLButtonElement>, isPrimaryOnly: boolean) => void;
     selectedModels: string[];
     setSelectedModels: React.Dispatch<React.SetStateAction<string[]>>;
@@ -17,8 +17,6 @@ interface InputSectionProps {
     isInitialScreen: boolean;
     handleReset: () => void;
     handleStopAllGeneration: () => void;
-    setSelectedImage: React.Dispatch<React.SetStateAction<string[] | null>>;
-    selectedImage: string[] | null;
 }
 
 export default function InputSection({
@@ -36,8 +34,6 @@ export default function InputSection({
     isInitialScreen,
     handleReset,
     handleStopAllGeneration,
-    setSelectedImage,
-    selectedImage
 }: InputSectionProps) {
     const [storedMessages, setStoredMessages, isStoredMessagesLoaded] = useLocalStorage<any[]>('chatMessages', []);
     const [isComposing, setIsComposing] = useState(false);
@@ -47,38 +43,22 @@ export default function InputSection({
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const sectionRef = useRef<HTMLElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [isEdited, setIsEdited] = useState(false);
 
     const originalMessage = storedMessages[messageIndex]?.user || null;
 
     useEffect(() => {
-        if (storedMessages[messageIndex]) {
-            const userContent = storedMessages[messageIndex].user;
-            const storedImages = userContent.filter((content: any) => content.type === 'image_url').map((content: any) => content.image_url.url);
-            setImagePreviews(storedImages);
-            setSelectedImage(storedImages.length > 0 ? storedImages : null);
-        } else {
-            setImagePreviews([]);
-            setSelectedImage(null);
+        if (mainInput) {
+            setChatInput([{ type: 'text', text: '' }]);
         }
-    }, [messageIndex, storedMessages, setSelectedImage]);
+    }, [mainInput, setChatInput]);
 
     useEffect(() => {
         if (originalMessage) {
-            const originalText = originalMessage.find((content: any) => content.type === 'text')?.text || '';
-            const originalImages = originalMessage.filter((content: any) => content.type === 'image_url').map((content: any) => content.image_url.url);
-
-            const isTextEdited = chatInput !== originalText;
-            const areImagesEdited = () => {
-                if (!originalImages || !selectedImage) return false;
-                if (originalImages.length !== selectedImage.length) return true;
-                return !originalImages.every((url: string, index: number) => url === selectedImage[index]);
-            };
-
-            setIsEdited(isTextEdited || areImagesEdited());
+            const isContentEdited = JSON.stringify(chatInput) !== JSON.stringify(originalMessage);
+            setIsEdited(isContentEdited);
         }
-    }, [chatInput, selectedImage, originalMessage]);
+    }, [chatInput, originalMessage]);
 
     useEffect(() => {
         if (inputRef.current && mainInput) {
@@ -129,7 +109,14 @@ export default function InputSection({
 
     const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const text = e.target.value;
-        setChatInput(text);
+        setChatInput(prevInput => {
+            const textItem = prevInput.find(item => item.type === 'text');
+            if (textItem) {
+                return prevInput.map(item => item.type === 'text' ? { ...item, text } : item);
+            } else {
+                return [{ type: 'text', text }, ...prevInput];
+            }
+        });
         updateSuggestions(text);
     };
 
@@ -155,7 +142,7 @@ export default function InputSection({
             inputRef.current.value = text;
             setShowSuggestions(false);
             setSuggestionIndex(0);
-            setChatInput(text);
+            setChatInput([{ type: 'text', text }]);
         }
     };
 
@@ -174,27 +161,24 @@ export default function InputSection({
 
     const handleSendAndResetInput = (event: React.MouseEvent<HTMLButtonElement>, isPrimaryOnly: boolean) => {
         handleSend(event, isPrimaryOnly);
-        setChatInput('');
-        setImagePreviews([]);
-        setSelectedImage(null);
+        setChatInput([{ type: 'text', text: '' }]);
     };
 
     const handleImageSelect = async (event: ChangeEvent<HTMLInputElement>) => {
         const files = event.target.files;
         if (files && files.length > 0) {
             try {
-                const newPreviews = await Promise.all(
+                const newImages = await Promise.all(
                     Array.from(files).map((file) =>
-                        new Promise<string>((resolve, reject) => {
+                        new Promise<{ type: string, image_url: { url: string } }>((resolve, reject) => {
                             const reader = new FileReader();
-                            reader.onloadend = () => resolve(reader.result as string);
+                            reader.onloadend = () => resolve({ type: 'image_url', image_url: { url: reader.result as string } });
                             reader.onerror = reject;
                             reader.readAsDataURL(file);
                         })
                     )
                 );
-                setImagePreviews((prev) => [...prev, ...newPreviews]);
-                setSelectedImage((prev) => prev ? [...prev, ...newPreviews] : newPreviews);
+                setChatInput(prevInput => [...prevInput, ...newImages]);
             } catch (error) {
                 toast.error('画像の読み込み中にエラーが発生しました', {
                     description: '別の画像を選択してください',
@@ -211,8 +195,7 @@ export default function InputSection({
     };
 
     const removeImage = (index: number) => {
-        setImagePreviews((prev) => prev.filter((_, i) => i !== index));
-        setSelectedImage((prev) => prev ? prev.filter((_, i) => i !== index) : null);
+        setChatInput(prevInput => prevInput.filter((_, i) => i !== index));
     };
 
     // Polyfill for unsupported browsers
@@ -222,7 +205,7 @@ export default function InputSection({
             if (!textarea) return;
 
             const adjustHeight = () => {
-                textarea.style.height = '1lh'; // 未入力時の高さを1lhに設定
+                textarea.style.height = '1lh';
                 textarea.style.height = `${Math.max(textarea.scrollHeight, parseFloat(getComputedStyle(textarea).lineHeight))}px`;
                 const computedStyle = window.getComputedStyle(textarea);
                 const maxHeight = parseInt(computedStyle.maxHeight);
@@ -233,16 +216,15 @@ export default function InputSection({
                     textarea.style.overflowY = 'hidden';
                 }
             };
-
+            Z
             textarea.addEventListener('input', adjustHeight);
             window.addEventListener('resize', adjustHeight);
 
-            // 初期高さを設定
             adjustHeight();
 
-            // chatInputが変更されたときに高さを調整
-            if (chatInput === '') {
-                textarea.style.height = '1lh'; // 未入力時の高さを1lhに設定
+            const textContent = chatInput.find(item => item.type === 'text')?.text || '';
+            if (textContent === '') {
+                textarea.style.height = '1lh';
             } else {
                 adjustHeight();
             }
@@ -254,13 +236,22 @@ export default function InputSection({
         }
     }, [chatInput]);
 
+    // chatInputが空の配列の場合に対応するヘルパー関数
+    const isInputEmpty = () => {
+        if (chatInput.length === 0) return true;
+        if (chatInput.length === 1) {
+            const firstItem = chatInput[0];
+            return firstItem.type === 'text' && (!firstItem.text || firstItem.text.trim() === '');
+        }
+        return false;
+    };
+
     return (
         <section className={`input-section ${isInitialScreen ? 'initial-screen' : ''} ${mainInput ? 'full-input fixed' : ''} ${isEdited ? 'edited' : ''}`} ref={sectionRef}>
-
             <div className="input-container input-actions">
                 <button
                     onClick={handleReset}
-                    className={`action-button new-thread-button icon-button ${chatInput.trim() === '' ? 'active' : ''}`}
+                    className={`action-button new-thread-button icon-button ${isInputEmpty() ? 'active' : ''}`}
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M12 5v14M5 12h14" />
@@ -270,11 +261,11 @@ export default function InputSection({
             </div>
 
             <div className="input-container chat-input-area">
-                {imagePreviews.length > 0 && (
+                {chatInput.filter(item => item.type === 'image_url').length > 0 && (
                     <div className="image-previews">
-                        {imagePreviews.map((preview, index) => (
+                        {chatInput.filter(item => item.type === 'image_url').map((image, index) => (
                             <div key={index} className="image-preview">
-                                <img src={preview} alt={`選択された画像 ${index + 1}`} />
+                                <img src={image.image_url?.url} alt={`選択された画像 ${index + 1}`} />
                                 <button onClick={() => removeImage(index)}>
                                     ×
                                 </button>
@@ -284,13 +275,13 @@ export default function InputSection({
                 )}
                 <textarea
                     ref={inputRef}
-                    value={chatInput}
+                    value={chatInput.find(item => item.type === 'text')?.text || ''}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
                     onCompositionStart={() => setIsComposing(true)}
                     onCompositionEnd={(e) => {
                         setIsComposing(false);
-                        setChatInput(e.currentTarget.value);
+                        handleInputChange(e as React.ChangeEvent<HTMLTextAreaElement>);
                     }}
                     className="chat-input"
                     placeholder={isEditMode ? "Edit your message here..." : "Type your message here…"}
@@ -333,7 +324,7 @@ export default function InputSection({
                     onChange={handleImageSelect}
                     accept="image/png,image/jpeg,image/webp"
                     style={{ display: 'none' }}
-                    multiple // 複数選択を許可
+                    multiple
                 />
             </div>
 
@@ -390,7 +381,7 @@ export default function InputSection({
                     <>
                         <button
                             onClick={(e) => handleSendAndResetInput(e, false)}
-                            className={`action-button send-button icon-button ${chatInput.trim() !== '' ? 'active' : ''}`}
+                            className={`action-button send-button icon-button ${!isInputEmpty() ? 'active' : ''}`}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -400,7 +391,7 @@ export default function InputSection({
                         </button>
                         <button
                             onClick={(e) => handleSendAndResetInput(e, true)}
-                            className={`action-button send-primary-button icon-button ${chatInput.trim() !== '' ? 'active' : ''}`}
+                            className={`action-button send-primary-button icon-button ${!isInputEmpty() ? 'active' : ''}`}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>

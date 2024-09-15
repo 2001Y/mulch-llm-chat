@@ -33,12 +33,11 @@ export default function Responses({
     const [lastAutoScrollTop, setLastAutoScrollTop] = useState(0);
     const isAutoScrollingRef = useRef(false);
     const MemoizedInputSection = useMemo(() => React.memo(InputSection), []);
-    const [selectedImage, setSelectedImage] = useState<string[] | null>(null);
     const [forceScroll, setForceScroll] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [abortControllers, setAbortControllers] = useState<AbortController[]>([]);
     const [showResetButton, setShowResetButton] = useState(false);
-    const [chatInput, setChatInput] = useState('');
+    const [chatInput, setChatInput] = useState<{ type: string, text?: string, image_url?: { url: string } }[]>([]);
     const [messages, setMessages] = useState<any[]>([]);
     const [storedMessages, setStoredMessages] = useStorageState<any[]>('chatMessages', []);
 
@@ -54,18 +53,18 @@ export default function Responses({
         }
     }, [storedMessages]);
 
-    const updateMessage = useCallback((messageIndex: number, responseIndex: number | null, text: { type: string, text: string }[] | undefined, selectedIndex?: number | undefined, toggleSelected?: boolean, saveOnly?: boolean, isEditing?: boolean) => {
+    const updateMessage = useCallback((messageIndex: number, responseIndex: number | null, content: { type: string, text?: string, image_url?: { url: string } }[] | undefined, selectedIndex?: number | undefined, toggleSelected?: boolean, saveOnly?: boolean, isEditing?: boolean) => {
         setMessages(prevMessages => {
             const newMessages = JSON.parse(JSON.stringify(prevMessages));
             if (responseIndex === null) {
-                if (text !== undefined) {
-                    newMessages[messageIndex].user = text;
-                    const isEdited = JSON.stringify((storedMessages[messageIndex] as any)?.user) !== JSON.stringify(text);
+                if (content !== undefined) {
+                    newMessages[messageIndex].user = content;
+                    const isEdited = JSON.stringify((storedMessages[messageIndex] as any)?.user) !== JSON.stringify(content);
                     newMessages[messageIndex].edited = isEdited;
                 }
             } else if (newMessages[messageIndex]?.llm[responseIndex] !== undefined) {
-                if (text !== undefined) {
-                    newMessages[messageIndex].llm[responseIndex].text = text.map(t => t.text).join('');
+                if (content !== undefined) {
+                    newMessages[messageIndex].llm[responseIndex].text = content.map(c => c.text).join('');
                 }
                 if (toggleSelected) {
                     const currentResponse = newMessages[messageIndex].llm[responseIndex];
@@ -91,7 +90,7 @@ export default function Responses({
         });
     }, [setMessages, setStoredMessages, storedMessages]);
 
-    const fetchChatResponse = useCallback(async (model: string, messageIndex: number, responseIndex: number, abortController: AbortController, inputText: string) => {
+    const fetchChatResponse = useCallback(async (model: string, messageIndex: number, responseIndex: number, abortController: AbortController, inputContent: { type: string, text?: string, image_url?: { url: string } }[]) => {
         try {
             setMessages(prevMessages => {
                 const newMessages = [...prevMessages];
@@ -129,13 +128,7 @@ export default function Responses({
                     ...pastMessages,
                     {
                         role: 'user',
-                        content: [
-                            { type: "text", text: inputText },
-                            ...(selectedImage ? selectedImage.map((imageUrl: string) => ({
-                                type: 'image_url',
-                                image_url: { url: imageUrl },
-                            })) : [])
-                        ],
+                        content: inputContent,
                     },
                 ],
                 stream: true,
@@ -229,12 +222,11 @@ export default function Responses({
                 return prevMessages;
             });
         }
-    }, [messages, openai, updateMessage, setStoredMessages, toolFunctions, selectedImage]);
+    }, [messages, openai, updateMessage, setStoredMessages, toolFunctions]);
 
     const handleSend = async (event: React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>, isPrimaryOnly = false, messageIndex?: number) => {
         if (isGenerating) return;
 
-        let inputText = chatInput;
         const modelsToUse = isPrimaryOnly ? [selectedModels[0]] : selectedModels;
 
         setIsGenerating(true);
@@ -245,13 +237,7 @@ export default function Responses({
         setMessages(prevMessages => {
             const currentMessages = Array.isArray(prevMessages) ? prevMessages : [];
             const newMessage = {
-                user: [
-                    { type: 'text', text: inputText },
-                    ...(selectedImage ? selectedImage.map(imageUrl => ({
-                        type: 'image_url',
-                        image_url: { url: imageUrl }
-                    })) : [])
-                ],
+                user: chatInput,
                 llm: modelsToUse.map((model, index) => ({
                     role: 'assistant',
                     model,
@@ -262,7 +248,7 @@ export default function Responses({
             };
             const newMessages = [...currentMessages, newMessage];
             newMessage.llm.forEach((response, index) => {
-                fetchChatResponse(response.model, newMessages.length - 1, index, newAbortControllers[index], inputText)
+                fetchChatResponse(response.model, newMessages.length - 1, index, newAbortControllers[index], chatInput)
                     .finally(() => {
                         setMessages(prevMessages => {
                             const updatedMessages = [...prevMessages];
@@ -283,8 +269,7 @@ export default function Responses({
             setStoredMessages(newMessages);
             return newMessages;
         });
-        setChatInput('');
-        setSelectedImage(null); // 送信後に選択された画���をリセット
+        setChatInput([]);
 
         setTimeout(() => setForceScroll(false), 100);
     };
@@ -327,13 +312,13 @@ export default function Responses({
     };
 
     const handleRegenerate = async (messageIndex: number, responseIndex: number, model: string) => {
-        const inputText = messages[messageIndex].user;
+        const inputContent = messages[messageIndex].user;
         const abortController = new AbortController();
         setAbortControllers([abortController]);
         setIsGenerating(true);
 
         try {
-            await fetchChatResponse(model, messageIndex, responseIndex, abortController, inputText);
+            await fetchChatResponse(model, messageIndex, responseIndex, abortController, inputContent);
             setMessages(prevMessages => {
                 setStoredMessages(prevMessages);
                 return prevMessages;
@@ -468,8 +453,8 @@ export default function Responses({
                         <div key={messageIndex} className="message-block" >
                             <MemoizedInputSection
                                 models={models}
-                                chatInput={message.user.map((u: { text: string }) => u.text).join('')}
-                                setChatInput={(newInput: string) => updateMessage(messageIndex, null, [{ type: 'text', text: newInput }])}
+                                chatInput={message.user}
+                                setChatInput={(newInput) => updateMessage(messageIndex, null, newInput)}
                                 handleSend={(event, isPrimaryOnly) => handleSendForInputSection(event, isPrimaryOnly, messageIndex)}
                                 selectedModels={selectedModels}
                                 setSelectedModels={setSelectedModels}
@@ -481,8 +466,6 @@ export default function Responses({
                                 isInitialScreen={false}
                                 handleReset={handleReset}
                                 handleStopAllGeneration={handleStopAllGeneration}
-                                setSelectedImage={setSelectedImage}
-                                selectedImage={selectedImage}
                             />
                             <div className="scroll_area">
                                 {Array.isArray(message.llm) && message.llm.map((response: { role: string, model: string, text: string, selected: boolean, isGenerating: boolean }, responseIndex: number) => (
@@ -548,8 +531,6 @@ export default function Responses({
                 isInitialScreen={messages.length === 0}
                 handleReset={handleReset}
                 handleStopAllGeneration={handleStopAllGeneration}
-                setSelectedImage={setSelectedImage}
-                selectedImage={selectedImage}
             />
         </>
     );
