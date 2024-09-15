@@ -23,7 +23,7 @@ marked.use(
 );
 
 export default function Home() {
-  const [models, setModels] = useStorageState<string[]>('models', ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'google/gemini-1.5-pro-exp-0801', 'cohere/command-r-plus', "perplexity/llama-3.1-sonar-large-128k-online", "meta-llama/llama-3.1-405b-instruct"]);
+  const [models, setModels] = useStorageState<string[]>('models', ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'cohere/command-r-plus']);
   const [demoModels] = useState<string[]>(['google/gemma-2-9b-it:free', "google/gemma-7b-it:free", "meta-llama/llama-3-8b-instruct:free", "openchat/openchat-7b:free"]);
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<any[]>([]);
@@ -101,7 +101,7 @@ export default function Home() {
         },
       },
     },
-    // 他のツールをここに追加
+    // 他のツール���ここに追加
   ]
   );
 
@@ -164,7 +164,7 @@ export default function Home() {
   useEffect(() => {
     if (storedMessages.length > 0) {
       try {
-        console.log('以前のメッ��ージを復元:', storedMessages);
+        console.log('以前のメッージを復元:', storedMessages);
         setMessages(storedMessages);
         setShowResetButton(true);
       } catch (error) {
@@ -175,7 +175,7 @@ export default function Home() {
 
   useEffect(() => {
     if (accessToken !== previousAccessToken) {
-      setModels(['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'google/gemini-1.5-pro-exp-0801', 'cohere/command-r-plus', "perplexity/llama-3.1-sonar-large-128k-online", "meta-llama/llama-3.1-405b-instruct"]);
+      setModels(['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5', 'cohere/command-r-plus']);
     }
   }, [accessToken, previousAccessToken, setModels]);
 
@@ -337,7 +337,7 @@ export default function Home() {
           }
 
           const markedResult = await marked(result.map(r => r.text).join(''));
-          updateMessage(messageIndex, responseIndex, result, undefined, false, false, false);
+          updateMessage(messageIndex, responseIndex, [{ type: 'text', text: markedResult }], undefined, false, false, false);
         }
 
         setIsAutoScroll(false);
