@@ -40,15 +40,11 @@ export default function Responses({
     const [abortControllers, setAbortControllers] = useState<AbortController[]>(
         []
     );
-    const [showResetButton, setShowResetButton] = useState(false);
     const [chatInput, setChatInput] = useState<
         { type: string; text?: string; image_url?: { url: string } }[]
     >([]);
     const [messages, setMessages] = useState<any[]>([]);
-    const [storedMessages, setStoredMessages] = useStorageState<any[]>(
-        "chatMessages",
-        []
-    );
+    const [storedMessages, setStoredMessages] = useStorageState<any[]>("chatMessages", []);
 
     const MemoizedInputSection = useMemo(() => React.memo(InputSection), []);
 
@@ -56,7 +52,6 @@ export default function Responses({
         if (storedMessages.length > 0) {
             console.log("以前のメッセージを復元:", storedMessages);
             setMessages(storedMessages);
-            setShowResetButton(true);
         }
     }, [storedMessages]);
 
@@ -311,7 +306,6 @@ export default function Responses({
                     })),
                 };
                 const newMessages = [...prevMessages, newMessage];
-                if (prevMessages.length === 0) setShowResetButton(true);
                 setStoredMessages(newMessages);
                 return newMessages;
             });
@@ -358,18 +352,6 @@ export default function Responses({
                 })),
             }))
         );
-    };
-
-    const handleReset = () => {
-        if (
-            window.confirm(
-                "チャット履歴をクリアしてもよろしいですか？この操作は元に戻せません。"
-            )
-        ) {
-            setMessages([]);
-            setStoredMessages([]);
-            setShowResetButton(false);
-        }
     };
 
     const handleStop = (messageIndex: number, responseIndex: number) => {
@@ -517,7 +499,6 @@ export default function Responses({
                                 handleSaveOnly={handleSaveOnly}
                                 mainInput={false}
                                 isInitialScreen={false}
-                                handleReset={handleReset}
                                 handleStopAllGeneration={handleStopAllGeneration}
                             />
                             <div className="scroll_area">
@@ -535,8 +516,8 @@ export default function Responses({
                                         <div
                                             key={responseIndex}
                                             className={`response ${response.role} ${hasSelectedResponse && !response.selected
-                                                    ? "unselected"
-                                                    : ""
+                                                ? "unselected"
+                                                : ""
                                                 }`}
                                         >
                                             <div className="meta">
@@ -643,7 +624,6 @@ export default function Responses({
                 handleResetAndRegenerate={() => { }}
                 handleSaveOnly={() => { }}
                 isInitialScreen={messages.length === 0}
-                handleReset={handleReset}
                 handleStopAllGeneration={handleStopAllGeneration}
             />
         </>

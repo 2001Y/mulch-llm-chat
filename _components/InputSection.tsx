@@ -15,7 +15,6 @@ interface InputSectionProps {
     handleResetAndRegenerate: (messageIndex: number) => void;
     handleSaveOnly: (messageIndex: number) => void;
     isInitialScreen: boolean;
-    handleReset: () => void;
     handleStopAllGeneration: () => void;
 }
 
@@ -32,7 +31,6 @@ export default function InputSection({
     handleResetAndRegenerate,
     handleSaveOnly,
     isInitialScreen,
-    handleReset,
     handleStopAllGeneration,
 }: InputSectionProps) {
     const [storedMessages] = useLocalStorage<any[]>('chatMessages', []);
@@ -48,21 +46,15 @@ export default function InputSection({
     const originalMessage = storedMessages[messageIndex]?.user || null;
 
     useEffect(() => {
-        if (mainInput) {
-            setChatInput([{ type: 'text', text: '' }]);
-        }
+        if (mainInput) setChatInput([{ type: 'text', text: '' }]);
     }, [mainInput, setChatInput]);
 
     useEffect(() => {
-        if (originalMessage) {
-            setIsEdited(JSON.stringify(chatInput) !== JSON.stringify(originalMessage));
-        }
+        if (originalMessage) setIsEdited(JSON.stringify(chatInput) !== JSON.stringify(originalMessage));
     }, [chatInput, originalMessage]);
 
     useEffect(() => {
-        if (inputRef.current && mainInput) {
-            inputRef.current.focus();
-        }
+        if (inputRef.current && mainInput) inputRef.current.focus();
     }, [mainInput]);
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -84,9 +76,6 @@ export default function InputSection({
             } else if (event.key === 'Backspace' && (event.metaKey || event.ctrlKey)) {
                 event.preventDefault();
                 handleStopAllGeneration();
-            } else if (event.key === 'n' && (event.metaKey || event.ctrlKey)) {
-                event.preventDefault();
-                handleReset();
             }
         }
     };
@@ -210,20 +199,6 @@ export default function InputSection({
                 } ${isEdited ? 'edited' : ''}`}
             ref={sectionRef}
         >
-            <div className="input-container input-actions">
-                <button
-                    onClick={handleReset}
-                    className={`action-button new-thread-button icon-button ${isInputEmpty() ? 'active' : ''}`}
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 5v14M5 12h14" />
-                    </svg>
-                    <span>
-                        New Thread<span className="shortcut">⌘N</span>
-                    </span>
-                </button>
-            </div>
-
             <div className="input-container chat-input-area">
                 {chatInput.slice(1).some(item => item.type === 'image_url') && (
                     <div className="image-previews">

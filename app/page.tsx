@@ -228,22 +228,6 @@ export default function Home() {
         {!isLoggedIn && <div className="free-version">Free Version</div>}
       </header>
       <Responses
-        // messages={messages}
-        // updateMessage={updateMessage}
-        // forceScroll={forceScroll}
-        // handleRegenerate={handleRegenerate}
-        // handleResetAndRegenerate={handleResetAndRegenerate}
-        // handleStop={handleStop}
-        // handleSend={handleSend}
-        // chatInput={chatInput}
-        // setChatInput={setChatInput}
-        // isGenerating={isGenerating}
-        // showResetButton={showResetButton}
-        // handleReset={handleReset}
-        // selectedImage={selectedImage}
-        // setSelectedImage={setSelectedImage}
-        // handleStopAllGeneration={handleStopAllGeneration}
-        // openModal={openModal}
         openai={openai}
         models={isLoggedIn ? models : demoModels}
         selectedModels={selectedModels}
