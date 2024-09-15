@@ -53,18 +53,37 @@ export default function Responses({
         }
     }, [storedMessages]);
 
-    const updateMessage = useCallback((messageIndex: number, responseIndex: number | null, content: { type: string, text?: string, image_url?: { url: string } }[] | undefined, selectedIndex?: number | undefined, toggleSelected?: boolean, saveOnly?: boolean, isEditing?: boolean) => {
+    const updateMessage = useCallback((
+        messageIndex: number,
+        responseIndex: number | null,
+        content?: { type: string, text?: string, image_url?: { url: string } }[] | ((prevState: { type: string, text?: string, image_url?: { url: string } }[]) => { type: string, text?: string, image_url?: { url: string } }[]),
+        selectedIndex?: number | undefined,
+        toggleSelected?: boolean,
+        saveOnly?: boolean,
+        isEditing?: boolean
+    ) => {
         setMessages(prevMessages => {
             const newMessages = JSON.parse(JSON.stringify(prevMessages));
             if (responseIndex === null) {
                 if (content !== undefined) {
-                    newMessages[messageIndex].user = content;
-                    const isEdited = JSON.stringify((storedMessages[messageIndex] as any)?.user) !== JSON.stringify(content);
+                    if (typeof content === 'function') {
+                        newMessages[messageIndex].user = content(newMessages[messageIndex].user);
+                    } else {
+                        newMessages[messageIndex].user = content;
+                    }
+                    const isEdited = JSON.stringify((storedMessages[messageIndex] as any)?.user) !== JSON.stringify(newMessages[messageIndex].user);
                     newMessages[messageIndex].edited = isEdited;
                 }
             } else if (newMessages[messageIndex]?.llm[responseIndex] !== undefined) {
                 if (content !== undefined) {
-                    newMessages[messageIndex].llm[responseIndex].text = content.map(c => c.text).join('');
+                    if (typeof content === 'function') {
+                        const updatedContent = content(newMessages[messageIndex].llm[responseIndex].text);
+                        newMessages[messageIndex].llm[responseIndex].text = Array.isArray(updatedContent)
+                            ? updatedContent.map((c: any) => c.text).join('')
+                            : updatedContent;
+                    } else if (Array.isArray(content)) {
+                        newMessages[messageIndex].llm[responseIndex].text = content.map((c: any) => c.text).join('');
+                    }
                 }
                 if (toggleSelected) {
                     const currentResponse = newMessages[messageIndex].llm[responseIndex];
@@ -435,7 +454,7 @@ export default function Responses({
     };
 
     const handleSelectResponse = useCallback((messageIndex: number, responseIndex: number) => {
-        updateMessage(messageIndex, responseIndex, undefined, undefined, true);
+        updateMessage(messageIndex, responseIndex, prevContent => prevContent, undefined, true);
     }, [updateMessage]);
 
     const handleSaveOnly = (messageIndex: number) => {

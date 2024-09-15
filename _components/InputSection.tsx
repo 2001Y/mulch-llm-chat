@@ -6,7 +6,7 @@ interface InputSectionProps {
     models: string[];
     mainInput: boolean;
     chatInput: { type: string, text?: string, image_url?: { url: string } }[];
-    setChatInput: (input: { type: string, text?: string, image_url?: { url: string } }[]) => void;
+    setChatInput: React.Dispatch<React.SetStateAction<{ type: string, text?: string, image_url?: { url: string } }[]>>;
     handleSend: (event: React.MouseEvent<HTMLButtonElement>, isPrimaryOnly: boolean) => void;
     selectedModels: string[];
     setSelectedModels: React.Dispatch<React.SetStateAction<string[]>>;
@@ -216,7 +216,6 @@ export default function InputSection({
                     textarea.style.overflowY = 'hidden';
                 }
             };
-            Z
             textarea.addEventListener('input', adjustHeight);
             window.addEventListener('resize', adjustHeight);
 
@@ -281,7 +280,7 @@ export default function InputSection({
                     onCompositionStart={() => setIsComposing(true)}
                     onCompositionEnd={(e) => {
                         setIsComposing(false);
-                        handleInputChange(e as React.ChangeEvent<HTMLTextAreaElement>);
+                        handleInputChange({ target: e.target } as React.ChangeEvent<HTMLTextAreaElement>);
                     }}
                     className="chat-input"
                     placeholder={isEditMode ? "Edit your message here..." : "Type your message here…"}
