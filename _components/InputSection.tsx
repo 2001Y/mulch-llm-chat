@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from "react";
 import useLocalStorage from "_hooks/useLocalStorage";
 import { toast } from 'sonner';
+import ModelSuggestions from './ModelSuggestions';
 
 interface InputSectionProps {
     models: string[];
@@ -16,6 +17,7 @@ interface InputSectionProps {
     handleSaveOnly: (messageIndex: number) => void;
     isInitialScreen: boolean;
     handleStopAllGeneration: () => void;
+    isGenerating: boolean;
 }
 
 export default function InputSection({
@@ -32,16 +34,15 @@ export default function InputSection({
     handleSaveOnly,
     isInitialScreen,
     handleStopAllGeneration,
+    isGenerating,
 }: InputSectionProps) {
     const [storedMessages] = useLocalStorage<any[]>('chatMessages', []);
     const [isComposing, setIsComposing] = useState(false);
-    const [showSuggestions, setShowSuggestions] = useState(false);
-    const [suggestionIndex, setSuggestionIndex] = useState(0);
-    const [filteredModels, setFilteredModels] = useState(models);
+    const [isEdited, setIsEdited] = useState(false);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const sectionRef = useRef<HTMLElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [isEdited, setIsEdited] = useState(false);
+    const [showSuggestions, setShowSuggestions] = useState(false);
 
     const originalMessage = storedMessages[messageIndex]?.user || null;
 
@@ -59,20 +60,13 @@ export default function InputSection({
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (document.body.dataset?.softwareKeyboard === 'false') {
-            if (event.key === 'Enter' && !event.shiftKey && !isComposing) {
+            if (event.key === 'Enter' && !event.shiftKey && !isComposing && !isGenerating) {
                 event.preventDefault();
-                isEditMode
-                    ? handleResetAndRegenerate(messageIndex)
-                    : handleSendAndResetInput(event as unknown as React.MouseEvent<HTMLButtonElement>, event.metaKey || event.ctrlKey);
-            } else if (showSuggestions && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
-                event.preventDefault();
-                setSuggestionIndex(prevIndex =>
-                    event.key === 'ArrowDown'
-                        ? Math.min(prevIndex + 1, filteredModels.length - 1)
-                        : Math.max(prevIndex - 1, 0)
-                );
-            } else if (event.key === 'Escape') {
-                setShowSuggestions(false);
+                if (!isInputEmpty()) {
+                    isEditMode
+                        ? handleResetAndRegenerate(messageIndex)
+                        : handleSendAndResetInput(event as unknown as React.MouseEvent<HTMLButtonElement>, event.metaKey || event.ctrlKey);
+                }
             } else if (event.key === 'Backspace' && (event.metaKey || event.ctrlKey)) {
                 event.preventDefault();
                 handleStopAllGeneration();
@@ -87,31 +81,12 @@ export default function InputSection({
             newInput[0] = { ...newInput[0], text };
             return newInput;
         });
-        updateSuggestions(text);
+        setShowSuggestions(/@[^@\s]*$/.test(text));
     };
 
-    const updateSuggestions = (text: string) => {
-        const mentionMatch = text.match(/@[^@]*$/);
-        if (mentionMatch) {
-            const searchText = mentionMatch[0].slice(1).toLowerCase();
-            if (!searchText.includes(' ') && searchText.length <= 15) {
-                const matchedModels = models.filter(model => model.toLowerCase().includes(searchText));
-                setFilteredModels(matchedModels);
-                setShowSuggestions(true);
-                setSelectedModels(matchedModels);
-                return;
-            }
-        }
-        setShowSuggestions(false);
-    };
-
-    const selectSuggestion = (index: number) => {
-        const selectedModel = filteredModels[index];
+    const selectSuggestion = (selectedModel: string) => {
         if (inputRef.current) {
             const text = inputRef.current.value.replace(/@[^@]*$/, `@${selectedModel.split('/')[1]} `);
-            inputRef.current.value = text;
-            setShowSuggestions(false);
-            setSuggestionIndex(0);
             setChatInput([{ type: 'text', text }]);
         }
     };
@@ -200,19 +175,46 @@ export default function InputSection({
             ref={sectionRef}
         >
             <div className="input-container chat-input-area">
-                {chatInput.slice(1).some(item => item.type === 'image_url') && (
-                    <div className="image-previews">
-                        {chatInput
-                            .slice(1)
-                            .filter(item => item.type === 'image_url')
-                            .map((image, idx) => (
-                                <div key={idx} className="image-preview">
-                                    <img src={image.image_url?.url} alt={`選択された画像 ${idx + 1}`} />
-                                    <button onClick={() => removeImage(idx + 1)}>×</button>
-                                </div>
-                            ))}
-                    </div>
-                )}
+                <div className="files-previews">
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="action-button add-files-button icon-button"
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        >
+                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                        </svg>
+                        <span>
+                            Add files
+                        </span>
+                    </button>
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleImageSelect}
+                        accept="image/png,image/jpeg,image/webp"
+                        style={{ display: 'none' }}
+                        multiple
+                    />
+                    {chatInput
+                        .slice(1)
+                        .filter(item => item.type === 'image_url')
+                        .map((image, idx) => (
+                            <div key={idx} className="image-preview">
+                                <img src={image.image_url?.url} alt={`選択された画像 ${idx + 1}`} />
+                                <button onClick={() => removeImage(idx + 1)}>×</button>
+                            </div>
+                        ))}
+                </div>
                 <textarea
                     ref={inputRef}
                     value={chatInput[0]?.text || ''}
@@ -228,41 +230,13 @@ export default function InputSection({
                     data-fieldsizing="content"
                 />
                 {showSuggestions && (
-                    <ul className="suggestions-list">
-                        {filteredModels.map((model, idx) => (
-                            <li
-                                key={model}
-                                className={idx === suggestionIndex ? 'active' : ''}
-                                onClick={() => selectSuggestion(idx)}
-                            >
-                                <input
-                                    type="radio"
-                                    id={`suggestion-${idx}`}
-                                    name="model-suggestion"
-                                    value={model}
-                                    checked={idx === suggestionIndex}
-                                    onChange={() => selectSuggestion(idx)}
-                                />
-                                <label htmlFor={`suggestion-${idx}`}>{model.split('/')[1]}</label>
-                            </li>
-                        ))}
-                    </ul>
+                    <ModelSuggestions
+                        inputValue={(chatInput[0]?.text?.match(/@([^@\s]*)$/) || [])[1] || ''}
+                        onSelectSuggestion={selectSuggestion}
+                        inputRef={inputRef}
+                        className={`${mainInput ? 'newInput' : 'existingInput'}`}
+                    />
                 )}
-                <button onClick={() => fileInputRef.current?.click()} className="image-select-button icon-button">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                        <circle cx="8.5" cy="8.5" r="1.5" />
-                        <polyline points="21 15 16 10 5 21" />
-                    </svg>
-                </button>
-                <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleImageSelect}
-                    accept="image/png,image/jpeg,image/webp"
-                    style={{ display: 'none' }}
-                    multiple
-                />
             </div>
 
             <div className="input-container model-select-area">
@@ -281,60 +255,83 @@ export default function InputSection({
             </div>
 
             <div className="input-container input-actions">
-                {isEditMode ? (
-                    <>
-                        <button
-                            onClick={() => handleResetAndRegenerate(messageIndex)}
-                            className="action-button reset-regenerate-button icon-button"
+                {isGenerating ? (
+                    <button
+                        onClick={handleStopAllGeneration}
+                        className="action-button stop-button icon-button"
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            stroke="none"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
-                            </svg>
-                            <span>
-                                Regenerate<span className="shortcut">⏎</span>
-                            </span>
-                        </button>
-                        <button
-                            onClick={() => handleSaveOnly(messageIndex)}
-                            className="action-button save-only-button icon-button"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                                <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                                <polyline points="7 3 7 8 15 8"></polyline>
-                            </svg>
-                            <span>Save</span>
-                        </button>
-                        <span className="line-break shortcut-area">
-                            Line break<span className="shortcut">⇧⏎</span>
+                            <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+                        </svg>
+                        <span>
+                            Stop<span className="shortcut">⌘⌫</span>
                         </span>
-                    </>
+                    </button>
+
                 ) : (
                     <>
-                        <button
-                            onClick={e => handleSendAndResetInput(e, false)}
-                            className={`action-button send-button icon-button ${!isInputEmpty() ? 'active' : ''}`}
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="22" y1="2" x2="11" y2="13"></line>
-                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                            </svg>
-                            <span>
-                                Send<span className="shortcut">⏎</span>
-                            </span>
-                        </button>
-                        <button
-                            onClick={e => handleSendAndResetInput(e, true)}
-                            className={`action-button send-primary-button icon-button ${!isInputEmpty() ? 'active' : ''}`}
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-                            </svg>
-                            <span>
-                                Send to <code>{selectedModels[0].split('/')[1]}</code>
-                                <span className="shortcut">⌘⏎</span>
-                            </span>
-                        </button>
+                        {isEditMode && isEdited ? (
+                            <>
+                                <button
+                                    onClick={() => handleResetAndRegenerate(messageIndex)}
+                                    className="action-button reset-regenerate-button icon-button"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
+                                    </svg>
+                                    <span>
+                                        ReGenerate<span className="shortcut">⏎</span>
+                                    </span>
+                                </button>
+                                <button
+                                    onClick={() => handleSaveOnly(messageIndex)}
+                                    className="action-button save-only-button icon-button"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                        <polyline points="7 3 7 8 15 8"></polyline>
+                                    </svg>
+                                    <span>Save Only</span>
+                                </button>
+                            </>
+                        ) : !isEditMode && (
+                            <>
+                                <button
+                                    onClick={e => handleSendAndResetInput(e, false)}
+                                    className={`action-button send-button icon-button ${!isInputEmpty() ? 'active' : ''}`}
+                                    disabled={isInputEmpty()}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                    </svg>
+                                    <span>
+                                        Send<span className="shortcut">⏎</span>
+                                    </span>
+                                </button>
+                                <button
+                                    onClick={e => handleSendAndResetInput(e, true)}
+                                    className={`action-button send-primary-button icon-button ${!isInputEmpty() ? 'active' : ''}`}
+                                    disabled={isInputEmpty()}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                                    </svg>
+                                    <span>
+                                        Send to <code>{selectedModels[0].split('/')[1]}</code>
+                                        <span className="shortcut">⌘⏎</span>
+                                    </span>
+                                </button>
+                            </>
+                        )}
                         <span className="line-break shortcut-area">
                             Line break<span className="shortcut">⇧⏎</span>
                         </span>

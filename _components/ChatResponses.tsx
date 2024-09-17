@@ -35,6 +35,7 @@ export default function Responses({
     toolFunctions: Record<string, (args: any) => any>;
 }) {
     const containerRef = useRef<HTMLDivElement>(null);
+    const [AllModels, setAllModels] = useState<{ fullId: string; shortId: string }[]>([]);
     const [isAutoScroll, setIsAutoScroll] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
     const [abortControllers, setAbortControllers] = useState<AbortController[]>(
@@ -54,6 +55,51 @@ export default function Responses({
             setMessages(storedMessages);
         }
     }, [storedMessages]);
+
+    useEffect(() => {
+        const fetchModels = async () => {
+            try {
+                const response = await fetch('https://openrouter.ai/api/v1/models');
+                const data = await response.json();
+                const modelIds = data.data.map((model: any) => ({
+                    fullId: model.id,
+                    shortId: model.id.split('/').pop()
+                }));
+                setAllModels(modelIds);
+            } catch (error) {
+                console.error('モデルリストの取得に失敗しました:', error);
+            }
+        };
+        fetchModels();
+    }, []);
+
+    const extractModelsFromInput = (inputContent: any): string[] => {
+        const textContent = inputContent
+            .filter((item: any) => item.type === 'text' && item.text)
+            .map((item: any) => item.text)
+            .join(' ');
+
+        const modelMatches = textContent.match(/@(\S+)/g) || [];
+        return modelMatches
+            .map((match: string) => match.slice(1)) // '@'を削除
+            .map((shortId: string) => {
+                const matchedModel = AllModels.find(model => model.shortId === shortId);
+                return matchedModel ? matchedModel.fullId : null;
+            })
+            .filter((model: string | null): model is string => model !== null); // nullを除外
+    };
+
+    const cleanInputContent = (inputContent: any): any => {
+        return inputContent.map((item: any) => {
+            if (item.type === 'text' && item.text) {
+                return {
+                    ...item,
+                    text: item.text.replace(/@\S+/g, '').trim(), // 全てのモデル指定を削除
+                };
+            }
+            return item;
+        }).filter((item: any) => item.text !== '');
+    };
 
     const updateMessage = useCallback(
         (
@@ -133,47 +179,65 @@ export default function Responses({
 
             try {
                 const pastMessages = messages.flatMap((msg) => {
-                    const userMessage = { role: "user", content: msg.user };
+                    const userContent = Array.isArray(msg.user)
+                        ? msg.user.filter((item: { type: string; text?: string; image_url?: { url: string } }) =>
+                            (item.type === 'text' && item.text?.trim()) ||
+                            (item.type === 'image_url' && item.image_url?.url)
+                        )
+                        : msg.user;
+
+                    const userMessage = userContent.length > 0
+                        ? { role: "user", content: userContent }
+                        : null;
+
                     const selectedResponses = msg.llm
                         .filter((llm: any) => llm.selected)
-                        .sort(
-                            (a: any, b: any) =>
-                                (a.selectedOrder || 0) - (b.selectedOrder || 0)
-                        );
-                    const responseMessages =
-                        selectedResponses.length > 0
-                            ? selectedResponses.map((llm: any) => ({
+                        .sort((a: any, b: any) => (a.selectedOrder || 0) - (b.selectedOrder || 0));
+
+                    const responseMessages = selectedResponses.length > 0
+                        ? selectedResponses.map((llm: any) => ({
+                            role: "assistant",
+                            content: llm.text?.trim() ? [{ type: "text", text: llm.text.trim() }] : [],
+                        }))
+                        : msg.llm.find((llm: any) => llm.model === model)?.text?.trim()
+                            ? [{
                                 role: "assistant",
-                                content: [{ type: "text", text: llm.text }],
-                            }))
-                            : [
-                                {
-                                    role: "assistant",
-                                    content: [
-                                        {
-                                            type: "text",
-                                            text:
-                                                msg.llm.find((llm: any) => llm.model === model)
-                                                    ?.text || "",
-                                        },
-                                    ],
-                                },
-                            ];
-                    return [userMessage, ...responseMessages];
-                });
+                                content: [{ type: "text", text: msg.llm.find((llm: any) => llm.model === model).text.trim() }],
+                            }]
+                            : [];
+
+                    return [userMessage, ...responseMessages].filter(Boolean);
+                }).filter(message => message.content && message.content.length > 0);
+
+                // inputContentのフィルタリング
+                const filteredInputContent = Array.isArray(inputContent)
+                    ? inputContent.filter(item =>
+                        (item.type === 'text' && item.text?.trim()) ||
+                        (item.type === 'image_url' && item.image_url?.url)
+                    )
+                    : inputContent;
+
+                if (filteredInputContent.length === 0) {
+                    console.error("Invalid input content");
+                    return;
+                }
 
                 let result: { type: string; text: string }[] = [];
                 let fc = { name: "", arguments: "" };
                 let functionCallExecuted = false;
 
+                // ユーザー入力からモデルを抽出
+                const specifiedModel = extractModelsFromInput(inputContent);
+                const modelToUse = specifiedModel.length > 0 ? specifiedModel[0] : model;
+
                 const stream = await openai?.chat.completions.create(
                     {
-                        model,
+                        model: modelToUse,
                         messages: [
                             ...pastMessages,
                             {
                                 role: "user",
-                                content: inputContent,
+                                content: filteredInputContent,
                             },
                         ],
                         stream: true,
@@ -230,7 +294,7 @@ export default function Responses({
                                     functionCallExecuted = true;
                                 }
                             } catch (error) {
-                                console.error("ファンクションコールの実行エラー:", error);
+                                console.error("ファンクションコーの実行エラー:", error);
                             }
                         }
 
@@ -278,7 +342,7 @@ export default function Responses({
                 });
             }
         },
-        [messages, openai, updateMessage, setStoredMessages, toolFunctions]
+        [messages, openai, updateMessage, setStoredMessages, toolFunctions, extractModelsFromInput]
     );
 
     const handleSend = useCallback(
@@ -288,12 +352,19 @@ export default function Responses({
         ) => {
             if (isGenerating) return;
 
-            const modelsToUse = isPrimaryOnly ? [selectedModels[0]] : selectedModels;
+            // ユーザー入力から複数のモデルを抽出
+            const specifiedModels = extractModelsFromInput(chatInput);
+            const modelsToUse = specifiedModels.length > 0
+                ? specifiedModels
+                : isPrimaryOnly
+                    ? [selectedModels[0]]
+                    : selectedModels;
 
             setIsGenerating(true);
             const newAbortControllers = modelsToUse.map(() => new AbortController());
             setAbortControllers(newAbortControllers);
 
+            // ユーザーのメッセージをそのまま保存
             setMessages((prevMessages) => {
                 const newMessage = {
                     user: chatInput,
@@ -310,13 +381,16 @@ export default function Responses({
                 return newMessages;
             });
 
+            // モデルに送信する際にのみ入力をクリーンアップ
+            const cleanedChatInput = cleanInputContent(chatInput);
+
             modelsToUse.forEach((model, index) => {
                 fetchChatResponse(
                     model,
                     messages.length,
                     index,
                     newAbortControllers[index],
-                    chatInput
+                    cleanedChatInput
                 );
             });
 
@@ -331,6 +405,7 @@ export default function Responses({
             fetchChatResponse,
             messages.length,
             setStoredMessages,
+            AllModels,
         ]
     );
 
@@ -372,17 +447,25 @@ export default function Responses({
         model: string
     ) => {
         const inputContent = messages[messageIndex].user;
+
+        // ユーザー入力からモデルを抽出
+        const specifiedModels = extractModelsFromInput(inputContent);
+        const modelToUse = specifiedModels.length > 0 ? specifiedModels[0] : model;
+
+        // モデルに送信する際にのみクリーンアップ
+        const cleanedInputContent = cleanInputContent(inputContent);
+
         const abortController = new AbortController();
         setAbortControllers([abortController]);
         setIsGenerating(true);
 
         try {
             await fetchChatResponse(
-                model,
+                modelToUse,
                 messageIndex,
                 responseIndex,
                 abortController,
-                inputContent
+                cleanedInputContent
             );
         } finally {
             setIsGenerating(false);
@@ -392,8 +475,18 @@ export default function Responses({
     const handleResetAndRegenerate = async (messageIndex: number) => {
         setIsGenerating(true);
         const userMessage = messages[messageIndex].user;
+
+        // ユーザー入力からモデルを抽出
+        const specifiedModels = extractModelsFromInput(userMessage);
+        const modelsToUse = specifiedModels.length > 0
+            ? specifiedModels
+            : selectedModels;
+
+        // モデルに送信する際にのみクリーンアップ
+        const cleanedUserMessage = cleanInputContent(userMessage);
+
         const newMessages = [...messages].slice(0, messageIndex + 1);
-        newMessages[messageIndex].llm = selectedModels.map((model) => ({
+        newMessages[messageIndex].llm = modelsToUse.map((model) => ({
             role: "assistant",
             model,
             text: "",
@@ -402,16 +495,16 @@ export default function Responses({
 
         setMessages(newMessages);
 
-        const newAbortControllers = selectedModels.map(() => new AbortController());
+        const newAbortControllers = modelsToUse.map(() => new AbortController());
         setAbortControllers(newAbortControllers);
 
-        selectedModels.forEach((model, index) => {
+        modelsToUse.forEach((model, index) => {
             fetchChatResponse(
                 model,
                 messageIndex,
                 index,
                 newAbortControllers[index],
-                userMessage
+                cleanedUserMessage
             );
         });
 
@@ -500,6 +593,7 @@ export default function Responses({
                                 mainInput={false}
                                 isInitialScreen={false}
                                 handleStopAllGeneration={handleStopAllGeneration}
+                                isGenerating={isGenerating}
                             />
                             <div className="scroll_area">
                                 {message.llm.map(
@@ -625,6 +719,7 @@ export default function Responses({
                 handleSaveOnly={() => { }}
                 isInitialScreen={messages.length === 0}
                 handleStopAllGeneration={handleStopAllGeneration}
+                isGenerating={isGenerating}
             />
         </>
     );

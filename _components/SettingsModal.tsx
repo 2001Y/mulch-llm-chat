@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import ModelSuggestions from './ModelSuggestions';
 
 interface ModelInputModalProps {
     models: string[];
@@ -34,9 +35,12 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
     const [editingToolFunction, setEditingToolFunction] = useState('');
     const [suggestions, setSuggestions] = useState<OpenRouterModel[]>([]);
     const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number>(-1);
+    const [isFocused, setIsFocused] = useState(false);
 
     const dragItem = useRef<number | null>(null);
     const dragOverItem = useRef<number | null>(null);
+
+    const newModelInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (newModel.length > 0) {
@@ -56,17 +60,6 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
             setSuggestions(filteredModels);
         } catch (error) {
             console.error('モデルの取得に失敗しました:', error);
-        }
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'ArrowDown') {
-            setActiveSuggestionIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : prev));
-        } else if (e.key === 'ArrowUp') {
-            setActiveSuggestionIndex(prev => (prev > 0 ? prev - 1 : -1));
-        } else if (e.key === 'Enter' && activeSuggestionIndex !== -1) {
-            e.preventDefault();
-            handleSelectSuggestion(suggestions[activeSuggestionIndex].id);
         }
     };
 
@@ -163,7 +156,7 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
 
                 // ツール定義の構造を検証
                 if (!parsedTool.type || !parsedTool.function || !parsedTool.function.name || !parsedTool.function.description || !parsedTool.function.parameters) {
-                    throw new Error("ツール定義の構造が不正です。");
+                    throw new Error("ツール義の構造が不正です。");
                 }
 
                 let parsedFunction;
@@ -243,6 +236,13 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
         }
     };
 
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            handleAddModel();
+        }
+    };
+
     if (!isModalOpen) return null;
 
     return (
@@ -318,26 +318,24 @@ export default function ModelInputModal({ models, setModels, isModalOpen, closeM
                 </ul>
                 <form onSubmit={handleSubmit} className="input-area">
                     <input
+                        ref={newModelInputRef}
                         type="text"
                         value={newModel}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewModel(e.target.value)}
                         onKeyDown={handleKeyDown}
+                        onFocus={() => setIsFocused(true)}
+                        onBlur={() => setIsFocused(false)}
                         placeholder="New models added"
                         className="model-input"
                     />
                     <button type="submit" className="add-button">追加</button>
-                    {suggestions.length > 1 && (
-                        <ul className="suggestions-list">
-                            {suggestions.map((suggestion, index) => (
-                                <li
-                                    key={suggestion.id}
-                                    className={index === activeSuggestionIndex ? 'active' : ''}
-                                    onClick={() => handleSelectSuggestion(suggestion.id)}
-                                >
-                                    {suggestion.id}
-                                </li>
-                            ))}
-                        </ul>
+                    {isFocused && (
+                        <ModelSuggestions
+                            inputValue={newModel}
+                            onSelectSuggestion={handleSelectSuggestion}
+                            inputRef={newModelInputRef}
+                            className="settings-modal-suggestions"
+                        />
                     )}
                 </form>
                 <h2>Function Calls</h2>
