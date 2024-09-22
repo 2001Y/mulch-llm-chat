@@ -246,7 +246,7 @@ export function useChatLogic() {
             });
 
             try {
-                // 過去のメッセージを取得
+                // 過去のメッセージを取得し、null値を除外
                 const pastMessages = messages.flatMap((msg) => {
                     const userContent = Array.isArray(msg.user)
                         ? msg.user.filter(
@@ -257,7 +257,7 @@ export function useChatLogic() {
                         : msg.user;
 
                     const userMessage = userContent.length > 0
-                        ? { role: 'user', content: userContent }
+                        ? { role: 'user' as const, content: userContent }
                         : null;
 
                     const selectedResponses = msg.llm
@@ -267,16 +267,14 @@ export function useChatLogic() {
                                 (a.selectedOrder || 0) - (b.selectedOrder || 0)
                         );
 
-                    const responseMessages = selectedResponses.length > 0
-                        ? selectedResponses.map((llm: any) => ({
-                            role: 'assistant',
-                            content: llm.text?.trim()
-                                ? [{ type: 'text', text: llm.text.trim() }]
-                                : [],
-                        }))
-                        : [];
+                    const responseMessages = selectedResponses
+                        .filter((llm: any) => llm.text?.trim())
+                        .map((llm: any) => ({
+                            role: 'assistant' as const,
+                            content: llm.text.trim(),
+                        }));
 
-                    return [userMessage, ...responseMessages].filter(Boolean);
+                    return [userMessage, ...responseMessages].filter((message) => message !== null);
                 });
 
                 // ユーザー入力からモデルを抽出
@@ -292,8 +290,10 @@ export function useChatLogic() {
                         messages: [
                             ...pastMessages,
                             {
-                                role: 'user',
-                                content: cleanedInputContent,
+                                role: 'user' as const,
+                                content: Array.isArray(cleanedInputContent)
+                                    ? cleanedInputContent.map(item => item.text).join('\n')
+                                    : cleanedInputContent,
                             },
                         ],
                         stream: true,
@@ -401,7 +401,7 @@ export function useChatLogic() {
         }
     }, []);
 
-    // 自動スクロー��
+    // 自動スクロー
     useEffect(() => {
         if (isAutoScroll && containerRef.current) {
             const container = containerRef.current;
