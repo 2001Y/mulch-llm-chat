@@ -10,6 +10,7 @@ import useStorageState from "_hooks/useLocalStorage";
 import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
+import { useParams } from 'next/navigation';
 
 marked.use(
     markedHighlight({
@@ -34,6 +35,9 @@ export default function Responses({
     setSelectedModels: React.Dispatch<React.SetStateAction<string[]>>;
     toolFunctions: Record<string, (args: any) => any>;
 }) {
+    const params = useParams();
+    const roomId = params.id as string;
+
     const containerRef = useRef<HTMLDivElement>(null);
     const [AllModels, setAllModels] = useState<{ fullId: string; shortId: string }[]>([]);
     const [isAutoScroll, setIsAutoScroll] = useState(true);
@@ -45,16 +49,57 @@ export default function Responses({
         { type: string; text?: string; image_url?: { url: string } }[]
     >([]);
     const [messages, setMessages] = useState<any[]>([]);
-    const [storedMessages, setStoredMessages] = useStorageState<any[]>("chatMessages", []);
+    const [storedMessages, setStoredMessages] = useStorageState<any[]>(`chatMessages_${roomId}`, []);
+    const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
     const MemoizedInputSection = useMemo(() => React.memo(InputSection), []);
 
+    // メッセージを復元するuseEffect
     useEffect(() => {
-        if (storedMessages.length > 0) {
-            console.log("以前のメッセージを復元:", storedMessages);
+        if (storedMessages.length > 0 && !initialLoadComplete) {
+            console.log(`ルーム ${roomId} の以前のメッセージを復元:`, storedMessages);
             setMessages(storedMessages);
+            setInitialLoadComplete(true);
         }
-    }, [storedMessages]);
+    }, [storedMessages, roomId, initialLoadComplete]);
+
+    // 未完了の生成を再開するuseEffect
+    useEffect(() => {
+        if (!initialLoadComplete) return;
+
+        let hasUnfinishedGeneration = false;
+        messages.forEach((message, messageIndex) => {
+            message.llm.forEach(
+                (
+                    response: { isGenerating: boolean; text: string; model: string },
+                    responseIndex: number
+                ) => {
+                    if (response.isGenerating && !response.text) {
+                        hasUnfinishedGeneration = true;
+                        const abortController = new AbortController();
+                        setAbortControllers((prevControllers) => {
+                            const newControllers = [...prevControllers];
+                            newControllers[responseIndex] = abortController;
+                            return newControllers;
+                        });
+                        fetchChatResponse(
+                            response.model,
+                            messageIndex,
+                            responseIndex,
+                            abortController,
+                            cleanInputContent(message.user)
+                        );
+                    }
+                }
+            );
+        });
+
+        if (hasUnfinishedGeneration) {
+            setIsGenerating(true);
+        }
+
+        // 初回のみ実行されるようにするため、依存配列を空に
+    }, [initialLoadComplete]);
 
     useEffect(() => {
         const fetchModels = async () => {
@@ -160,7 +205,7 @@ export default function Responses({
                 return newMessages;
             });
         },
-        [setMessages, setStoredMessages, storedMessages]
+        [setMessages, setStoredMessages, storedMessages, roomId]
     );
 
     const fetchChatResponse = useCallback(

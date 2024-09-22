@@ -1,7 +1,6 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/react'
-import '@/styles/globals.scss'
 import { ManifestLink } from '_components/ManifestLink'
 import { Toaster } from 'sonner';
 

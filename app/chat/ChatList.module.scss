@@ -1,0 +1,86 @@
+$body-padding: max(1em, 2vmax);
+$height_header: 4.5em;
+$border-radius: 15px;
+$bg_body: #000;
+$accent-color: #C02020;
+$shadow: 0 0 .5em rgba(0, 0, 0, 1);
+
+.chatList {
+    width: 100vw;
+    min-height: 100svh;
+    height: 100svh;
+    max-height: 100svh;
+    padding: calc($height_header * 2 + env(safe-area-inset-top)) $body-padding $body-padding;
+    overflow-y: auto;
+    color: #fff;
+    background: $bg_body;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+    h1 {
+        font-size: 2em;
+        margin-bottom: 1em;
+        font-family: "Glegoo", serif;
+        font-weight: 700;
+        text-shadow: $shadow;
+    }
+
+    ul {
+        max-width: 35em;
+        list-style-type: none;
+        padding: 0;
+        margin: auto;
+        /* リストの余白をリセット */
+
+        li {
+            margin-bottom: 1em;
+            /* 各リスト項目の間隔を調整 */
+        }
+    }
+
+    a {
+        text-decoration: none;
+        /* リンクの下線を除去 */
+        color: inherit;
+        /* 親要素の色を継承 */
+    }
+
+    .chatItem {
+        background: rgba(250, 250, 250, .1);
+        border-radius: $border-radius;
+        padding: 1em;
+        margin-bottom: 1em;
+        transition: background-color 0.3s, transform 0.3s;
+        cursor: pointer;
+        box-shadow: $shadow;
+
+        &:hover {
+            background-color: rgba(250, 250, 250, .15);
+            transform: translateY(-2px);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            margin: 0 0 0.5em 0;
+            color: #fff;
+        }
+
+        p {
+            margin: 0 0 0.5em 0;
+            color: rgba(255, 255, 255, 0.7);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        small {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.8em;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    .chatList {
+        color-scheme: dark;
+    }
+}
