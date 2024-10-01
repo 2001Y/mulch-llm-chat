@@ -378,6 +378,8 @@ export default function Responses({
               }
             }
 
+            // 'markedResult'の生成と'setMessages'の更新を修正
+            /* 修正前
             const markedResult = await marked(
               result.map((r) => r.text).join("")
             );
@@ -388,6 +390,10 @@ export default function Responses({
               false,
               false
             );
+            */
+
+            // 修正後: 'marked'を使用せずに生のテキストを保存
+            updateMessage(messageIndex, responseIndex, result, false, false);
           }
           setIsAutoScroll(false);
         } else {
@@ -788,7 +794,9 @@ export default function Responses({
                             (e.target as HTMLDivElement).innerHTML
                           )
                         }
-                        dangerouslySetInnerHTML={{ __html: response.text }}
+                        dangerouslySetInnerHTML={{
+                          __html: marked(response.text),
+                        }}
                       />
                     </div>
                   )
