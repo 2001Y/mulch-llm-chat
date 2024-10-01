@@ -11,6 +11,7 @@ import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
 import { useParams } from "next/navigation";
+import TurndownService from "turndown";
 
 marked.use(
   markedHighlight({
@@ -462,7 +463,7 @@ export default function Responses({
       const newAbortControllers = modelsToUse.map(() => new AbortController());
       setAbortControllers(newAbortControllers);
 
-      // ユーザーのメッセージをそのまま保存
+      // ユーザーのメッセージをそ���まま保存
       setMessages((prevMessages) => {
         const newMessage = {
           user: chatInput,
@@ -613,7 +614,9 @@ export default function Responses({
     responseIndex: number | null,
     newContent: string
   ) => {
-    const newText = [{ type: "text", text: newContent }];
+    const turndownService = new TurndownService();
+    const markdownContent = turndownService.turndown(newContent);
+    const newText = [{ type: "text", text: markdownContent }];
     updateMessage(messageIndex, responseIndex, newText);
   };
 
