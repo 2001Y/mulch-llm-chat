@@ -308,8 +308,8 @@ export default function ChatListPage() {
             <li key={chat.id}>
               <Link href={`/chat/${chat.id}`}>
                 <div className={styles.chatItem}>
-                  <h3>{chat.title}</h3>
-                  <p>{chat.lastMessage}</p>
+                  <h3>{chat.lastMessage}</h3>
+                  <p>{chat.title}</p>
                   <small>{new Date(chat.timestamp).toLocaleString()}</small>
                   <button
                     className={styles.moreButton}

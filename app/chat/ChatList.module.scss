@@ -10,8 +10,8 @@ $shadow: 0 0 0.5em rgba(0, 0, 0, 1);
   min-height: 100svh;
   height: 100svh;
   max-height: 100svh;
-  padding: calc($height_header * 2 + env(safe-area-inset-top)) $body-padding
-    $body-padding;
+  padding: calc($height_header * 2) $body-padding;
+  padding-bottom: 15rem;
   overflow-y: auto;
   color: #fff;
   background: $bg_body;
@@ -64,6 +64,11 @@ $shadow: 0 0 0.5em rgba(0, 0, 0, 1);
       font-size: 1.2em;
       margin: 0 0 0.5em 0;
       color: #fff;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 1; /* 省略する行数 */
+      -webkit-box-orient: vertical;
     }
 
     p {
