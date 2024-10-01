@@ -1,4 +1,4 @@
-@import '~highlight.js/styles/github-dark.css';
+@import "~highlight.js/styles/github-dark.css";
 
 // SCSS変数宣言
 $body-padding: max(1em, 2vmax);
@@ -6,9 +6,9 @@ $height_header: 4.5em;
 $border-radius: 15px;
 $bg_body: #000;
 $padding: $body-padding;
-$shadow: 0 0 .5em rgba(0, 0, 0, 1);
+$shadow: 0 0 0.5em rgba(0, 0, 0, 1);
 $modal-button_height: 2em;
-$accent-color: #C02020;
+$accent-color: #c02020;
 
 @media (prefers-color-scheme: dark) {
   $bg_body: #000;
@@ -36,7 +36,9 @@ body {
   overflow: hidden;
   font-size: 14px;
   overscroll-behavior-inline: contain;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol";
   color: #fff;
   background: $bg_body;
 }
@@ -58,11 +60,23 @@ html {
   text-size-adjust: 100%;
 }
 
-:where(button, [type='button'], [type='reset'], [type='submit']) {
+:where(button, [type="button"], [type="reset"], [type="submit"]) {
   touch-action: manipulation;
 }
 
-:where(:any-link, button, [type='button'], [type='reset'], [type='submit'], label[for], select, summary, [role='tab'], [role='button'], [type='checkbox']) {
+:where(
+    :any-link,
+    button,
+    [type="button"],
+    [type="reset"],
+    [type="submit"],
+    label[for],
+    select,
+    summary,
+    [role="tab"],
+    [role="button"],
+    [type="checkbox"]
+  ) {
   cursor: pointer;
 }
 
@@ -79,8 +93,8 @@ html {
 }
 
 .shortcut {
-  margin-left: .5em;
-  opacity: .5;
+  margin-left: 0.5em;
+  opacity: 0.5;
   display: inline-flex;
   align-items: center;
 
@@ -104,7 +118,7 @@ header {
   z-index: 1;
 
   &::after {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
@@ -126,14 +140,14 @@ header {
 
     h1 {
       font-size: 1.5em;
-      line-height: .75em;
+      line-height: 0.75em;
       font-family: "Glegoo", serif;
       font-weight: 700;
       text-shadow: $shadow;
 
       small {
-        font-size: .5em;
-        line-height: .5em;
+        font-size: 0.5em;
+        line-height: 0.5em;
         color: mix(#fff, #000, 45%);
       }
     }
@@ -143,7 +157,7 @@ header {
     font-size: 1.3em;
     color: $accent-color;
     border: 2px solid $accent-color;
-    background: rgba(#000, .5);
+    background: rgba(#000, 0.5);
     padding: 2px 5px;
     border-radius: 4px;
     position: fixed;
@@ -151,7 +165,7 @@ header {
     left: calc($body-padding + 13rem);
 
     @media (max-width: 600px) {
-      font-size: .8em;
+      font-size: 0.8em;
       top: calc($height_header + 1.5em);
       left: auto;
       right: $body-padding;
@@ -161,11 +175,11 @@ header {
 
   .header-side {
     height: 100%;
-    padding: .5rem 0;
+    padding: 0.5rem 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: .5em;
+    gap: 0.5em;
 
     .login {
       background-color: $accent-color;
@@ -220,7 +234,6 @@ header {
   font-size: 16px;
 }
 
-
 $image-preview-size: 100px;
 $image-preview-gap: 10px;
 
@@ -234,14 +247,14 @@ $image-preview-gap: 10px;
   // padding-bottom: calc(env(safe-area-inset-bottom) + $body-padding);
   display: flex;
   flex-direction: column;
-  gap: .5em;
+  gap: 0.5em;
   overflow: visible;
   font-size: 0.8rem;
   margin: 0 auto;
   // font-size: 15px;
 
   &:first-of-type {
-    transition: .5s transform;
+    transition: 0.5s transform;
   }
 
   &.initial-screen {
@@ -267,7 +280,7 @@ $image-preview-gap: 10px;
       backdrop-filter: blur($blur-intensity);
       display: flex;
       align-items: center;
-      gap: .5em;
+      gap: 0.5em;
       border-radius: $border-radius;
       white-space: nowrap;
       overflow: hidden;
@@ -275,7 +288,7 @@ $image-preview-gap: 10px;
       box-shadow: $shadow;
 
       &::after {
-        content: '△';
+        content: "△";
       }
     }
 
@@ -292,7 +305,7 @@ $image-preview-gap: 10px;
     &.model-select-area {
       color: mix(#fff, #000, 70%);
       // display: flex;
-      gap: .5em;
+      gap: 0.5em;
       // width: 100vw;
       // margin: 0 calc(50% - 50vw);
       // padding: 0 calc(50vw - 50%);
@@ -334,7 +347,7 @@ $image-preview-gap: 10px;
           min-width: fit-content;
           display: flex;
           align-items: center;
-          padding: .6em;
+          padding: 0.6em;
           background: rgba(mix(#fff, #000, 10%), $background-opacity);
           backdrop-filter: blur($blur-intensity);
           border-radius: $border-radius;
@@ -352,7 +365,7 @@ $image-preview-gap: 10px;
           }
         }
 
-        input:checked+label {
+        input:checked + label {
           &::before {
             content: "✔︎";
             margin-right: 0.5em;
@@ -368,7 +381,10 @@ $image-preview-gap: 10px;
     }
 
     &.chat-input-area {
-      $maxHeight: calc(100svh - $height_header - $modal-button_height - $body-padding * 3 - env(safe-area-inset-top));
+      $maxHeight: calc(
+        100svh - $height_header - $modal-button_height - $body-padding * 3 -
+          env(safe-area-inset-top)
+      );
       max-height: $maxHeight;
       max-width: 100%;
       background: rgba(mix(#fff, #000, 10%), $background-opacity);
@@ -398,9 +414,9 @@ $image-preview-gap: 10px;
         height: 10vmin;
         max-height: 40px;
         aspect-ratio: 1/1;
-        margin: .5em;
+        margin: 0.5em;
         background: mix(#fff, $accent-color, 10%);
-        border-radius: calc($border-radius - .25em);
+        border-radius: calc($border-radius - 0.25em);
       }
 
       .files-previews {
@@ -414,7 +430,7 @@ $image-preview-gap: 10px;
         padding-right: 1em;
 
         &::after {
-          content: '';
+          content: "";
           display: block;
           width: 100%;
           height: 2rem;
@@ -426,7 +442,6 @@ $image-preview-gap: 10px;
           transform: translateY(-50%);
           z-index: -1;
         }
-
       }
 
       .image-preview {
@@ -477,21 +492,20 @@ $image-preview-gap: 10px;
     gap: 0.5em;
   }
 
-
   $button-icon-size: 1.2em;
   $button-padding-vertical: 0.5em;
   $button-padding-horizontal: 0.9em;
 
   code {
     font-family: monospace;
-    padding: 0 .1em;
+    padding: 0 0.1em;
     font-size: 0.9em;
-    opacity: .8;
+    opacity: 0.8;
 
     &:before,
     &:after {
       content: '"';
-      opacity: .5;
+      opacity: 0.5;
     }
   }
 
@@ -506,7 +520,7 @@ $image-preview-gap: 10px;
   }
 
   .shortcut-area {
-    opacity: .5;
+    opacity: 0.5;
 
     &.line-break {
       display: flex;
@@ -528,15 +542,17 @@ $image-preview-gap: 10px;
       color: #fff;
     }
 
-    >svg {
+    > svg {
       width: $button-icon-size;
       height: $button-icon-size;
     }
 
     &.icon-button {
-      padding-left: calc($button-icon-size + $button-padding-horizontal * 2 * 0.9);
+      padding-left: calc(
+        $button-icon-size + $button-padding-horizontal * 2 * 0.9
+      );
 
-      >svg {
+      > svg {
         position: absolute;
         left: $button-padding-horizontal;
         top: 50%;
@@ -550,7 +566,10 @@ $image-preview-gap: 10px;
       transition: background-color 0.3s, border-color 0.3s, color 0.3s;
 
       &.active {
-        background-color: rgba(mix($bg_body, #00ff00, 80%), $background-opacity);
+        background-color: rgba(
+          mix($bg_body, #00ff00, 80%),
+          $background-opacity
+        );
         backdrop-filter: blur($blur-intensity);
         border: 1px solid mix($bg_body, #00ff00, 60%);
         color: #00ff00;
@@ -614,14 +633,14 @@ $image-preview-gap: 10px;
     padding: $padding 0;
     pointer-events: none;
 
-    >*>* {
+    > * > * {
       pointer-events: auto;
     }
 
     overflow: visible;
 
     &::before {
-      content: '';
+      content: "";
       position: absolute;
       $blur-width: 200%;
       $blur-height: 200%;
@@ -629,15 +648,19 @@ $image-preview-gap: 10px;
       left: calc((100% - #{$blur-width}) / 2);
       width: $blur-width;
       height: $blur-height;
-      background: rgba($bg_body, .85);
+      background: rgba($bg_body, 0.85);
       backdrop-filter: blur(10px);
-      mask: radial-gradient(ellipse at bottom, #000 40%, transparent, transparent);
+      mask: radial-gradient(
+        ellipse at bottom,
+        #000 40%,
+        transparent,
+        transparent
+      );
       z-index: -1;
     }
   }
 
   &.full-input {
-
     .input-actions,
     .model-select-area {
       display: flex;
@@ -671,12 +694,10 @@ $image-preview-gap: 10px;
   }
 
   &.focused {
-
     .input-actions,
     .model-select-area {
       display: flex;
     }
-
   }
 }
 
@@ -741,7 +762,7 @@ $image-preview-gap: 10px;
 
   .message-block {
     width: 100%;
-    transition: .3s transform;
+    transition: 0.3s transform;
     transform: translateY(0);
 
     &:last-of-type {
@@ -750,7 +771,10 @@ $image-preview-gap: 10px;
       // min-height: calc(100svh - $height_header*1.5);
 
       .scroll_area {
-        min-height: calc(100svh - $height_header*1.5 - calc($height_header * 2 + env(safe-area-inset-top)));
+        min-height: calc(
+          100svh - $height_header * 1.5 -
+            calc($height_header * 2 + env(safe-area-inset-top))
+        );
         padding-bottom: calc($height_header * 4 + env(safe-area-inset-bottom));
         overflow-y: hidden;
       }
@@ -807,13 +831,15 @@ $image-preview-gap: 10px;
           }
 
           &.icon-button {
-            padding-left: calc($button-icon-size + $button-padding-horizontal * 2 * 0.9);
+            padding-left: calc(
+              $button-icon-size + $button-padding-horizontal * 2 * 0.9
+            );
           }
 
           .shortcut {
             display: none;
-            margin-left: .5em;
-            opacity: .5;
+            margin-left: 0.5em;
+            opacity: 0.5;
           }
         }
       }
@@ -821,7 +847,7 @@ $image-preview-gap: 10px;
       &.editing {
         p {
           outline: none;
-          background-color: rgba(255, 255, 255, .2);
+          background-color: rgba(255, 255, 255, 0.2);
           border-radius: 4px;
           padding: 8px;
         }
@@ -855,19 +881,19 @@ $image-preview-gap: 10px;
     overflow-x: auto;
     overflow-y: hidden;
     transition: max-height 0.3s ease;
-    gap: calc($body-padding * .7);
+    gap: calc($body-padding * 0.7);
     padding: 1em 2em 2em $body-padding;
     cursor: pointer;
 
     .response {
       width: calc(100vw - $body-padding);
       min-width: 22em;
-      background: rgba(250, 250, 250, .1);
+      background: rgba(250, 250, 250, 0.1);
       padding: 1em;
       border-radius: calc($border-radius / 5);
       display: flex;
       flex-direction: column;
-      gap: .5em;
+      gap: 0.5em;
       cursor: auto;
 
       &.reply {
@@ -879,10 +905,10 @@ $image-preview-gap: 10px;
       }
 
       &.unselected {
-        background-color: rgba(250, 250, 250, .05);
+        background-color: rgba(250, 250, 250, 0.05);
 
         .markdown-content {
-          opacity: .3;
+          opacity: 0.3;
 
           pre {
             code {
@@ -898,7 +924,7 @@ $image-preview-gap: 10px;
       }
 
       .meta {
-        font-size: .8em;
+        font-size: 0.8em;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -924,7 +950,6 @@ $image-preview-gap: 10px;
               animation: bounce 0.5s ease-in-out;
 
               @keyframes bounce {
-
                 0%,
                 100% {
                   transform: translateY(0);
@@ -981,7 +1006,7 @@ $image-preview-gap: 10px;
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 
       &::before {
-        content: '';
+        content: "";
         display: inline-block;
         width: 0.8em;
         height: 0.8em;
@@ -1032,7 +1057,7 @@ $image-preview-gap: 10px;
   h2 {
     font-size: 1.5em;
     margin-top: 1em;
-    margin-bottom: .3em;
+    margin-bottom: 0.3em;
     font-family: "Glegoo", serif;
     font-weight: 700;
     color: #fff;
@@ -1056,7 +1081,6 @@ $image-preview-gap: 10px;
 
   .tool-input-area,
   .function-call-list {
-
     textarea {
       min-width: 100%;
       min-height: 20em;
@@ -1070,7 +1094,7 @@ $image-preview-gap: 10px;
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: .05em;
+    gap: 0.05em;
     overflow-y: auto;
 
     &:empty {
@@ -1078,7 +1102,6 @@ $image-preview-gap: 10px;
     }
 
     &.model-list {
-
       .insert-line {
         height: 2px;
         background-color: $accent-color;
@@ -1098,9 +1121,9 @@ $image-preview-gap: 10px;
         }
 
         &::before {
-          content: '≡';
+          content: "≡";
           font-size: 1.2em;
-          opacity: .5;
+          opacity: 0.5;
           margin-right: 0.5em;
           cursor: grab;
           display: flex;
@@ -1228,14 +1251,14 @@ $image-preview-gap: 10px;
       flex-direction: column;
       gap: 1em;
 
-      >* {
+      > * {
         display: block;
       }
 
       .tool-edit-buttons {
         display: flex;
         justify-content: flex-end;
-        gap: .5em;
+        gap: 0.5em;
       }
     }
 
@@ -1275,7 +1298,6 @@ $image-preview-gap: 10px;
   }
 }
 
-
 .function-input-area {
   background: rgba(255, 255, 255, 0.05);
   border-radius: $border-radius;
@@ -1306,7 +1328,6 @@ $image-preview-gap: 10px;
     min-height: 100px;
     resize: vertical;
   }
-
 }
 
 .input-area {
@@ -1347,7 +1368,6 @@ $image-preview-gap: 10px;
     }
   }
 }
-
 
 .model-input,
 .tool-input {
@@ -1508,11 +1528,11 @@ button {
 
   pre {
     background-color: $color-code-bg;
-    padding: .1em .3rem;
+    padding: 0.1em 0.3rem;
     border-radius: $border-radius;
     overflow-x: auto;
     font-family: "JetBrains Mono", monospace;
-    font-size: .8em;
+    font-size: 0.8em;
     line-height: 1.2;
     font-optical-sizing: auto;
     white-space: pre;
@@ -1563,7 +1583,7 @@ button {
 body {
   .responses-container {
     will-change: transform;
-    transition: transform .3s;
+    transition: transform 0.3s;
   }
 }
 
@@ -1582,7 +1602,7 @@ textarea[data-fieldsizing="content"] {
   transform: translate(-50%, -50%);
   padding: 1em;
   background: $accent-color;
-  border-radius: .5em;
+  border-radius: 0.5em;
 }
 
 .suggestions-list {
@@ -1608,12 +1628,12 @@ textarea[data-fieldsizing="content"] {
     width: 20em;
 
     &.newInput {
-      top: -.5em;
+      top: -0.5em;
       transform: translateY(-100%);
     }
 
     &.existingInput {
-      bottom: -.5em;
+      bottom: -0.5em;
       transform: translateY(100%);
     }
   }
