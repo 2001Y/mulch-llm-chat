@@ -1,0 +1,48 @@
+.layout {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  //   overflow: hidden;
+}
+
+.sidebar {
+  width: 300px;
+  min-width: 300px;
+  height: 100%;
+  border-right: 1px solid #2a2a2a;
+  background-color: #000;
+  overflow-y: auto;
+
+  @media (max-width: 768px) {
+    width: 100%;
+    min-width: 100%;
+    display: none;
+
+    .chat-page & {
+      display: none;
+    }
+
+    .home-page & {
+      display: block;
+    }
+  }
+}
+
+.main-content {
+  flex: 1;
+  height: 100%;
+  overflow-y: auto;
+  background-color: #000;
+
+  @media (max-width: 768px) {
+    width: 100%;
+
+    .chat-page & {
+      display: block;
+    }
+
+    .home-page & {
+      display: none;
+    }
+  }
+}

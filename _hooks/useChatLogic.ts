@@ -73,7 +73,7 @@ export function useChatLogic() {
     }
   }, [storedMessages, roomId, initialLoadComplete]);
 
-  // モデル一覧を取得する useEffect
+  // デル一覧を取得する useEffect
   useEffect(() => {
     const fetchModels = async () => {
       try {
@@ -142,6 +142,12 @@ export function useChatLogic() {
       toggleSelected?: boolean,
       saveOnly?: boolean
     ) => {
+      console.log("updateMessage called:", {
+        messageIndex,
+        responseIndex,
+        toggleSelected,
+        saveOnly,
+      });
       setMessages((prevMessages) => {
         const newMessages = [...prevMessages];
         const message = { ...newMessages[messageIndex] };
@@ -156,6 +162,7 @@ export function useChatLogic() {
           }
         } else {
           const llmResponse = { ...message.llm[responseIndex] };
+          console.log("Current llmResponse:", llmResponse);
           if (content !== undefined) {
             if (typeof content === "function") {
               const updatedContent = content(llmResponse.text);
@@ -167,6 +174,10 @@ export function useChatLogic() {
             }
           }
           if (toggleSelected) {
+            console.log("Toggling selection. Current state:", {
+              selected: llmResponse.selected,
+              selectedOrder: llmResponse.selectedOrder,
+            });
             if (llmResponse.selected) {
               llmResponse.selected = false;
               delete llmResponse.selectedOrder;
@@ -186,6 +197,10 @@ export function useChatLogic() {
               llmResponse.selected = true;
               llmResponse.selectedOrder = selectedCount + 1;
             }
+            console.log("After toggle:", {
+              selected: llmResponse.selected,
+              selectedOrder: llmResponse.selectedOrder,
+            });
           }
           message.llm[responseIndex] = llmResponse;
         }

@@ -29,12 +29,16 @@ export default function Responses({
   selectedModels,
   setSelectedModels,
   toolFunctions,
+  messages,
+  setMessages,
 }: {
   openai: any;
   models: string[];
   selectedModels: string[];
   setSelectedModels: React.Dispatch<React.SetStateAction<string[]>>;
   toolFunctions: Record<string, (args: any) => any>;
+  messages: any[];
+  setMessages: React.Dispatch<React.SetStateAction<any[]>>;
 }) {
   const params = useParams();
   const roomId = params.id as string;
@@ -51,7 +55,6 @@ export default function Responses({
   const [chatInput, setChatInput] = useState<
     { type: string; text?: string; image_url?: { url: string } }[]
   >([]);
-  const [messages, setMessages] = useState<any[]>([]);
   const [storedMessages, setStoredMessages] = useStorageState<any[]>(
     `chatMessages_${roomId}`,
     []
@@ -67,7 +70,14 @@ export default function Responses({
       setMessages(storedMessages);
       setInitialLoadComplete(true);
     }
-  }, [storedMessages, roomId, initialLoadComplete]);
+  }, [storedMessages, roomId, initialLoadComplete, setMessages]);
+
+  // メッセージが更新されたらローカルストレージに保存
+  useEffect(() => {
+    if (initialLoadComplete) {
+      setStoredMessages(messages);
+    }
+  }, [messages, initialLoadComplete, setStoredMessages]);
 
   // 未完了の生成を再開するuseEffect
   useEffect(() => {
@@ -379,7 +389,7 @@ export default function Responses({
               }
             }
 
-            // 'markedResult'の生成と'setMessages'の更新を修正
+            // 'markedResult'の生成と'setMessages'の更新を正
             /* 修正前
             const markedResult = await marked(
               result.map((r) => r.text).join("")
@@ -463,7 +473,7 @@ export default function Responses({
       const newAbortControllers = modelsToUse.map(() => new AbortController());
       setAbortControllers(newAbortControllers);
 
-      // ユーザーのメッセージをそ���まま保存
+      // ユーザーのメッセージをそま���保存
       setMessages((prevMessages) => {
         const newMessage = {
           user: chatInput,
@@ -622,9 +632,19 @@ export default function Responses({
 
   const handleSelectResponse = useCallback(
     (messageIndex: number, responseIndex: number) => {
+      console.log("Before updateMessage:", {
+        messageIndex,
+        responseIndex,
+        response: messages[messageIndex]?.llm[responseIndex],
+        allResponses: messages[messageIndex]?.llm,
+        selectedResponses: messages[messageIndex]?.llm.filter(
+          (r: any) => r.selected
+        ),
+      });
       updateMessage(messageIndex, responseIndex, undefined, true);
+      console.log("After updateMessage called");
     },
-    [updateMessage]
+    [updateMessage, messages]
   );
 
   const handleSaveOnly = (messageIndex: number) => {

@@ -2,23 +2,26 @@
 import "@/styles/chat.scss";
 
 import { useState, useEffect } from "react";
-import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Responses from "_components/ChatResponses";
 import useStorageState from "_hooks/useLocalStorage";
 import useAccessToken from "_hooks/useAccessToken";
 import { useOpenAI } from "_hooks/useOpenAI";
+import Header from "_components/Header";
+import { useChatLogic } from "_hooks/useChatLogic";
 
 export default function ChatPage() {
-  const [models, setModels] = useStorageState<string[]>("models", [
-    "anthropic/claude-3.5-sonnet",
-    "openai/gpt-4o",
-    "google/gemini-pro-1.5",
-    "cohere/command-r-plus",
-    "qwen/qwen-2.5-72b-instruct",
-    "mistralai/mistral-large",
-  ]);
+  const {
+    models,
+    setModels,
+    selectedModels,
+    setSelectedModels,
+    messages,
+    setMessages,
+    isGenerating,
+    setIsGenerating,
+  } = useChatLogic();
+
   const [demoModels] = useState<string[]>([
     "google/gemma-2-9b-it:free",
     "google/gemma-7b-it:free",
@@ -28,8 +31,8 @@ export default function ChatPage() {
   const [accessToken, setAccessToken, previousAccessToken] = useAccessToken();
   const [demoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO || "");
   const openai = useOpenAI(accessToken || demoAccessToken);
-  const [selectedModels, setSelectedModels] = useState<string[]>(models);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [tools, setTools] = useStorageState("tools", [
     {
       type: "function",
@@ -193,32 +196,15 @@ export default function ChatPage() {
 
   return (
     <>
-      <header>
-        <Link href="/">
-          <div className="back-button">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="19" y1="12" x2="5" y2="12"></line>
-              <polyline points="12 19 5 12 12 5"></polyline>
-            </svg>
-          </div>
-        </Link>
-      </header>
+      <Header setIsModalOpen={setIsModalOpen} isLoggedIn={isLoggedIn} />
       <Responses
         openai={openai}
         models={isLoggedIn ? models : demoModels}
         selectedModels={selectedModels}
         setSelectedModels={setSelectedModels}
         toolFunctions={toolFunctions}
+        messages={messages}
+        setMessages={setMessages}
       />
     </>
   );
