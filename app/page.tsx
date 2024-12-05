@@ -19,6 +19,8 @@ export default function ChatListPage() {
     chatInput,
     setChatInput,
     isGenerating,
+    handleSend,
+    handleNewChat,
   } = useChatLogic();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -164,54 +166,23 @@ export default function ChatListPage() {
     setIsLoggedIn(!!accessToken);
   }, [accessToken]);
 
-  // ロッセージ送信時にチャットIDを作成し、ローカルストレージに保存してから遷移
-  const handleSend = (
-    event:
-      | React.FormEvent<HTMLFormElement>
-      | React.MouseEvent<HTMLButtonElement>,
-    isPrimaryOnly = false
-  ) => {
-    event.preventDefault();
-    if (isGenerating) return;
-
-    // 新しいチャットIDを作成
-    const newChatId = Date.now().toString();
-
-    // 初期メッセージを作成してローカルストレージに保存
-    const initialMessage = {
-      user: chatInput,
-      llm: selectedModels.map((model) => ({
-        role: "assistant",
-        model,
-        text: "",
-        selected: false,
-        isGenerating: true,
-      })),
-      timestamp: Date.now(),
-    };
-
-    const messages = [initialMessage];
-
-    // ローカルストレージに保存
-    localStorage.setItem(`chatMessages_${newChatId}`, JSON.stringify(messages));
-
-    // ストレージ変更イベントを発火
-    window.dispatchEvent(
-      new StorageEvent("storage", {
-        key: `chatMessages_${newChatId}`,
-        newValue: JSON.stringify(messages),
-      })
-    );
-
-    // チャットページに遷移
-    router.push(`/${newChatId}`);
-  };
-
   const handleLogout = () => {
     setAccessToken("");
     setModels(demoModels);
     setSelectedModels(demoModels);
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "n") {
+        e.preventDefault();
+        handleNewChat();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleNewChat]);
 
   return (
     <>

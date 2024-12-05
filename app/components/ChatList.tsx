@@ -69,6 +69,7 @@ export default function ChatList() {
     <div className={styles.chatList}>
       <Link href="/" className={styles.newChatButton}>
         Start New Chat
+        <span className={styles.shortcut}>⌘N</span>
       </Link>
       {chats.map((chat) => (
         <Link href={`/${chat.id}`} key={chat.id} className={styles.chatItem}>

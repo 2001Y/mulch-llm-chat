@@ -73,7 +73,7 @@ export function useChatLogic() {
     }
   }, [storedMessages, roomId, initialLoadComplete]);
 
-  // デル一覧を取得する useEffect
+  // 一覧を取得する useEffect
   useEffect(() => {
     const fetchModels = async () => {
       try {
@@ -126,12 +126,6 @@ export function useChatLogic() {
       setIsGenerating(true);
     }
   }, [initialLoadComplete]);
-
-  // 新しいチャットを作成する
-  const handleNewChat = () => {
-    const newChatId = Date.now().toString();
-    router.push(`/${newChatId}`);
-  };
 
   // メッセージの更新
   const updateMessage = useCallback(
@@ -212,6 +206,25 @@ export function useChatLogic() {
     [setMessages, setStoredMessages, storedMessages]
   );
 
+  // 新しいチャットを作成する
+  const handleNewChat = useCallback(() => {
+    // 新しいチャットIDを作成
+    const newChatId = Date.now().toString();
+
+    // 初期状態のメッセージを作成
+    const initialMessage = {
+      user: [{ type: "text", text: "" }],
+      llm: [],
+      timestamp: Date.now(),
+    };
+
+    // ローカルストレージに保存
+    setStoredMessages([initialMessage]);
+
+    // チャットページに遷移
+    router.push(`/${newChatId}`);
+  }, [router, setStoredMessages]);
+
   // メッセージ送信のハンドラー
   const handleSend = useCallback(
     async (
@@ -223,15 +236,44 @@ export function useChatLogic() {
       event.preventDefault();
       if (isGenerating) return;
 
+      // 新規チャットの場合
+      if (!roomId) {
+        // 新しいチャットIDを作成
+        const newChatId = Date.now().toString();
+        const modelsToUse = isPrimaryOnly
+          ? [selectedModels[0]]
+          : selectedModels;
+
+        // 初期メッセージを作成
+        const initialMessage = {
+          user: chatInput,
+          llm: modelsToUse.map((model) => ({
+            role: "assistant",
+            model,
+            text: "",
+            selected: false,
+            isGenerating: true,
+          })),
+          timestamp: Date.now(),
+        };
+
+        // ローカルストレージに保存
+        setStoredMessages([initialMessage]);
+
+        // チャットページに遷移
+        router.push(`/${newChatId}`);
+        return;
+      }
+
+      // 既存チャットの処理
       setIsGenerating(true);
-      const newAbortControllers = selectedModels.map(
-        () => new AbortController()
-      );
+      const modelsToUse = isPrimaryOnly ? [selectedModels[0]] : selectedModels;
+      const newAbortControllers = modelsToUse.map(() => new AbortController());
       setAbortControllers(newAbortControllers);
 
       const newMessage = {
         user: chatInput,
-        llm: selectedModels.map((model) => ({
+        llm: modelsToUse.map((model) => ({
           role: "assistant",
           model,
           text: "",
@@ -243,7 +285,7 @@ export function useChatLogic() {
 
       setMessages((prevMessages) => [...prevMessages, newMessage]);
 
-      selectedModels.forEach((model, index) => {
+      modelsToUse.forEach((model, index) => {
         fetchChatResponse(
           model,
           messages.length,
@@ -256,7 +298,15 @@ export function useChatLogic() {
       setChatInput([]);
       setIsAutoScroll(true);
     },
-    [chatInput, isGenerating, selectedModels, messages.length]
+    [
+      chatInput,
+      isGenerating,
+      selectedModels,
+      messages.length,
+      roomId,
+      setStoredMessages,
+      router,
+    ]
   );
 
   // チャットのレスポンスを取得する関数
@@ -508,7 +558,7 @@ export function useChatLogic() {
       setIsGenerating(true);
       const userMessage = messages[messageIndex].user;
 
-      // ユーザー入力からモデルを抽出
+      // ユーザー入力からモデルを抽��
       const specifiedModels = extractModelsFromInput(userMessage);
       const modelsToUse =
         specifiedModels.length > 0 ? specifiedModels : selectedModels;
