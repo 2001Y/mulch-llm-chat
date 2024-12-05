@@ -194,7 +194,7 @@ export default function ChatPage() {
   return (
     <>
       <header>
-        <Link href="/chat">
+        <Link href="/">
           <div className="back-button">
             <svg
               xmlns="http://www.w3.org/2000/svg"

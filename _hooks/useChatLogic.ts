@@ -130,7 +130,7 @@ export function useChatLogic() {
   // 新しいチャットを作成する
   const handleNewChat = () => {
     const newChatId = Date.now().toString();
-    router.push(`/chat/${newChatId}`);
+    router.push(`/${newChatId}`);
   };
 
   // メッセージの更新
