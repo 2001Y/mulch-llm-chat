@@ -18,7 +18,7 @@ marked.use(
   })
 );
 
-interface ToolFunction {
+export interface ToolFunction {
   (args: any): any;
 }
 
@@ -143,7 +143,7 @@ export function useChatLogic() {
     }
   }, [initialLoadComplete]);
 
-  // メッセージの更新
+  // メッセージ更新
   const updateMessage = useCallback(
     (
       messageIndex: number,
@@ -237,7 +237,10 @@ export function useChatLogic() {
     // ローカルストレージに保存
     setStoredMessages([initialMessage]);
 
-    // カスタムイベントを発火させて、ChatListコンポーネントに通知
+    // デフォルトのストレージを削除（トップページ用）
+    localStorage.removeItem("chatMessages_default");
+
+    // チャットリストの更新を通知
     window.dispatchEvent(new Event("chatListUpdate"));
 
     // チャットページに遷移
@@ -339,9 +342,8 @@ export function useChatLogic() {
       setMessages((prevMessages) => [...prevMessages, newMessage]);
 
       // チャットリストを更新（ストレージ保存後に実行）
-      setStoredMessages([...messages, newMessage]).then(() => {
-        window.dispatchEvent(new Event("chatListUpdate"));
-      });
+      setStoredMessages([...messages, newMessage]);
+      window.dispatchEvent(new Event("chatListUpdate"));
 
       modelsToUse.forEach((model, index) => {
         fetchChatResponse(
@@ -389,7 +391,7 @@ export function useChatLogic() {
       });
 
       try {
-        // 過去のメッセージを取得し、null値を除外
+        // 過去のメッセージを取得し、null値を除
         const pastMessages = messages
           .slice(0, messageIndex) // 現在のメッセージより前のメッセージのみを取得
           .flatMap((msg) => {
@@ -431,7 +433,7 @@ export function useChatLogic() {
 
         console.log("[fetchChatResponse] 過去のメッセージ:", pastMessages);
 
-        // ユーザー入力からモデルを抽出
+        // ユーザー入力らモデルを抽出
         const specifiedModel = extractModelsFromInput(inputContent);
         const modelToUse =
           specifiedModel.length > 0 ? specifiedModel[0] : model;
@@ -666,15 +668,11 @@ export function useChatLogic() {
     messages,
     setMessages,
     isGenerating,
+    setIsGenerating,
     handleSend,
     handleNewChat,
-    handleInputChange,
-    handleModelSelect,
-    handlePrimaryModelSelect,
-    handleResetAndRegenerate,
     handleStopAllGeneration,
-    containerRef,
-    isAutoScroll,
+    handleResetAndRegenerate,
     isModalOpen,
     handleOpenModal,
     handleCloseModal,

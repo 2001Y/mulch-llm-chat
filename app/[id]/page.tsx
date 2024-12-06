@@ -8,7 +8,7 @@ import useStorageState from "_hooks/useLocalStorage";
 import useAccessToken from "_hooks/useAccessToken";
 import { useOpenAI } from "_hooks/useOpenAI";
 import Header from "_components/Header";
-import { useChatLogic } from "_hooks/useChatLogic";
+import { useChatLogic, ToolFunction } from "_hooks/useChatLogic";
 import SettingsModal from "_components/SettingsModal";
 
 export default function ChatPage() {
@@ -100,8 +100,6 @@ export default function ChatPage() {
     },
     // 他のツールここに追加
   ]);
-
-  type ToolFunction = (args: any) => any;
 
   const [toolFunctions, setToolFunctions] = useStorageState<
     Record<string, ToolFunction>
@@ -208,7 +206,11 @@ export default function ChatPage() {
         tools={tools}
         setTools={setTools}
         toolFunctions={toolFunctions}
-        setToolFunctions={setToolFunctions}
+        setToolFunctions={
+          setToolFunctions as unknown as (
+            toolFunctions: Record<string, ToolFunction>
+          ) => void
+        }
       />
       <Responses
         openai={openai}

@@ -79,7 +79,7 @@ export default function Responses({
     }
   }, [messages, initialLoadComplete, setStoredMessages]);
 
-  // 完了の生成を再開するuseEffect
+  // ���了の生成を再開するuseEffect
   useEffect(() => {
     if (!initialLoadComplete) return;
 
@@ -638,6 +638,7 @@ export default function Responses({
           text: "",
           selected: false,
         })),
+        timestamp: Date.now(),
       };
 
       setMessages((prev) => [...prev, newMessage]);

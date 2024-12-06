@@ -24,13 +24,22 @@ export default function ChatList() {
         const chatData = JSON.parse(localStorage.getItem(key) || "[]");
         if (chatData.length > 0) {
           const firstMessage = chatData[0];
-          const lastMessage = chatData[chatData.length - 1];
+
+          // タイムスタンプを後ろから順に探索
+          let timestamp = null;
+          for (let j = chatData.length - 1; j >= 0; j--) {
+            if (chatData[j].timestamp) {
+              timestamp = chatData[j].timestamp;
+              break;
+            }
+          }
+
           chatItems.push({
             id: chatId,
             title: chatId,
             firstMessage:
               firstMessage.user[0]?.text?.slice(0, 20) || "No messages",
-            timestamp: lastMessage.timestamp || Date.now(),
+            timestamp: timestamp || -1, // タイムスタンプが見つからない場合は-1（0000/00/00用）
           });
         }
       }
@@ -97,7 +106,9 @@ export default function ChatList() {
             </div>
             <div className={styles.chatItemMeta}>
               <div className={styles.chatItemTimestamp}>
-                {new Date(chat.timestamp).toLocaleString()}
+                {chat.timestamp === -1
+                  ? "0000/00/00"
+                  : new Date(chat.timestamp).toLocaleString()}
               </div>
               <div className={styles.chatItemTitle}>{chat.title}</div>
             </div>
