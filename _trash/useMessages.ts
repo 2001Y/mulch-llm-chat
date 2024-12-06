@@ -23,7 +23,10 @@ export function useMessages(roomId: string) {
 
   useEffect(() => {
     if (storedMessages.length > 0 && !initialLoadComplete) {
-      console.log(`ルーム ${roomId} の以前のメッセージを復元:`, storedMessages);
+      console.log(`[useMessages] ルーム ${roomId} のメッセージを復元:`, {
+        messageCount: storedMessages.length,
+        messages: storedMessages,
+      });
       setMessages(storedMessages);
       setInitialLoadComplete(true);
     }
@@ -31,6 +34,10 @@ export function useMessages(roomId: string) {
 
   useEffect(() => {
     if (initialLoadComplete) {
+      console.log(`[useMessages] メッセージをストレージに保存:`, {
+        messageCount: messages.length,
+        messages: messages,
+      });
       setStoredMessages(messages);
     }
   }, [messages, initialLoadComplete, setStoredMessages]);

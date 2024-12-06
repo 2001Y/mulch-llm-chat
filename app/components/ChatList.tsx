@@ -15,40 +15,50 @@ export default function ChatList() {
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadChats = () => {
-      const chatItems: ChatItem[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith("chatMessages_")) {
-          const chatId = key.replace("chatMessages_", "");
-          const chatData = JSON.parse(localStorage.getItem(key) || "[]");
-          if (chatData.length > 0) {
-            const lastMessage = chatData[chatData.length - 1];
-            chatItems.push({
-              id: chatId,
-              title: `Chat ${chatId}`,
-              lastMessage: lastMessage.user[0]?.text || "No messages",
-              timestamp: lastMessage.timestamp || Date.now(),
-            });
-          }
+  const loadChats = () => {
+    const chatItems: ChatItem[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("chatMessages_")) {
+        const chatId = key.replace("chatMessages_", "");
+        const chatData = JSON.parse(localStorage.getItem(key) || "[]");
+        if (chatData.length > 0) {
+          const lastMessage = chatData[chatData.length - 1];
+          chatItems.push({
+            id: chatId,
+            title: `Chat ${chatId}`,
+            lastMessage: lastMessage.user[0]?.text || "No messages",
+            timestamp: lastMessage.timestamp || Date.now(),
+          });
         }
       }
-      setChats(chatItems.sort((a, b) => b.timestamp - a.timestamp));
-    };
+    }
+    setChats(chatItems.sort((a, b) => b.timestamp - a.timestamp));
+  };
 
+  useEffect(() => {
     // 初回ロード
     loadChats();
 
-    // ストレージの変更を監視
+    // ストレージの変更を監視（他のウィンドウ用）
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key && e.key.startsWith("chatMessages_")) {
         loadChats();
       }
     };
 
+    // 新規チャット作成時の更新を監視
+    const handleChatListUpdate = () => {
+      loadChats();
+    };
+
     window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+    window.addEventListener("chatListUpdate", handleChatListUpdate);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("chatListUpdate", handleChatListUpdate);
+    };
   }, []);
 
   const handleDelete = (chatId: string, event: React.MouseEvent) => {

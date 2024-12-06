@@ -79,7 +79,7 @@ export default function Responses({
     }
   }, [messages, initialLoadComplete, setStoredMessages]);
 
-  // 未完了の生成を再開するuseEffect
+  // 完了の生成を再開するuseEffect
   useEffect(() => {
     if (!initialLoadComplete) return;
 
@@ -113,8 +113,6 @@ export default function Responses({
     if (hasUnfinishedGeneration) {
       setIsGenerating(true);
     }
-
-    // 初回のみ実行されるようにするため、依存配列を空に
   }, [initialLoadComplete]);
 
   useEffect(() => {
@@ -408,7 +406,7 @@ export default function Responses({
           }
           setIsAutoScroll(false);
         } else {
-          console.error("ストリームの作成に失敗しました");
+          console.error("ストリームの作成に失敗しした");
           updateMessage(
             messageIndex,
             responseIndex,
@@ -448,73 +446,6 @@ export default function Responses({
       setStoredMessages,
       toolFunctions,
       extractModelsFromInput,
-    ]
-  );
-
-  const handleSend = useCallback(
-    async (
-      event:
-        | React.FormEvent<HTMLFormElement>
-        | React.MouseEvent<HTMLButtonElement>,
-      isPrimaryOnly = false
-    ) => {
-      if (isGenerating) return;
-
-      // ユーザー入力から複数のモデルを抽出
-      const specifiedModels = extractModelsFromInput(chatInput);
-      const modelsToUse =
-        specifiedModels.length > 0
-          ? specifiedModels
-          : isPrimaryOnly
-          ? [selectedModels[0]]
-          : selectedModels;
-
-      setIsGenerating(true);
-      const newAbortControllers = modelsToUse.map(() => new AbortController());
-      setAbortControllers(newAbortControllers);
-
-      // ユーザーのメッセージをそま���保存
-      setMessages((prevMessages) => {
-        const newMessage = {
-          user: chatInput,
-          llm: modelsToUse.map((model) => ({
-            role: "assistant",
-            model,
-            text: "",
-            selected: false,
-            isGenerating: true,
-          })),
-        };
-        const newMessages = [...prevMessages, newMessage];
-        setStoredMessages(newMessages);
-        return newMessages;
-      });
-
-      // モデルに送信する際にのみ入力をクリーンアップ
-      const cleanedChatInput = cleanInputContent(chatInput);
-
-      modelsToUse.forEach((model, index) => {
-        fetchChatResponse(
-          model,
-          messages.length,
-          index,
-          newAbortControllers[index],
-          cleanedChatInput
-        );
-      });
-
-      setChatInput([]);
-      setIsAutoScroll(true);
-    },
-    [
-      isGenerating,
-      selectedModels,
-      chatInput,
-      setMessages,
-      fetchChatResponse,
-      messages.length,
-      setStoredMessages,
-      AllModels,
     ]
   );
 
@@ -561,7 +492,7 @@ export default function Responses({
     const specifiedModels = extractModelsFromInput(inputContent);
     const modelToUse = specifiedModels.length > 0 ? specifiedModels[0] : model;
 
-    // モデルに送信する際にのみクリーンアップ
+    // モデルに送信する際にのみリーンアップ
     const cleanedInputContent = cleanInputContent(inputContent);
 
     const abortController = new AbortController();
@@ -676,6 +607,66 @@ export default function Responses({
       container.scrollTop = scrollHeight - clientHeight;
     }
   }, [messages, isAutoScroll]);
+
+  const handleSend = useCallback(
+    async (
+      event: React.MouseEvent<HTMLButtonElement>,
+      isPrimaryOnly: boolean = false
+    ) => {
+      event.preventDefault();
+      if (!chatInput.length) return;
+
+      setIsGenerating(true);
+      const newMessageIndex = messages.length;
+
+      // ユーザー入力からモデルを抽出
+      const specifiedModels = extractModelsFromInput(chatInput);
+      const modelsToUse = isPrimaryOnly
+        ? [selectedModels[0]]
+        : specifiedModels.length > 0
+        ? specifiedModels
+        : selectedModels;
+
+      // モデルに送信する際にのみクリーンアップ
+      const cleanedChatInput = cleanInputContent(chatInput);
+
+      const newMessage = {
+        user: chatInput,
+        llm: modelsToUse.map((model) => ({
+          role: "assistant",
+          model,
+          text: "",
+          selected: false,
+        })),
+      };
+
+      setMessages((prev) => [...prev, newMessage]);
+      setChatInput([]);
+
+      const newAbortControllers = modelsToUse.map(() => new AbortController());
+      setAbortControllers(newAbortControllers);
+
+      modelsToUse.forEach((model, index) => {
+        fetchChatResponse(
+          model,
+          newMessageIndex,
+          index,
+          newAbortControllers[index],
+          cleanedChatInput
+        );
+      });
+
+      setIsAutoScroll(true);
+    },
+    [
+      chatInput,
+      messages,
+      selectedModels,
+      extractModelsFromInput,
+      cleanInputContent,
+      fetchChatResponse,
+    ]
+  );
 
   return (
     <>

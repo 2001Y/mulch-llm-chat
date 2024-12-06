@@ -35,6 +35,14 @@ export function useChatLogic() {
   const params = useParams();
   const roomId = params?.id as string | undefined;
 
+  // ページロード時にroomIdがない場合は新しいチャットページにリダイレクト
+  // useEffect(() => {
+  //   if (!roomId) {
+  //     const newChatId = Date.now().toString();
+  //     router.push(`/${newChatId}`);
+  //   }
+  // }, [roomId, router]);
+
   const [models, setModels] = useStorageState<string[]>("models", [
     "anthropic/claude-3.5-sonnet",
     "openai/gpt-4o",
@@ -51,6 +59,8 @@ export function useChatLogic() {
     []
   );
   const [isAutoScroll, setIsAutoScroll] = useState(true);
+
+  // roomIdが確定してからストレージを初期化
   const [storedMessages, setStoredMessages] = useStorageState<Message[]>(
     `chatMessages_${roomId || "default"}`,
     []
@@ -64,7 +74,7 @@ export function useChatLogic() {
   >([]);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
-  // ローカルストレージからメッセージを読み込む
+  // ローカルストレージからメッセージ読み込む
   useEffect(() => {
     if (storedMessages.length > 0 && !initialLoadComplete) {
       console.log(`ルーム ${roomId} の以前のメッセージを復元:`, storedMessages);
@@ -73,7 +83,7 @@ export function useChatLogic() {
     }
   }, [storedMessages, roomId, initialLoadComplete]);
 
-  // 一覧を取得する useEffect
+  // 覧を取得する useEffect
   useEffect(() => {
     const fetchModels = async () => {
       try {
@@ -221,6 +231,9 @@ export function useChatLogic() {
     // ローカルストレージに保存
     setStoredMessages([initialMessage]);
 
+    // カスタムイベントを発火させて、ChatListコンポーネントに通知
+    window.dispatchEvent(new Event("chatListUpdate"));
+
     // チャットページに遷移
     router.push(`/${newChatId}`);
   }, [router, setStoredMessages]);
@@ -236,7 +249,7 @@ export function useChatLogic() {
       event.preventDefault();
       if (isGenerating) return;
 
-      // 新規チャットの場合
+      // 新規チャットの場合（トップページからの送信）
       if (!roomId) {
         // 新しいチャットIDを作成
         const newChatId = Date.now().toString();
@@ -244,7 +257,7 @@ export function useChatLogic() {
           ? [selectedModels[0]]
           : selectedModels;
 
-        // 初期メッセージを作成
+        // 初期メッセージを作成（生成開始フラグはfalseで保存）
         const initialMessage = {
           user: chatInput,
           llm: modelsToUse.map((model) => ({
@@ -252,22 +265,36 @@ export function useChatLogic() {
             model,
             text: "",
             selected: false,
-            isGenerating: true,
+            isGenerating: true, // チャットページ遷移後に生成を開始するためにtrueにしておく
           })),
           timestamp: Date.now(),
         };
 
-        // ローカルストレージに保存
-        setStoredMessages([initialMessage]);
+        // しいチ���ットIDでメッセージを保存
+        const newStorageKey = `chatMessages_${newChatId}`;
+        localStorage.setItem(newStorageKey, JSON.stringify([initialMessage]));
+
+        // チフォルトのストレージをクリア
+        localStorage.removeItem("chatMessages_default");
+
+        // カスタムイベントを発火させて、ChatListコンポーネントに通知
+        window.dispatchEvent(new Event("chatListUpdate"));
 
         // チャットページに遷移
         router.push(`/${newChatId}`);
         return;
       }
 
-      // 既存チャットの処理
+      // 既存のチャットの場合
+      const specifiedModels = extractModelsFromInput(chatInput);
+      const modelsToUse =
+        specifiedModels.length > 0
+          ? specifiedModels
+          : isPrimaryOnly
+          ? [selectedModels[0]]
+          : selectedModels;
+
       setIsGenerating(true);
-      const modelsToUse = isPrimaryOnly ? [selectedModels[0]] : selectedModels;
       const newAbortControllers = modelsToUse.map(() => new AbortController());
       setAbortControllers(newAbortControllers);
 
@@ -309,7 +336,7 @@ export function useChatLogic() {
     ]
   );
 
-  // チャットのレスポンスを取得する関数
+  // チャットのレスポンスを取得る関数
   const fetchChatResponse = useCallback(
     async (
       model: string,
@@ -318,6 +345,11 @@ export function useChatLogic() {
       abortController: AbortController,
       inputContent: any
     ) => {
+      console.log("[fetchChatResponse] 開始", {
+        model,
+        messageIndex,
+        responseIndex,
+      });
       setMessages((prevMessages) => {
         const newMessages = [...prevMessages];
         newMessages[messageIndex].llm[responseIndex].isGenerating = true;
@@ -326,42 +358,46 @@ export function useChatLogic() {
 
       try {
         // 過去のメッセージを取得し、null値を除外
-        const pastMessages = messages.flatMap((msg) => {
-          const userContent = Array.isArray(msg.user)
-            ? msg.user.filter(
-                (item: {
-                  type: string;
-                  text?: string;
-                  image_url?: { url: string };
-                }) =>
-                  (item.type === "text" && item.text?.trim()) ||
-                  (item.type === "image_url" && item.image_url?.url)
-              )
-            : msg.user;
+        const pastMessages = messages
+          .slice(0, messageIndex) // 現在のメッセージより前のメッセージのみを取得
+          .flatMap((msg) => {
+            const userContent = Array.isArray(msg.user)
+              ? msg.user.filter(
+                  (item: {
+                    type: string;
+                    text?: string;
+                    image_url?: { url: string };
+                  }) =>
+                    (item.type === "text" && item.text?.trim()) ||
+                    (item.type === "image_url" && item.image_url?.url)
+                )
+              : msg.user;
 
-          const userMessage =
-            userContent.length > 0
-              ? { role: "user" as const, content: userContent }
-              : null;
+            const userMessage =
+              userContent.length > 0
+                ? { role: "user" as const, content: userContent }
+                : null;
 
-          const selectedResponses = msg.llm
-            .filter((llm: any) => llm.selected)
-            .sort(
-              (a: any, b: any) =>
-                (a.selectedOrder || 0) - (b.selectedOrder || 0)
+            const selectedResponses = msg.llm
+              .filter((llm: any) => llm.selected)
+              .sort(
+                (a: any, b: any) =>
+                  (a.selectedOrder || 0) - (b.selectedOrder || 0)
+              );
+
+            const responseMessages = selectedResponses
+              .filter((llm: any) => llm.text?.trim())
+              .map((llm: any) => ({
+                role: "assistant" as const,
+                content: llm.text.trim(),
+              }));
+
+            return [userMessage, ...responseMessages].filter(
+              (message) => message !== null
             );
+          });
 
-          const responseMessages = selectedResponses
-            .filter((llm: any) => llm.text?.trim())
-            .map((llm: any) => ({
-              role: "assistant" as const,
-              content: llm.text.trim(),
-            }));
-
-          return [userMessage, ...responseMessages].filter(
-            (message) => message !== null
-          );
-        });
+        console.log("[fetchChatResponse] 過去のメッセージ:", pastMessages);
 
         // ユーザー入力からモデルを抽出
         const specifiedModel = extractModelsFromInput(inputContent);
@@ -370,6 +406,11 @@ export function useChatLogic() {
 
         // 入力をクリーンアップ
         const cleanedInputContent = cleanInputContent(inputContent);
+
+        console.log("[fetchChatResponse] API呼び出し開始", {
+          model: modelToUse,
+          cleanedInputContent,
+        });
 
         const stream = await openai?.chat.completions.create(
           {
@@ -391,9 +432,21 @@ export function useChatLogic() {
           }
         );
 
+        // APIに送信されるメッセージ内容をログ出力
+        console.log("[API Request] Messages:", [
+          ...pastMessages,
+          {
+            role: "user",
+            content: Array.isArray(cleanedInputContent)
+              ? cleanedInputContent.map((item) => item.text).join("\n")
+              : cleanedInputContent,
+          },
+        ]);
+
         let resultText = "";
 
         if (stream) {
+          console.log("[fetchChatResponse] ストリーム受信開始");
           for await (const part of stream) {
             if (abortController.signal.aborted) {
               throw new DOMException("Aborted", "AbortError");
@@ -402,6 +455,11 @@ export function useChatLogic() {
             resultText += content;
 
             const markedResult = marked(resultText);
+            console.log("[fetchChatResponse] メッセージ更新", {
+              messageIndex,
+              responseIndex,
+              contentLength: content.length,
+            });
             updateMessage(
               messageIndex,
               responseIndex,
@@ -412,7 +470,7 @@ export function useChatLogic() {
           }
           setIsAutoScroll(true);
         } else {
-          console.error("ストリームの作成に失敗しました");
+          console.error("[fetchChatResponse] ストリームの作成に失敗しました");
           updateMessage(
             messageIndex,
             responseIndex,
@@ -423,10 +481,7 @@ export function useChatLogic() {
         }
       } catch (error: any) {
         if (error.name !== "AbortError") {
-          console.error(
-            "モデルからのレスポンス取得中にエラーが発生しました:",
-            error
-          );
+          console.error("[fetchChatResponse] エラー発生:", error);
           updateMessage(
             messageIndex,
             responseIndex,
@@ -436,6 +491,10 @@ export function useChatLogic() {
           );
         }
       } finally {
+        console.log("[fetchChatResponse] 完了", {
+          messageIndex,
+          responseIndex,
+        });
         setMessages((prevMessages) => {
           const newMessages = [...prevMessages];
           newMessages[messageIndex].llm[responseIndex].isGenerating = false;
@@ -472,7 +531,7 @@ export function useChatLogic() {
     );
   };
 
-  // 自動スクロールハンドラ
+  // 自動スクロールハラ
   const handleScroll = () => {
     const container = containerRef.current;
     if (container) {
@@ -558,12 +617,12 @@ export function useChatLogic() {
       setIsGenerating(true);
       const userMessage = messages[messageIndex].user;
 
-      // ユーザー入力からモデルを抽��
+      // ユーザー入力からモデルを抽
       const specifiedModels = extractModelsFromInput(userMessage);
       const modelsToUse =
         specifiedModels.length > 0 ? specifiedModels : selectedModels;
 
-      // モデルに送信する際にのみクリーンアップ
+      // モデルに送信す際にのみクリンアプ
       const cleanedUserMessage = cleanInputContent(userMessage);
 
       const newMessages = [...messages].slice(0, messageIndex + 1);
