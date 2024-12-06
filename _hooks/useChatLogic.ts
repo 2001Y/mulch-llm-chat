@@ -74,7 +74,7 @@ export function useChatLogic() {
   >([]);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
-  // ローカルストレージからメッセージ読み込む
+  // ローカルストレージからメッ��ジ読み込む
   useEffect(() => {
     if (storedMessages.length > 0 && !initialLoadComplete) {
       console.log(`ルーム ${roomId} の以前のメッセージを復元:`, storedMessages);
@@ -238,6 +238,69 @@ export function useChatLogic() {
     router.push(`/${newChatId}`);
   }, [router, setStoredMessages]);
 
+  // extractModelsFromInput 関数
+  const extractModelsFromInput = (inputContent: any): string[] => {
+    const textContent = inputContent
+      .filter((item: any) => item.type === "text" && item.text)
+      .map((item: any) => item.text)
+      .join(" ");
+
+    const modelMatches = textContent.match(/@(\S+)/g) || [];
+    return modelMatches
+      .map((match: string) => match.slice(1)) // '@'を削除
+      .map((shortId: string) => {
+        const matchedModel = AllModels.find(
+          (model) => model.shortId === shortId
+        );
+        return matchedModel ? matchedModel.fullId : null;
+      })
+      .filter((model: string | null): model is string => model !== null);
+  };
+
+  // cleanInputContent 関数
+  const cleanInputContent = (inputContent: any): any => {
+    return inputContent
+      .map((item: any) => {
+        if (item.type === "text" && item.text) {
+          return {
+            ...item,
+            text: item.text.replace(/@\S+/g, "").trim(), // 全てのモデル指定を削除
+          };
+        }
+        return item;
+      })
+      .filter((item: any) => item.text !== "");
+  };
+
+  // モデル選択のロジックを共通化する関数
+  const determineModelsToUse = useCallback(
+    (userInput: any[], isPrimaryOnly: boolean) => {
+      const specifiedModels = extractModelsFromInput(userInput);
+      return isPrimaryOnly
+        ? [selectedModels[0]]
+        : specifiedModels.length > 0
+        ? specifiedModels
+        : selectedModels;
+    },
+    [extractModelsFromInput, selectedModels]
+  );
+
+  // メッセージ作成のロジックを共通化する関数
+  const createMessage = useCallback(
+    (userInput: any[], modelsToUse: string[]) => ({
+      user: userInput,
+      llm: modelsToUse.map((model) => ({
+        role: "assistant",
+        model,
+        text: "",
+        selected: false,
+        isGenerating: true,
+      })),
+      timestamp: Date.now(),
+    }),
+    []
+  );
+
   // メッセージ送信のハンドラー
   const handleSend = useCallback(
     async (
@@ -249,67 +312,24 @@ export function useChatLogic() {
       event.preventDefault();
       if (isGenerating) return;
 
+      const modelsToUse = determineModelsToUse(chatInput, isPrimaryOnly);
+      const newMessage = createMessage(chatInput, modelsToUse);
+
       // 新規チャットの場合（トップページからの送信）
       if (!roomId) {
-        // 新しいチャットIDを作成
         const newChatId = Date.now().toString();
-        const modelsToUse = isPrimaryOnly
-          ? [selectedModels[0]]
-          : selectedModels;
-
-        // 初期メッセージを作成（生成開始フラグはfalseで保存）
-        const initialMessage = {
-          user: chatInput,
-          llm: modelsToUse.map((model) => ({
-            role: "assistant",
-            model,
-            text: "",
-            selected: false,
-            isGenerating: true, // チャットページ遷移後に生成を開始するためにtrueにしておく
-          })),
-          timestamp: Date.now(),
-        };
-
-        // しいチ���ットIDでメッセージを保存
         const newStorageKey = `chatMessages_${newChatId}`;
-        localStorage.setItem(newStorageKey, JSON.stringify([initialMessage]));
-
-        // チフォルトのストレージをクリア
+        localStorage.setItem(newStorageKey, JSON.stringify([newMessage]));
         localStorage.removeItem("chatMessages_default");
-
-        // カスタムイベントを発火させて、ChatListコンポーネントに通知
         window.dispatchEvent(new Event("chatListUpdate"));
-
-        // チャットページに遷移
         router.push(`/${newChatId}`);
         return;
       }
 
       // 既存のチャットの場合
-      const specifiedModels = extractModelsFromInput(chatInput);
-      const modelsToUse =
-        specifiedModels.length > 0
-          ? specifiedModels
-          : isPrimaryOnly
-          ? [selectedModels[0]]
-          : selectedModels;
-
       setIsGenerating(true);
       const newAbortControllers = modelsToUse.map(() => new AbortController());
       setAbortControllers(newAbortControllers);
-
-      const newMessage = {
-        user: chatInput,
-        llm: modelsToUse.map((model) => ({
-          role: "assistant",
-          model,
-          text: "",
-          selected: false,
-          isGenerating: true,
-        })),
-        timestamp: Date.now(),
-      };
-
       setMessages((prevMessages) => [...prevMessages, newMessage]);
 
       modelsToUse.forEach((model, index) => {
@@ -328,11 +348,12 @@ export function useChatLogic() {
     [
       chatInput,
       isGenerating,
-      selectedModels,
-      messages.length,
       roomId,
-      setStoredMessages,
+      messages.length,
+      determineModelsToUse,
+      createMessage,
       router,
+      setStoredMessages,
     ]
   );
 
@@ -559,40 +580,6 @@ export function useChatLogic() {
     }
   }, [messages, isAutoScroll]);
 
-  // extractModelsFromInput 関数
-  const extractModelsFromInput = (inputContent: any): string[] => {
-    const textContent = inputContent
-      .filter((item: any) => item.type === "text" && item.text)
-      .map((item: any) => item.text)
-      .join(" ");
-
-    const modelMatches = textContent.match(/@(\S+)/g) || [];
-    return modelMatches
-      .map((match: string) => match.slice(1)) // '@'を削除
-      .map((shortId: string) => {
-        const matchedModel = AllModels.find(
-          (model) => model.shortId === shortId
-        );
-        return matchedModel ? matchedModel.fullId : null;
-      })
-      .filter((model: string | null): model is string => model !== null);
-  };
-
-  // cleanInputContent 関数
-  const cleanInputContent = (inputContent: any): any => {
-    return inputContent
-      .map((item: any) => {
-        if (item.type === "text" && item.text) {
-          return {
-            ...item,
-            text: item.text.replace(/@\S+/g, "").trim(), // 全てのモデル指定を削除
-          };
-        }
-        return item;
-      })
-      .filter((item: any) => item.text !== "");
-  };
-
   // InputSectionで必要な処理を統合
   const handleInputChange = useCallback((newInput: any[]) => {
     setChatInput(newInput);
@@ -612,17 +599,12 @@ export function useChatLogic() {
     setSelectedModels([model]);
   }, []);
 
+  // handleResetAndRegenerateも共通化したロジックを使用するように修正
   const handleResetAndRegenerate = useCallback(
     (messageIndex: number) => {
       setIsGenerating(true);
       const userMessage = messages[messageIndex].user;
-
-      // ユーザー入力からモデルを抽
-      const specifiedModels = extractModelsFromInput(userMessage);
-      const modelsToUse =
-        specifiedModels.length > 0 ? specifiedModels : selectedModels;
-
-      // モデルに送信す際にのみクリンアプ
+      const modelsToUse = determineModelsToUse(userMessage, false);
       const cleanedUserMessage = cleanInputContent(userMessage);
 
       const newMessages = [...messages].slice(0, messageIndex + 1);
@@ -650,13 +632,7 @@ export function useChatLogic() {
 
       setIsAutoScroll(true);
     },
-    [
-      messages,
-      selectedModels,
-      extractModelsFromInput,
-      cleanInputContent,
-      fetchChatResponse,
-    ]
+    [messages, determineModelsToUse, cleanInputContent, fetchChatResponse]
   );
 
   const handleSaveOnly = useCallback(
