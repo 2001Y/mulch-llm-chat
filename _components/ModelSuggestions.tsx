@@ -29,14 +29,12 @@ export default function ModelSuggestions({
     const textBeforeCursor = inputValue.slice(0, cursorPosition);
     const textAfterCursor = inputValue.slice(cursorPosition);
 
-    const beforeMatch = textBeforeCursor.match(/@[^@\s]*$/);
-    if (!beforeMatch) return "";
+    console.log("Current cursor position:", cursorPosition);
+    console.log("Text before cursor:", textBeforeCursor);
+    console.log("Text after cursor:", textAfterCursor);
 
-    if (beforeMatch[0] === "@") return "";
-
-    const afterMatch = textAfterCursor.match(/^[^@\s]*/);
-    const currentModel =
-      beforeMatch[0].slice(1) + (afterMatch ? afterMatch[0] : "");
+    const currentModel = textBeforeCursor.replace(/^@/, "").trim();
+    console.log("Extracted model query:", currentModel);
     return currentModel;
   }, [inputValue, inputRef]);
 
@@ -47,18 +45,42 @@ export default function ModelSuggestions({
 
   const fetchSuggestions = async (query: string) => {
     try {
+      console.log("Fetching suggestions with query:", query);
       const response = await fetch("https://openrouter.ai/api/v1/models");
       const data = await response.json();
       if (query.length > 0) {
-        const filteredModels = data.data.filter((model: OpenRouterModel) =>
-          model.id.toLowerCase().includes(query.toLowerCase())
-        );
-        const exactMatch = filteredModels.find(
-          (model: OpenRouterModel) =>
-            model.id.toLowerCase() === query.toLowerCase()
-        );
-        setSuggestions(exactMatch ? [] : filteredModels);
+        console.log("Filtering models for query:", query);
+        const calculateSimilarity = (str1: string, str2: string): number => {
+          str1 = str1.toLowerCase();
+          str2 = str2.toLowerCase();
+
+          if (str1 === str2) return 1;
+          if (str1.includes(str2) || str2.includes(str1)) return 0.8;
+
+          const chars1 = str1.split("");
+          const chars2 = str2.split("");
+          const matchCount = chars1.filter((char) =>
+            chars2.includes(char)
+          ).length;
+          return matchCount / Math.max(chars1.length, chars2.length);
+        };
+
+        const filteredModels = data.data
+          .map((model: OpenRouterModel) => {
+            const shortId = model.id.split("/").pop()?.toLowerCase() || "";
+            const similarity = calculateSimilarity(
+              shortId,
+              query.toLowerCase()
+            );
+            return { ...model, similarity };
+          })
+          .filter((model: any) => model.similarity > 0.2)
+          .sort((a: any, b: any) => b.similarity - a.similarity);
+
+        console.log("Filtered models:", filteredModels);
+        setSuggestions(filteredModels);
       } else {
+        console.log("No query, showing all models");
         setSuggestions(data.data);
       }
       setActiveSuggestionIndex(-1);
@@ -126,6 +148,17 @@ export default function ModelSuggestions({
       };
     }
   }, [handleKeyDown, inputRef]);
+
+  // アクティブな要素が変更されたときのスクロール処理
+  useEffect(() => {
+    if (activeSuggestionIndex >= 0) {
+      const activeElement = document.querySelector(".suggestions-list .active");
+      activeElement?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    }
+  }, [activeSuggestionIndex]);
 
   return (
     <ul className={`suggestions-list ${className || ""}`}>

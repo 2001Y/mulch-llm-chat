@@ -276,9 +276,15 @@ export default function InputSection({
         />
         {showSuggestions && (
           <ModelSuggestions
-            inputValue={
-              (chatInput[0]?.text?.match(/@([^@\s]*)$/) || [])[1] || ""
-            }
+            inputValue={(() => {
+              const input = inputRef.current;
+              if (!input) return "";
+              const cursorPosition = input.selectionStart || 0;
+              const textBeforeCursor =
+                chatInput[0]?.text?.slice(0, cursorPosition) || "";
+              const match = textBeforeCursor.match(/@([^\s]+)(?:\s*)$/);
+              return match?.[1] || "";
+            })()}
             onSelectSuggestion={selectSuggestion}
             inputRef={inputRef}
             className={`${mainInput ? "newInput" : "existingInput"}`}

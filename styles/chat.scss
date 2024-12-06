@@ -1677,41 +1677,43 @@ textarea[data-fieldsizing="content"] {
   }
 }
 
-.chatList {
-  .newChatButton {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    padding: 1em;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: $border-radius;
-    text-decoration: none;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    backdrop-filter: blur(10px);
-    box-shadow: $shadow;
-    margin-bottom: 1em;
-    color: mix(#fff, #000, 70%);
+// .chatList {
+//   .newChatButton {
+//     display: flex;
+//     align-items: center;
+//     justify-content: space-between;
+//     width: 100%;
+//     padding: 1em;
+//     background: rgba(255, 255, 255, 0.1);
+//     border-radius: $border-radius;
+//     text-decoration: none;
+//     backdrop-filter: blur(10px);
+//     box-shadow: $shadow;
+//     margin-bottom: 1em;
+//     color: mix(#fff, #000, 70%);
+//     position: fixed;
+//     top: calc($height_header + 1em);
+//     left: 1em;
+//     right: 1em;
+//     z-index: 100;
 
-    .shortcut {
-      color: mix(#fff, #000, 70%);
-      opacity: 0.5;
-      font-size: 0.9em;
-      padding: $button-padding-vertical $button-padding-horizontal;
-      display: flex;
-      align-items: center;
-      white-space: nowrap;
-    }
+//     .shortcut {
+//       color: mix(#fff, #000, 70%);
+//       opacity: 0.5;
+//       font-size: 0.9em;
+//       padding: $button-padding-vertical $button-padding-horizontal;
+//       display: flex;
+//       align-items: center;
+//       white-space: nowrap;
+//     }
 
-    &:hover {
-      background: rgba(255, 255, 255, 0.15);
-      color: #fff;
+//     &:hover {
+//       background: rgba(255, 255, 255, 0.15);
+//       color: #fff;
 
-      .shortcut {
-        color: #fff;
-      }
-    }
-  }
-}
+//       .shortcut {
+//         color: #fff;
+//       }
+//     }
+//   }
+// }

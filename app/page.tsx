@@ -21,9 +21,11 @@ export default function ChatListPage() {
     isGenerating,
     handleSend,
     handleNewChat,
+    isModalOpen,
+    handleOpenModal,
+    handleCloseModal,
   } = useChatLogic();
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [accessToken, setAccessToken] = useAccessToken();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [demoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO || "");
@@ -186,7 +188,7 @@ export default function ChatListPage() {
 
   return (
     <>
-      <Header setIsModalOpen={setIsModalOpen} isLoggedIn={isLoggedIn} />
+      <Header setIsModalOpen={handleOpenModal} isLoggedIn={isLoggedIn} />
 
       <div className="new-chat-container">
         <InputSection
@@ -211,7 +213,7 @@ export default function ChatListPage() {
         models={isLoggedIn ? models : demoModels}
         setModels={isLoggedIn ? setModels : () => {}}
         isModalOpen={isModalOpen}
-        closeModal={() => setIsModalOpen(false)}
+        closeModal={handleCloseModal}
         tools={tools}
         setTools={setTools}
         toolFunctions={toolFunctions}

@@ -7,7 +7,7 @@ import styles from "../ChatList.module.scss";
 interface ChatItem {
   id: string;
   title: string;
-  lastMessage: string;
+  firstMessage: string;
   timestamp: number;
 }
 
@@ -23,11 +23,13 @@ export default function ChatList() {
         const chatId = key.replace("chatMessages_", "");
         const chatData = JSON.parse(localStorage.getItem(key) || "[]");
         if (chatData.length > 0) {
+          const firstMessage = chatData[0];
           const lastMessage = chatData[chatData.length - 1];
           chatItems.push({
             id: chatId,
-            title: `Chat ${chatId}`,
-            lastMessage: lastMessage.user[0]?.text || "No messages",
+            title: chatId,
+            firstMessage:
+              firstMessage.user[0]?.text?.slice(0, 20) || "No messages",
             timestamp: lastMessage.timestamp || Date.now(),
           });
         }
@@ -82,10 +84,23 @@ export default function ChatList() {
         <span className={styles.shortcut}>⌘N</span>
       </Link>
       {chats.map((chat) => (
-        <Link href={`/${chat.id}`} key={chat.id} className={styles.chatItem}>
+        <Link
+          href={`/${chat.id}`}
+          key={chat.id}
+          className={`${styles.chatItem} ${
+            activeMenu === chat.id ? styles.menuActive : ""
+          }`}
+        >
           <div className={styles.chatItemContent}>
-            <div className={styles.chatItemTitle}>{chat.title}</div>
-            <div className={styles.chatItemLastMessage}>{chat.lastMessage}</div>
+            <div className={styles.chatItemFirstMessage}>
+              {chat.firstMessage}
+            </div>
+            <div className={styles.chatItemMeta}>
+              <div className={styles.chatItemTimestamp}>
+                {new Date(chat.timestamp).toLocaleString()}
+              </div>
+              <div className={styles.chatItemTitle}>{chat.title}</div>
+            </div>
           </div>
           <div className={styles.chatItemActions}>
             <button

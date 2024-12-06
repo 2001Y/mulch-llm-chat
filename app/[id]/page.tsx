@@ -9,6 +9,7 @@ import useAccessToken from "_hooks/useAccessToken";
 import { useOpenAI } from "_hooks/useOpenAI";
 import Header from "_components/Header";
 import { useChatLogic } from "_hooks/useChatLogic";
+import SettingsModal from "_components/SettingsModal";
 
 export default function ChatPage() {
   const {
@@ -20,6 +21,9 @@ export default function ChatPage() {
     setMessages,
     isGenerating,
     setIsGenerating,
+    isModalOpen,
+    handleOpenModal,
+    handleCloseModal,
   } = useChatLogic();
 
   const [demoModels] = useState<string[]>([
@@ -32,7 +36,6 @@ export default function ChatPage() {
   const [demoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO || "");
   const openai = useOpenAI(accessToken || demoAccessToken);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [tools, setTools] = useStorageState("tools", [
     {
       type: "function",
@@ -196,7 +199,17 @@ export default function ChatPage() {
 
   return (
     <>
-      <Header setIsModalOpen={setIsModalOpen} isLoggedIn={isLoggedIn} />
+      <Header setIsModalOpen={handleOpenModal} isLoggedIn={isLoggedIn} />
+      <SettingsModal
+        models={models}
+        setModels={isLoggedIn ? setModels : () => {}}
+        isModalOpen={isModalOpen}
+        closeModal={handleCloseModal}
+        tools={tools}
+        setTools={setTools}
+        toolFunctions={toolFunctions}
+        setToolFunctions={setToolFunctions}
+      />
       <Responses
         openai={openai}
         models={isLoggedIn ? models : demoModels}

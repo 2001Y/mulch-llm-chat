@@ -6,6 +6,7 @@ import hljs from "highlight.js";
 import useStorageState from "_hooks/useLocalStorage";
 import useAccessToken from "_hooks/useAccessToken";
 import { useOpenAI } from "_hooks/useOpenAI";
+import { generateId } from "@/utils/generateId";
 
 marked.use(
   markedHighlight({
@@ -34,6 +35,11 @@ export function useChatLogic() {
   const router = useRouter();
   const params = useParams();
   const roomId = params?.id as string | undefined;
+
+  // 設定モーダルの状態管理を追加
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const handleOpenModal = useCallback(() => setIsModalOpen(true), []);
+  const handleCloseModal = useCallback(() => setIsModalOpen(false), []);
 
   // ページロード時にroomIdがない場合は新しいチャットページにリダイレクト
   // useEffect(() => {
@@ -74,7 +80,7 @@ export function useChatLogic() {
   >([]);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
-  // ローカルストレージからメッ��ジ読み込む
+  // ローカルストレージからメッジ読み込む
   useEffect(() => {
     if (storedMessages.length > 0 && !initialLoadComplete) {
       console.log(`ルーム ${roomId} の以前のメッセージを復元:`, storedMessages);
@@ -219,7 +225,7 @@ export function useChatLogic() {
   // 新しいチャットを作成する
   const handleNewChat = useCallback(() => {
     // 新しいチャットIDを作成
-    const newChatId = Date.now().toString();
+    const newChatId = generateId(6);
 
     // 初期状態のメッセージを作成
     const initialMessage = {
@@ -317,7 +323,7 @@ export function useChatLogic() {
 
       // 新規チャットの場合（トップページからの送信）
       if (!roomId) {
-        const newChatId = Date.now().toString();
+        const newChatId = generateId(6);
         const newStorageKey = `chatMessages_${newChatId}`;
         localStorage.setItem(newStorageKey, JSON.stringify([newMessage]));
         localStorage.removeItem("chatMessages_default");
@@ -331,6 +337,11 @@ export function useChatLogic() {
       const newAbortControllers = modelsToUse.map(() => new AbortController());
       setAbortControllers(newAbortControllers);
       setMessages((prevMessages) => [...prevMessages, newMessage]);
+
+      // チャットリストを更新（ストレージ保存後に実行）
+      setStoredMessages([...messages, newMessage]).then(() => {
+        window.dispatchEvent(new Event("chatListUpdate"));
+      });
 
       modelsToUse.forEach((model, index) => {
         fetchChatResponse(
@@ -453,7 +464,7 @@ export function useChatLogic() {
           }
         );
 
-        // APIに送信されるメッセージ内容をログ出力
+        // APIに送信されるメッセージ内をログ出力
         console.log("[API Request] Messages:", [
           ...pastMessages,
           {
@@ -491,7 +502,7 @@ export function useChatLogic() {
           }
           setIsAutoScroll(true);
         } else {
-          console.error("[fetchChatResponse] ストリームの作成に失敗しました");
+          console.error("[fetchChatResponse] ストリーム作成に失敗しました");
           updateMessage(
             messageIndex,
             responseIndex,
@@ -522,7 +533,9 @@ export function useChatLogic() {
           const allResponsesComplete = newMessages[messageIndex].llm.every(
             (response: any) => !response.isGenerating
           );
-          if (allResponsesComplete) setIsGenerating(false);
+          if (allResponsesComplete) {
+            setIsGenerating(false);
+          }
           setStoredMessages(newMessages);
           return newMessages;
         });
@@ -653,20 +666,17 @@ export function useChatLogic() {
     messages,
     setMessages,
     isGenerating,
-    setIsGenerating,
     handleSend,
-    handleStopAllGeneration,
-    containerRef,
-    isAutoScroll,
     handleNewChat,
-    roomId,
-    AllModels,
-    extractModelsFromInput,
-    cleanInputContent,
     handleInputChange,
     handleModelSelect,
     handlePrimaryModelSelect,
     handleResetAndRegenerate,
-    handleSaveOnly,
+    handleStopAllGeneration,
+    containerRef,
+    isAutoScroll,
+    isModalOpen,
+    handleOpenModal,
+    handleCloseModal,
   };
 }
