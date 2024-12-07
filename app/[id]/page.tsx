@@ -160,15 +160,15 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (accessToken !== previousAccessToken) {
-      setModels(PAID_MODELS);
+      setModels([...PAID_MODELS]);
     }
   }, [accessToken, previousAccessToken, setModels]);
 
   useEffect(() => {
     if (accessToken) {
-      setSelectedModels(models);
+      setSelectedModels([...FREE_MODELS]);
     } else {
-      setSelectedModels(FREE_MODELS);
+      setSelectedModels([...FREE_MODELS]);
     }
   }, [accessToken, models]);
 
@@ -178,8 +178,8 @@ export default function ChatPage() {
 
   const handleLogout = () => {
     setAccessToken(""); // 直接空文字列を設定
-    setModels(FREE_MODELS);
-    setSelectedModels(FREE_MODELS);
+    setModels([...FREE_MODELS]);
+    setSelectedModels([...FREE_MODELS]);
     // setMessages([]);
   };
 
@@ -202,7 +202,7 @@ export default function ChatPage() {
       />
       <Responses
         openai={openai}
-        models={isLoggedIn ? models : FREE_MODELS}
+        models={isLoggedIn ? models : [...FREE_MODELS]}
         selectedModels={selectedModels}
         setSelectedModels={setSelectedModels}
         toolFunctions={toolFunctions}

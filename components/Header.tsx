@@ -7,14 +7,9 @@ import { navigateWithTransition } from "@/utils/navigation";
 interface HeaderProps {
   setIsModalOpen: (isOpen: boolean) => void;
   isLoggedIn: boolean;
-  onLogin: () => void;
 }
 
-export default function Header({
-  setIsModalOpen,
-  isLoggedIn,
-  onLogin,
-}: HeaderProps) {
+export default function Header({ setIsModalOpen, isLoggedIn }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [accessToken, setAccessToken] = useAccessToken();
@@ -26,6 +21,23 @@ export default function Header({
   const handleNavigation = (e: React.MouseEvent, href: string) => {
     e.preventDefault();
     navigateWithTransition(router, href);
+  };
+
+  const handleLogin = () => {
+    const isProduction = process.env.NODE_ENV === "production";
+    const redirectUri = isProduction
+      ? "https://mulch-llm-chat.vercel.app"
+      : "https://3000.2001y.dev";
+    const openRouterAuthUrl = `https://openrouter.ai/auth?callback_url=${redirectUri}`;
+    const width = 800;
+    const height = 600;
+    const left = (window.screen.width - width) / 2;
+    const top = (window.screen.height - height) / 2;
+    window.open(
+      openRouterAuthUrl,
+      "_blank",
+      `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`
+    );
   };
 
   const showBackButton = pathname !== "/" && window.innerWidth <= 768;
@@ -90,7 +102,7 @@ export default function Header({
             </div>
           </>
         ) : (
-          <button onClick={onLogin} className="login">
+          <button onClick={handleLogin} className="login">
             Login with OpenRouter
           </button>
         )}
