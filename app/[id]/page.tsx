@@ -10,6 +10,7 @@ import { useOpenAI } from "hooks/useOpenAI";
 import Header from "components/Header";
 import { useChatLogic, ToolFunction } from "hooks/useChatLogic";
 import SettingsModal from "components/SettingsModal";
+import { PAID_MODELS, FREE_MODELS } from "@/lib/models";
 
 export default function ChatPage() {
   const {
@@ -26,12 +27,6 @@ export default function ChatPage() {
     handleCloseModal,
   } = useChatLogic();
 
-  const [demoModels] = useState<string[]>([
-    "google/gemma-2-9b-it:free",
-    "google/gemma-7b-it:free",
-    "meta-llama/llama-3-8b-instruct:free",
-    "openchat/openchat-7b:free",
-  ]);
   const [accessToken, setAccessToken, previousAccessToken] = useAccessToken();
   const [demoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO || "");
   const openai = useOpenAI(accessToken || demoAccessToken);
@@ -165,14 +160,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (accessToken !== previousAccessToken) {
-      setModels([
-        "anthropic/claude-3.5-sonnet",
-        "openai/gpt-4o",
-        "google/gemini-pro-1.5",
-        "cohere/command-r-plus",
-        "qwen/qwen-2.5-72b-instruct",
-        "mistralai/mistral-large",
-      ]);
+      setModels(PAID_MODELS);
     }
   }, [accessToken, previousAccessToken, setModels]);
 
@@ -180,9 +168,9 @@ export default function ChatPage() {
     if (accessToken) {
       setSelectedModels(models);
     } else {
-      setSelectedModels(demoModels);
+      setSelectedModels(FREE_MODELS);
     }
-  }, [accessToken, models, demoModels]);
+  }, [accessToken, models]);
 
   useEffect(() => {
     setIsLoggedIn(!!accessToken);
@@ -190,8 +178,8 @@ export default function ChatPage() {
 
   const handleLogout = () => {
     setAccessToken(""); // 直接空文字列を設定
-    setModels(demoModels);
-    setSelectedModels(demoModels);
+    setModels(FREE_MODELS);
+    setSelectedModels(FREE_MODELS);
     // setMessages([]);
   };
 
@@ -214,7 +202,7 @@ export default function ChatPage() {
       />
       <Responses
         openai={openai}
-        models={isLoggedIn ? models : demoModels}
+        models={isLoggedIn ? models : FREE_MODELS}
         selectedModels={selectedModels}
         setSelectedModels={setSelectedModels}
         toolFunctions={toolFunctions}

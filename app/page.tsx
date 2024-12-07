@@ -11,6 +11,7 @@ import useStorageState from "hooks/useLocalStorage";
 import Header from "components/Header";
 import ChatList from "components/ChatList";
 import BentoFeatures from "components/BentoFeatures";
+import { PAID_MODELS, FREE_MODELS } from "@/lib/models";
 
 export default function ChatListPage() {
   const {
@@ -174,6 +175,16 @@ export default function ChatListPage() {
   }, [accessToken]);
 
   useEffect(() => {
+    if (accessToken) {
+      setModels(PAID_MODELS);
+      setSelectedModels(PAID_MODELS);
+    } else {
+      setModels(FREE_MODELS);
+      setSelectedModels(FREE_MODELS);
+    }
+  }, [accessToken]);
+
+  useEffect(() => {
     const checkActualChats = () => {
       const chatKeys = Object.keys(localStorage).filter(
         (key) =>
@@ -229,9 +240,30 @@ export default function ChatListPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleNewChat]);
 
+  const handleLogin = () => {
+    const isProduction = process.env.NODE_ENV === "production";
+    const redirectUri = isProduction
+      ? "https://mulch-llm-chat.vercel.app"
+      : "https://3000.2001y.dev";
+    const openRouterAuthUrl = `https://openrouter.ai/auth?callback_url=${redirectUri}`;
+    const width = 800;
+    const height = 600;
+    const left = (window.screen.width - width) / 2;
+    const top = (window.screen.height - height) / 2;
+    window.open(
+      openRouterAuthUrl,
+      "_blank",
+      `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`
+    );
+  };
+
   return (
     <>
-      <Header setIsModalOpen={handleOpenModal} isLoggedIn={isLoggedIn} />
+      <Header
+        setIsModalOpen={handleOpenModal}
+        isLoggedIn={isLoggedIn}
+        onLogin={handleLogin}
+      />
 
       {(!isMobile || (isMobile && !hasActualChats)) && <BentoFeatures />}
 

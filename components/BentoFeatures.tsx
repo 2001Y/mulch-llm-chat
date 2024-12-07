@@ -175,6 +175,30 @@ function BentoGrid({
   const [isPaused, setIsPaused] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const initialScrollSetRef = useRef(false);
+  const [repeatCount, setRepeatCount] = useState(3);
+
+  // ウィンドウのリサイズを監視し、必要に応じてセット数を調整
+  useEffect(() => {
+    const checkAndAdjustSets = () => {
+      const grid = gridRef.current;
+      if (!grid) return;
+
+      const gridWidth = grid.clientWidth;
+      const singleSetWidth = gridWidth / 3; // 1セット分の幅
+      const windowWidth = window.innerWidth;
+
+      // ウィンドウ幅が1セット分より大きい場合、セット数を増やす
+      const neededSets = Math.max(
+        3,
+        Math.ceil((windowWidth / singleSetWidth) * 1.5)
+      );
+      setRepeatCount(neededSets);
+    };
+
+    checkAndAdjustSets();
+    window.addEventListener("resize", checkAndAdjustSets);
+    return () => window.removeEventListener("resize", checkAndAdjustSets);
+  }, []);
 
   // 初期スクロール位置を中央に設定
   useEffect(() => {
@@ -206,21 +230,30 @@ function BentoGrid({
     const grid = gridRef.current;
     if (!grid) return;
 
-    // スクロールアニメーション
+    // スクロールイベントハンドラ
+    const handleScroll = () => {
+      const grid = gridRef.current;
+      if (!grid) return;
+
+      const scrollPosition = grid.scrollLeft;
+      const maxScroll = (grid.scrollWidth * 2) / 3;
+      const minScroll = grid.scrollWidth / 6;
+
+      // スクロール位置が範囲外の場合、直接中央位置に設定
+      if (scrollPosition >= maxScroll || scrollPosition <= minScroll) {
+        grid.scrollLeft = grid.scrollWidth / 3;
+      }
+    };
+
+    // 自動スクロール
     const scrollInterval = setInterval(() => {
       if (!isPaused) {
         grid.scrollLeft += 1;
-
-        // スクロール位置が最後のセットに近づいたら中央セットに戻す
-        if (grid.scrollLeft >= (grid.scrollWidth * 2) / 3) {
-          grid.scrollLeft = grid.scrollWidth / 3;
-        }
-        // スクロール位置が最初のセットに近づいたら中央セットに戻す
-        else if (grid.scrollLeft <= grid.scrollWidth / 6) {
-          grid.scrollLeft = grid.scrollWidth / 3;
-        }
       }
     }, 30);
+
+    // スクロールイベントリスナーを追加
+    grid.addEventListener("scroll", handleScroll, { passive: true });
 
     // マウスイベントの処理
     const handleMouseEnter = () => setIsPaused(true);
@@ -231,6 +264,7 @@ function BentoGrid({
 
     return () => {
       clearInterval(scrollInterval);
+      grid.removeEventListener("scroll", handleScroll);
       grid.removeEventListener("mouseenter", handleMouseEnter);
       grid.removeEventListener("mouseleave", handleMouseLeave);
     };
@@ -238,15 +272,16 @@ function BentoGrid({
 
   return (
     <div className={`grid ${isVisible ? "visible" : ""}`} ref={gridRef}>
-      {[...initialFeatures, ...initialFeatures, ...initialFeatures].map(
-        (feature, index) => (
+      {Array(repeatCount)
+        .fill(initialFeatures)
+        .flat()
+        .map((feature, index) => (
           <div key={index} className="bento-item">
             <div className="icon">{feature.icon}</div>
             <h3>{feature.title}</h3>
             <p>{feature.description}</p>
           </div>
-        )
-      )}
+        ))}
     </div>
   );
 }

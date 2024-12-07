@@ -12,6 +12,9 @@ $shadow: 0 0 0.5em rgba(0, 0, 0, 1);
   max-height: 100%;
   padding: 1em;
   padding-top: calc($height_header * 2.2);
+  @media (max-width: 768px) {
+    padding-top: 1.5rem;
+  }
   overflow-y: auto;
   color: #fff;
   background: $bg_body;
@@ -45,6 +48,10 @@ $shadow: 0 0 0.5em rgba(0, 0, 0, 1);
     &:hover {
       background-color: darken($accent-color, 10%);
       transform: translateY(-2px);
+    }
+
+    @media (max-width: 768px) {
+      display: none;
     }
   }
 
@@ -157,13 +164,13 @@ $shadow: 0 0 0.5em rgba(0, 0, 0, 1);
     }
   }
 
-  .main-content {
-    position: relative;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-  }
+  // .main-content {
+  //   position: relative;
+  //   flex: 1;
+  //   display: flex;
+  //   flex-direction: column;
+  //   height: 100%;
+  // }
 
   .input-section {
     padding: 20px;
