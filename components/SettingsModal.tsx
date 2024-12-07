@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import ModelSuggestions from "./ModelSuggestions";
-import { ToolFunction } from "_hooks/useChatLogic";
+import { ToolFunction } from "hooks/useChatLogic";
 
 interface ModelInputModalProps {
   models: string[];

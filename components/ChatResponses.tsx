@@ -6,7 +6,7 @@ import React, {
   useMemo,
 } from "react";
 import InputSection from "./InputSection";
-import useStorageState from "_hooks/useLocalStorage";
+import useStorageState from "hooks/useLocalStorage";
 import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
@@ -79,7 +79,7 @@ export default function Responses({
     }
   }, [messages, initialLoadComplete, setStoredMessages]);
 
-  // ���了の生成を再開するuseEffect
+  // 完了の生成を再開するuseEffect
   useEffect(() => {
     if (!initialLoadComplete) return;
 
@@ -383,7 +383,7 @@ export default function Responses({
                   functionCallExecuted = true;
                 }
               } catch (error) {
-                console.error("ファンクションコーの実行エラー:", error);
+                console.error("ファンクションコーの実���エラー:", error);
               }
             }
 

@@ -2,7 +2,7 @@ import React from "react";
 import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
-import type { Message } from "../_hooks/useMessages";
+import type { Message } from "../hooks/useMessages";
 
 marked.use(
   markedHighlight({

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
-import useAccessToken from "_hooks/useAccessToken";
+import useAccessToken from "hooks/useAccessToken";
 import Link from "next/link";
 
 interface HeaderProps {

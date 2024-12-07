@@ -1,10 +1,10 @@
 "use client";
-import "@/_styles/top.scss";
+import "@/styles/top.scss";
 import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import useAccessToken from "_hooks/useAccessToken";
+import useAccessToken from "hooks/useAccessToken";
 
 const isProduction = process.env.NODE_ENV === "production";
 const redirectUri = isProduction

@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import styles from "@/_styles/ChatList.module.scss";
-import { useChats } from "_hooks/useLocalStorage";
+import styles from "@/styles/ChatList.module.scss";
+import { useChats } from "hooks/useLocalStorage";
 
 interface ChatItem {
   id: string;

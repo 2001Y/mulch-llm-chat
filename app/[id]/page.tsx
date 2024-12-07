@@ -1,15 +1,15 @@
 "use client";
-import "@/_styles/chat.scss";
+import "@/styles/chat.scss";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Responses from "_components/ChatResponses";
-import useStorageState from "_hooks/useLocalStorage";
-import useAccessToken from "_hooks/useAccessToken";
-import { useOpenAI } from "_hooks/useOpenAI";
-import Header from "_components/Header";
-import { useChatLogic, ToolFunction } from "_hooks/useChatLogic";
-import SettingsModal from "_components/SettingsModal";
+import Responses from "components/ChatResponses";
+import useStorageState from "hooks/useLocalStorage";
+import useAccessToken from "hooks/useAccessToken";
+import { useOpenAI } from "hooks/useOpenAI";
+import Header from "components/Header";
+import { useChatLogic, ToolFunction } from "hooks/useChatLogic";
+import SettingsModal from "components/SettingsModal";
 
 export default function ChatPage() {
   const {

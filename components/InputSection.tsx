@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from "react";
-import useLocalStorage from "_hooks/useLocalStorage";
+import useLocalStorage from "hooks/useLocalStorage";
 import { toast } from "sonner";
 import ModelSuggestions from "./ModelSuggestions";
 

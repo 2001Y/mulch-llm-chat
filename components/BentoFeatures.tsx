@@ -1,4 +1,4 @@
-import "@/_styles/bento.scss";
+import "@/styles/bento.scss";
 import { useEffect, useRef, useState, useCallback, memo } from "react";
 
 const initialFeatures1 = [
@@ -186,7 +186,7 @@ function BentoGrid({
     if (!gridItem) return;
     const itemWidth = gridItem.clientWidth;
 
-    // 中央のセットにスクロー�� + アイテム幅の半分をオフセット
+    // 中央のセットにスクロール + アイテム幅の半分をオフセット
     let middleSetPosition = grid.scrollWidth / 3 - itemWidth / 2;
 
     // 奇数番目のグリッドの場合、さらにアイテム幅の半分を追加

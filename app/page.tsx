@@ -1,16 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import "@/_styles/chat.scss";
-import { useChatLogic } from "_hooks/useChatLogic";
-import InputSection from "_components/InputSection";
+import "@/styles/chat.scss";
+import { useChatLogic } from "hooks/useChatLogic";
+import InputSection from "components/InputSection";
 import { useRouter } from "next/navigation";
-import useAccessToken from "_hooks/useAccessToken";
-import ModelInputModal from "_components/SettingsModal";
-import useStorageState from "_hooks/useLocalStorage";
-import Header from "_components/Header";
-import ChatList from "_components/ChatList";
-import BentoFeatures from "_components/BentoFeatures";
+import useAccessToken from "hooks/useAccessToken";
+import ModelInputModal from "components/SettingsModal";
+import useStorageState from "hooks/useLocalStorage";
+import Header from "components/Header";
+import ChatList from "components/ChatList";
+import BentoFeatures from "components/BentoFeatures";
 
 export default function ChatListPage() {
   const {
@@ -133,7 +133,7 @@ export default function ChatListPage() {
       const { account_to, amount } = args;
       return {
         status: "success",
-        message: `振込が成功しました: ${amount}円を送��しました。`,
+        message: `振込が成功しました: ${amount}円を送金しました。`,
       };
     },
     search_account: (args: any) => {

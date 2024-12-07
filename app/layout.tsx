@@ -1,11 +1,11 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/react";
-import { ManifestLink } from "_components/ManifestLink";
+import { ManifestLink } from "components/ManifestLink";
 import { Toaster } from "sonner";
-import ClientOnly from "_components/ClientOnly";
+import ClientOnly from "components/ClientOnly";
 import Sidebar from "components/Sidebar";
-import "@/_styles/layout.scss";
+import "@/styles/layout.scss";
 
 export const metadata: Metadata = {
   title: "Multi AI Chat | OpenRouter Chat Client",

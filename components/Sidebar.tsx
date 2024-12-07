@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import ChatList from "../_components/ChatList";
+import ChatList from "../components/ChatList";
 
 export default function Sidebar() {
   const [hasChats, setHasChats] = useState(false);

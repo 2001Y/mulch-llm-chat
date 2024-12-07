@@ -3,9 +3,9 @@ import { useParams, useRouter } from "next/navigation";
 import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
-import useStorageState from "_hooks/useLocalStorage";
-import useAccessToken from "_hooks/useAccessToken";
-import { useOpenAI } from "_hooks/useOpenAI";
+import useStorageState from "hooks/useLocalStorage";
+import useAccessToken from "hooks/useAccessToken";
+import { useOpenAI } from "hooks/useOpenAI";
 import { generateId } from "@/utils/generateId";
 
 marked.use(
@@ -256,7 +256,7 @@ export function useChatLogic() {
 
     const modelMatches = textContent.match(/@(\S+)/g) || [];
     return modelMatches
-      .map((match: string) => match.slice(1)) // '@'を削除
+      .map((match: string) => match.slice(1)) // '@'��削除
       .map((shortId: string) => {
         const matchedModel = AllModels.find(
           (model) => model.shortId === shortId
@@ -391,7 +391,7 @@ export function useChatLogic() {
       });
 
       try {
-        // 過去のメッセージを取得し、null値を除
+        // 過去のメッセージを取得し、null���を除
         const pastMessages = messages
           .slice(0, messageIndex) // 現在のメッセージより前のメッセージのみを取得
           .flatMap((msg) => {
