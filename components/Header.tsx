@@ -2,6 +2,7 @@ import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import useAccessToken from "hooks/useAccessToken";
 import Link from "next/link";
+import { navigateWithTransition } from "@/utils/navigation";
 
 interface HeaderProps {
   setIsModalOpen: (isOpen: boolean) => void;
@@ -17,12 +18,20 @@ export default function Header({ setIsModalOpen, isLoggedIn }: HeaderProps) {
     setAccessToken("");
   };
 
+  const handleNavigation = (e: React.MouseEvent, href: string) => {
+    e.preventDefault();
+    navigateWithTransition(router, href);
+  };
+
   const showBackButton = pathname !== "/" && window.innerWidth <= 768;
 
   return (
     <header>
       {showBackButton && (
-        <button className="back-button" onClick={() => router.push("/")}>
+        <button
+          className="back-button"
+          onClick={(e) => handleNavigation(e, "/")}
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="24"
@@ -39,7 +48,7 @@ export default function Header({ setIsModalOpen, isLoggedIn }: HeaderProps) {
         </button>
       )}
       <div className="logo">
-        <Link href="/">
+        <Link href="/" onClick={(e) => handleNavigation(e, "/")}>
           <Image
             src="/logo.png"
             width={40}
@@ -58,7 +67,10 @@ export default function Header({ setIsModalOpen, isLoggedIn }: HeaderProps) {
         {isLoggedIn ? (
           <button onClick={handleLogout}>Logout</button>
         ) : (
-          <button onClick={() => router.push("/login")} className="login">
+          <button
+            onClick={(e) => handleNavigation(e, "/login")}
+            className="login"
+          >
             Login
           </button>
         )}

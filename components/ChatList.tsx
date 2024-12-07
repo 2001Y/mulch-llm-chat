@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import styles from "@/styles/ChatList.module.scss";
 import { useChats } from "hooks/useLocalStorage";
+import { navigateWithTransition } from "@/utils/navigation";
 
 interface ChatItem {
   id: string;
@@ -13,6 +15,7 @@ interface ChatItem {
 }
 
 export default function ChatList() {
+  const router = useRouter();
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const { chatIds } = useChats();
@@ -65,9 +68,21 @@ export default function ChatList() {
     setActiveMenu(activeMenu === chatId ? null : chatId);
   };
 
+  const handleChatClick = (e: React.MouseEvent, chatId: string) => {
+    e.preventDefault();
+    navigateWithTransition(router, `/${chatId}`);
+  };
+
   return (
     <div className={styles.chatList}>
-      <Link href="/" className={styles.newChatButton}>
+      <Link
+        href="/"
+        className={styles.newChatButton}
+        onClick={(e) => {
+          e.preventDefault();
+          navigateWithTransition(router, "/");
+        }}
+      >
         Start New Chat
         <span className={styles.shortcut}>⌘N</span>
       </Link>
@@ -78,6 +93,7 @@ export default function ChatList() {
           className={`${styles.chatItem} ${
             activeMenu === chat.id ? styles.menuActive : ""
           }`}
+          onClick={(e) => handleChatClick(e, chat.id)}
         >
           <div className={styles.chatItemContent}>
             <div className={styles.chatItemFirstMessage}>
