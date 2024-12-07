@@ -1,8 +1,8 @@
 .layout {
-  display: flex;
-  height: 100vh;
-  width: 100vw;
-  //   overflow: hidden;
+  //   display: flex;
+  height: 100%;
+  //   width: 100vw;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -27,7 +27,7 @@
 .main-content {
   flex: 1;
   height: 100%;
-  overflow-y: auto;
+  overflow: hidden;
   background-color: #000;
   position: relative;
 

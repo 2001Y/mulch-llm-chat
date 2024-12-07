@@ -670,6 +670,12 @@ $image-preview-gap: 10px;
     padding: $padding 0;
     pointer-events: none;
 
+    @media (hover: none) {
+      body[data-software-keyboard="true"] & {
+        bottom: 0;
+      }
+    }
+
     // @media (min-width: 768px) {
     //   left: calc(50% + 150.5px);
     // }
