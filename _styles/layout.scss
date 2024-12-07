@@ -13,17 +13,21 @@
   background-color: #000;
   overflow-y: auto;
 
-  @media (max-width: 768px) {
-    width: 100%;
-    min-width: 100%;
+  &:empty {
     display: none;
+  }
 
-    .chat-page & {
-      display: none;
-    }
+  @media (max-width: 768px) {
+    display: none;
 
     .home-page & {
       display: block;
+      width: 100%;
+      min-width: 100%;
+
+      &:empty {
+        display: none;
+      }
     }
   }
 }
@@ -31,16 +35,12 @@
 .main-content {
   flex: 1;
   height: 100%;
-  overflow-y: auto;
+  overflow: hidden;
   background-color: #000;
   position: relative;
 
   @media (max-width: 768px) {
     width: 100%;
-
-    .chat-page & {
-      display: block;
-    }
 
     .home-page & {
       display: none;

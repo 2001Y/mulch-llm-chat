@@ -131,7 +131,27 @@ header {
     z-index: -1;
   }
 
+  .back-button {
+    display: none;
+    padding: 0.5em;
+    color: #fff;
+    cursor: pointer;
+    transition: opacity 0.3s;
+
+    &:hover {
+      opacity: 0.7;
+    }
+
+    @media (max-width: 768px) {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  }
+
   .logo {
+    flex: 1;
+    height: 100%;
     display: flex;
     align-items: center;
     gap: 1em;
@@ -402,9 +422,10 @@ $image-preview-gap: 10px;
       border-radius: $border-radius;
       box-shadow: $shadow;
       font-size: 1rem;
-      padding: 1em;
+      padding: 0.8em 1em;
       margin: 0 $padding;
       position: relative;
+      border: 1px solid rgba(255, 255, 255, 0.05);
 
       .chat-input {
         width: 100%;
@@ -495,6 +516,7 @@ $image-preview-gap: 10px;
   .shortcut-area,
   .model-radio label {
     height: 2rem;
+    border: 1px solid rgba(255, 255, 255, 0.05);
   }
 
   .input-actions {
@@ -647,6 +669,10 @@ $image-preview-gap: 10px;
     transform: translateX(-50%);
     padding: $padding 0;
     pointer-events: none;
+
+    // @media (min-width: 768px) {
+    //   left: calc(50% + 150.5px);
+    // }
 
     > * > * {
       pointer-events: auto;
@@ -1717,3 +1743,23 @@ textarea[data-fieldsizing="content"] {
 //     }
 //   }
 // }
+
+.chat-list-container {
+  margin-top: $height_header;
+  padding: $body-padding;
+  height: calc(100vh - $height_header - 200px);
+  overflow-y: auto;
+
+  @media (min-width: 768px) {
+    display: none;
+  }
+}
+
+.new-chat-container {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: $body-padding;
+  background: linear-gradient(to top, $bg_body 80%, transparent);
+}

@@ -1,5 +1,5 @@
 "use client";
-import "@/styles/chat.scss";
+import "@/_styles/chat.scss";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";

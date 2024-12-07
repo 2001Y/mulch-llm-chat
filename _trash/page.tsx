@@ -1,5 +1,5 @@
 "use client";
-import "@/styles/top.scss";
+import "@/_styles/top.scss";
 import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";

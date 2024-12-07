@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import "@/styles/chat.scss";
+import "@/_styles/chat.scss";
 import { useChatLogic } from "_hooks/useChatLogic";
 import InputSection from "_components/InputSection";
 import { useRouter } from "next/navigation";
@@ -9,6 +9,8 @@ import useAccessToken from "_hooks/useAccessToken";
 import ModelInputModal from "_components/SettingsModal";
 import useStorageState from "_hooks/useLocalStorage";
 import Header from "_components/Header";
+import ChatList from "_components/ChatList";
+import BentoFeatures from "_components/BentoFeatures";
 
 export default function ChatListPage() {
   const {
@@ -97,7 +99,6 @@ export default function ChatListPage() {
         },
       },
     },
-    // 他のツールここに追加
   ]);
 
   type ToolFunction = (args: any) => any;
@@ -132,7 +133,7 @@ export default function ChatListPage() {
       const { account_to, amount } = args;
       return {
         status: "success",
-        message: `振込が成功しました: ${amount}円を送金しました。`,
+        message: `振込が成功しました: ${amount}円を送��しました。`,
       };
     },
     search_account: (args: any) => {
@@ -141,7 +142,7 @@ export default function ChatListPage() {
         { name: "田中太郎", account: "1234567890" },
         { name: "田中花子", account: "2345678901" },
         { name: "田中一郎", account: "3456789012" },
-        { name: "佐藤次郎", account: "4567890123" },
+        { name: "佐次郎", account: "4567890123" },
         { name: "鈴木三郎", account: "5678901234" },
       ];
 
@@ -160,13 +161,55 @@ export default function ChatListPage() {
         ),
       };
     },
-    // 他のー尔函数をここに加
   });
+
   const router = useRouter();
+
+  const [chats] = useStorageState<string[]>("chats", []);
+  const [hasActualChats, setHasActualChats] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     setIsLoggedIn(!!accessToken);
   }, [accessToken]);
+
+  useEffect(() => {
+    const checkActualChats = () => {
+      const chatKeys = Object.keys(localStorage).filter(
+        (key) =>
+          key.startsWith("chatMessages_") &&
+          key !== "chatMessages_default" &&
+          JSON.parse(localStorage.getItem(key) || "[]").some((msg: any) =>
+            msg.user?.some((u: any) => u.text?.trim())
+          )
+      );
+      setHasActualChats(chatKeys.length > 0);
+    };
+
+    checkActualChats();
+    window.addEventListener("storage", (e) => {
+      if (e.key?.startsWith("chatMessages_")) {
+        checkActualChats();
+      }
+    });
+    window.addEventListener("chatListUpdate", checkActualChats);
+
+    return () => {
+      window.removeEventListener("storage", checkActualChats);
+      window.removeEventListener("chatListUpdate", checkActualChats);
+    };
+  }, []);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const handleLogout = () => {
     setAccessToken("");
@@ -190,24 +233,30 @@ export default function ChatListPage() {
     <>
       <Header setIsModalOpen={handleOpenModal} isLoggedIn={isLoggedIn} />
 
-      <div className="new-chat-container">
-        <InputSection
-          mainInput={true}
-          models={models}
-          chatInput={chatInput}
-          setChatInput={setChatInput}
-          handleSend={handleSend}
-          selectedModels={selectedModels}
-          setSelectedModels={setSelectedModels}
-          isEditMode={false}
-          messageIndex={0}
-          handleResetAndRegenerate={() => {}}
-          handleSaveOnly={() => {}}
-          isInitialScreen={true}
-          handleStopAllGeneration={() => {}}
-          isGenerating={isGenerating}
-        />
-      </div>
+      {(!isMobile || (isMobile && !hasActualChats)) && <BentoFeatures />}
+
+      {hasActualChats && (
+        <div className="chat-list-container">
+          <ChatList />
+        </div>
+      )}
+
+      <InputSection
+        mainInput={true}
+        models={models}
+        chatInput={chatInput}
+        setChatInput={setChatInput}
+        handleSend={handleSend}
+        selectedModels={selectedModels}
+        setSelectedModels={setSelectedModels}
+        isEditMode={false}
+        messageIndex={0}
+        handleResetAndRegenerate={() => {}}
+        handleSaveOnly={() => {}}
+        isInitialScreen={true}
+        handleStopAllGeneration={() => {}}
+        isGenerating={isGenerating}
+      />
 
       <ModelInputModal
         models={isLoggedIn ? models : demoModels}

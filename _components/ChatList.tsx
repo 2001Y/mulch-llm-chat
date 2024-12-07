@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import styles from "../ChatList.module.scss";
+import styles from "@/_styles/ChatList.module.scss";
+import { useChats } from "_hooks/useLocalStorage";
 
 interface ChatItem {
   id: string;
@@ -14,63 +15,40 @@ interface ChatItem {
 export default function ChatList() {
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const { chatIds } = useChats();
 
   const loadChats = () => {
     const chatItems: ChatItem[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith("chatMessages_")) {
-        const chatId = key.replace("chatMessages_", "");
-        const chatData = JSON.parse(localStorage.getItem(key) || "[]");
-        if (chatData.length > 0) {
-          const firstMessage = chatData[0];
+    chatIds.forEach((chatId) => {
+      const key = `chatMessages_${chatId}`;
+      const chatData = JSON.parse(localStorage.getItem(key) || "[]");
+      if (chatData.length > 0) {
+        const firstMessage = chatData[0];
 
-          // タイムスタンプを後ろから順に探索
-          let timestamp = null;
-          for (let j = chatData.length - 1; j >= 0; j--) {
-            if (chatData[j].timestamp) {
-              timestamp = chatData[j].timestamp;
-              break;
-            }
+        // タイムスタンプを後ろから順に探索
+        let timestamp = null;
+        for (let j = chatData.length - 1; j >= 0; j--) {
+          if (chatData[j].timestamp) {
+            timestamp = chatData[j].timestamp;
+            break;
           }
-
-          chatItems.push({
-            id: chatId,
-            title: chatId,
-            firstMessage:
-              firstMessage.user[0]?.text?.slice(0, 20) || "No messages",
-            timestamp: timestamp || -1, // タイムスタンプが見つからない場合は-1（0000/00/00用）
-          });
         }
+
+        chatItems.push({
+          id: chatId,
+          title: chatId,
+          firstMessage:
+            firstMessage.user[0]?.text?.slice(0, 20) || "No messages",
+          timestamp: timestamp || -1,
+        });
       }
-    }
+    });
     setChats(chatItems.sort((a, b) => b.timestamp - a.timestamp));
   };
 
   useEffect(() => {
-    // 初回ロード
     loadChats();
-
-    // ストレージの変更を監視（他のウィンドウ用）
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key && e.key.startsWith("chatMessages_")) {
-        loadChats();
-      }
-    };
-
-    // 新規チャット作成時の更新を監視
-    const handleChatListUpdate = () => {
-      loadChats();
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    window.addEventListener("chatListUpdate", handleChatListUpdate);
-
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      window.removeEventListener("chatListUpdate", handleChatListUpdate);
-    };
-  }, []);
+  }, [chatIds]);
 
   const handleDelete = (chatId: string, event: React.MouseEvent) => {
     event.preventDefault();
@@ -78,6 +56,7 @@ export default function ChatList() {
     localStorage.removeItem(`chatMessages_${chatId}`);
     setChats((prevChats) => prevChats.filter((chat) => chat.id !== chatId));
     setActiveMenu(null);
+    window.dispatchEvent(new Event("chatListUpdate"));
   };
 
   const handleOpenMenu = (chatId: string, event: React.MouseEvent) => {
@@ -108,7 +87,13 @@ export default function ChatList() {
               <div className={styles.chatItemTimestamp}>
                 {chat.timestamp === -1
                   ? "0000/00/00"
-                  : new Date(chat.timestamp).toLocaleString()}
+                  : new Date(chat.timestamp).toLocaleString(undefined, {
+                      year: "numeric",
+                      month: "2-digit",
+                      day: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
               </div>
               <div className={styles.chatItemTitle}>{chat.title}</div>
             </div>

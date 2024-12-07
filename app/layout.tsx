@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/react";
 import { ManifestLink } from "_components/ManifestLink";
 import { Toaster } from "sonner";
-import ClientOnly from "./components/ClientOnly";
-import ChatList from "./components/ChatList";
-import "@/styles/layout.scss";
+import ClientOnly from "_components/ClientOnly";
+import Sidebar from "components/Sidebar";
+import "@/_styles/layout.scss";
 
 export const metadata: Metadata = {
   title: "Multi AI Chat | OpenRouter Chat Client",
@@ -54,9 +54,7 @@ export default function RootLayout({
       </head>
       <body>
         <div className="layout">
-          <aside className="sidebar">
-            <ChatList />
-          </aside>
+          <Sidebar />
           <main className="main-content">{children}</main>
         </div>
         <ClientOnly />
