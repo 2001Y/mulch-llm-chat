@@ -1089,16 +1089,17 @@ $image-preview-gap: 10px;
   backdrop-filter: blur(5px);
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-end;
   z-index: 1000;
 }
 
 .modal-content {
   background: mix(#fff, #000, 15%);
-  padding: 2em;
-  border-radius: $border-radius;
-  max-width: 90%;
-  max-height: 75svh;
+  padding: 3vmax 4vmax;
+  $border-radius: $border-radius * 1.5;
+  border-radius: $border-radius $border-radius 0 0;
+  // max-width: 90%;
+  max-height: 90svh;
   overflow-y: auto;
   width: 30rem;
   position: relative;
@@ -1112,11 +1113,18 @@ $image-preview-gap: 10px;
     font-weight: 700;
     color: #fff;
   }
+  h3 {
+    font-weight: bold;
+    font-size: 1.2em;
+    margin-top: 3vmax;
+    margin-bottom: 0.3em;
+    color: #bdbdbd;
+  }
 
   .close-button {
     position: absolute;
-    top: 10px;
-    right: 10px;
+    top: 20px;
+    right: 20px;
     font-size: 1.5em;
     background: none;
     border: none;

@@ -289,7 +289,8 @@ export default function ModelInputModal({
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
         </button>
-        <h2>Model Settings</h2>
+        <h2>Settings</h2>
+        <h3>Model</h3>
         <ul className="model-list">
           {models.map((model, index) => (
             <li
@@ -421,7 +422,7 @@ export default function ModelInputModal({
             />
           )}
         </form>
-        <h2>Function Calls</h2>
+        <h3>Function Calls</h3>
         <ul className="function-call-list">
           {tools.map((tool, index) => (
             <li key={index}>
