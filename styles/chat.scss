@@ -1096,6 +1096,7 @@ $image-preview-gap: 10px;
 .modal-content {
   background: mix(#fff, #000, 15%);
   padding: 3vmax 4vmax;
+  padding-bottom: env(safe-area-inset-bottom);
   $border-radius: $border-radius * 1.5;
   border-radius: $border-radius $border-radius 0 0;
   // max-width: 90%;
