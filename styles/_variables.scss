@@ -1,0 +1,41 @@
+// Colors
+$primary-color: #000;
+$secondary-color: #0a0a0a;
+$accent-color: #c02020;
+$text-primary: rgba(255, 255, 255, 0.9);
+$text-secondary: rgba(255, 255, 255, 0.6);
+$bg-body: #000;
+
+// Typography
+$font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+  "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+  "Segoe UI Symbol";
+$font-size-base: 14px;
+
+// Layout
+$body-padding: max(1em, 2vmax);
+$height_header: 4.5em;
+$border-radius: 15px;
+$shadow: 0 0 0.5em rgba(0, 0, 0, 1);
+$modal-button-height: 2em;
+
+// Input
+$button-padding-vertical: 0.5em;
+$button-padding-horizontal: 0.9em;
+$button-icon-size: 1.2em;
+
+// Image Preview
+$image-preview-size: 100px;
+$image-preview-gap: 10px;
+
+// Chat Input
+$chat-input-max-width: 50em;
+$background-opacity: 0.8;
+$blur-intensity: 10px;
+
+// Breakpoints
+$mobile-breakpoint: 768px;
+
+// Bento Grid
+$bento-font-size: 16px;
+$bento-mobile-font-size: 14px;

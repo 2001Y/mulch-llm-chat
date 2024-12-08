@@ -1,17 +1,9 @@
-// Variables
-$primary-color: #000;
-$secondary-color: #0a0a0a;
-$accent-color: #c02020;
-$text-primary: rgba(255, 255, 255, 0.9);
-$text-secondary: rgba(255, 255, 255, 0.6);
-$font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-  "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
-  "Segoe UI Symbol";
+@import "variables";
 
 .bento-grid {
-  font-size: 16px;
-  @media (max-width: 768px) {
-    font-size: 14px;
+  font-size: $bento-font-size;
+  @media (max-width: $mobile-breakpoint) {
+    font-size: $bento-mobile-font-size;
   }
 
   background-color: $primary-color;

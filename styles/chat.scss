@@ -1,20 +1,5 @@
+@import "variables";
 @import "~highlight.js/styles/github-dark.css";
-
-// SCSS変数宣言
-$body-padding: max(1em, 2vmax);
-$height_header: 4.5em;
-$border-radius: 15px;
-$bg_body: #000;
-$padding: $body-padding;
-$shadow: 0 0 0.5em rgba(0, 0, 0, 1);
-$modal-button_height: 2em;
-$accent-color: #c02020;
-$button-padding-vertical: 0.5em;
-$button-padding-horizontal: 0.9em;
-
-@media (prefers-color-scheme: dark) {
-  $bg_body: #000;
-}
 
 /* リセットCSS */
 *,
@@ -264,9 +249,6 @@ header {
   font-size: 16px;
 }
 
-$image-preview-size: 100px;
-$image-preview-gap: 10px;
-
 .input-section {
   width: 100%;
   $chat-input-max-width: 50em;
@@ -302,7 +284,7 @@ $image-preview-gap: 10px;
     align-items: flex-end;
     align-items: center;
     gap: 1em;
-    padding: 0 $padding;
+    padding: 0 $body-padding;
 
     .open-modal-button {
       height: $modal-button_height;
@@ -425,7 +407,7 @@ $image-preview-gap: 10px;
       box-shadow: $shadow;
       font-size: 1rem;
       padding: 0.8em 1em;
-      margin: 0 $padding;
+      margin: 0 $body-padding;
       position: relative;
       border: 1px solid rgba(255, 255, 255, 0.05);
 
@@ -1095,8 +1077,8 @@ $image-preview-gap: 10px;
 
 .modal-content {
   background: mix(#fff, #000, 15%);
-  padding: 3vmax 4vmax;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding: 3vw 4vw;
+  padding-bottom: max(env(safe-area-inset-bottom), 5vw);
   $border-radius: $border-radius * 1.5;
   border-radius: $border-radius $border-radius 0 0;
   // max-width: 90%;
@@ -1107,7 +1089,7 @@ $image-preview-gap: 10px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
 
   h2 {
-    font-size: 1.5em;
+    font-size: 1.7em;
     margin-top: 1em;
     margin-bottom: 0.3em;
     font-family: "Glegoo", serif;
@@ -1780,4 +1762,172 @@ textarea[data-fieldsizing="content"] {
   right: 0;
   padding: $body-padding;
   background: linear-gradient(to top, $bg_body 80%, transparent);
+}
+
+.modal-content {
+  .model-list,
+  .function-call-list {
+    li {
+      min-height: 3.5em;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 0.8em 1em;
+      margin-bottom: 0.5em;
+      border-radius: $border-radius;
+      transition: all 0.3s ease;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      box-shadow: $shadow;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.15);
+        transform: translateY(-1px);
+      }
+
+      &.dragging {
+        opacity: 0.5;
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      &.model-edit {
+        padding: 0.8em 1em;
+        gap: 0.8em;
+
+        .model-input {
+          flex: 1;
+          height: 2.4em;
+          background: rgba(255, 255, 255, 0.1);
+          color: #fff;
+          padding: 0 0.8em;
+          border-radius: calc($border-radius / 2);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          transition: all 0.3s ease;
+
+          &:focus {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.2);
+            outline: none;
+          }
+        }
+
+        .model-edit-buttons {
+          display: flex;
+          gap: 0.5em;
+        }
+      }
+
+      .tool-buttons,
+      .model-buttons,
+      .model-edit-buttons {
+        display: flex;
+        gap: 0.5em;
+
+        button {
+          width: 2.4em;
+          height: 2.4em;
+          padding: 0;
+          border-radius: calc($border-radius / 2);
+          transition: all 0.3s ease;
+          background: rgba(255, 255, 255, 0.1);
+          display: grid;
+          place-items: center;
+
+          svg {
+            width: 1.2em;
+            height: 1.2em;
+          }
+
+          &:hover {
+            background: rgba(255, 255, 255, 0.2);
+          }
+
+          &.save-button {
+            background: $accent-color;
+            color: #fff;
+
+            &:hover {
+              background: darken($accent-color, 10%);
+            }
+          }
+
+          &.delete-button:hover {
+            background: rgba($accent-color, 0.2);
+            color: $accent-color;
+          }
+        }
+      }
+    }
+  }
+
+  .input-area {
+    margin-top: 1em;
+    display: flex;
+    gap: 0.8em;
+
+    .model-input {
+      flex: 1;
+      height: 2.8em;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      padding: 0 1em;
+      border-radius: $border-radius;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.3s ease;
+
+      &:focus {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.2);
+        outline: none;
+      }
+
+      &::placeholder {
+        color: rgba(255, 255, 255, 0.4);
+      }
+    }
+
+    .add-button {
+      height: 2.8em;
+      padding: 0 1.2em;
+      background: $accent-color;
+      color: #fff;
+      border-radius: $border-radius;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.5em;
+
+      svg {
+        width: 1.2em;
+        height: 1.2em;
+      }
+
+      &:hover {
+        background: darken($accent-color, 10%);
+      }
+    }
+  }
+
+  .add-button {
+    width: 100%;
+    height: 2.8em;
+    margin-top: 1em;
+    background: $accent-color;
+    color: #fff;
+    border-radius: $border-radius;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+
+    svg {
+      width: 1.2em;
+      height: 1.2em;
+    }
+
+    &:hover {
+      background: darken($accent-color, 10%);
+    }
+  }
 }

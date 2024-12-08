@@ -1,9 +1,4 @@
-$body-padding: max(1em, 2vmax);
-$height_header: 4.5em;
-$border-radius: 15px;
-$bg_body: #000;
-$accent-color: #c02020;
-$shadow: 0 0 0.5em rgba(0, 0, 0, 1);
+@import "variables";
 
 .chatList {
   width: 100%;
@@ -12,14 +7,13 @@ $shadow: 0 0 0.5em rgba(0, 0, 0, 1);
   max-height: 100%;
   padding: 1em;
   padding-top: calc($height_header * 2.2);
-  @media (max-width: 768px) {
+  @media (max-width: $mobile-breakpoint) {
     padding-top: 1.5rem;
   }
   overflow-y: auto;
   color: #fff;
-  background: $bg_body;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  background: $bg-body;
+  font-family: $font-family;
 
   a {
     text-decoration: none;
@@ -50,7 +44,7 @@ $shadow: 0 0 0.5em rgba(0, 0, 0, 1);
       transform: translateY(-2px);
     }
 
-    @media (max-width: 768px) {
+    @media (max-width: $mobile-breakpoint) {
       display: none;
     }
   }
