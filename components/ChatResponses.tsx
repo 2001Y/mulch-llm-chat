@@ -12,6 +12,8 @@ import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
 import { useParams } from "next/navigation";
 import TurndownService from "turndown";
+import { FunctionCallHandler } from "../utils/functionCallHandler";
+import { MessageContent } from "../types/chat";
 
 marked.use(
   markedHighlight({
@@ -22,6 +24,18 @@ marked.use(
     },
   })
 );
+
+// JSONパース用のヘルパー関数
+const safeJSONParse = (text: string) => {
+  try {
+    // 引用符で囲まれていない文字列を修正
+    const fixedText = text.replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":');
+    return JSON.parse(fixedText);
+  } catch (e) {
+    console.error("[JSON Parse Error]", { text, error: e });
+    throw new Error(`JSON解析エラー: ${text}`);
+  }
+};
 
 export default function Responses({
   openai,
@@ -79,7 +93,7 @@ export default function Responses({
     }
   }, [messages, initialLoadComplete, setStoredMessages]);
 
-  // 完了の生成を再開するuseEffect
+  // 完了生成を再開するuseEffect
   useEffect(() => {
     if (!initialLoadComplete) return;
 
@@ -311,8 +325,8 @@ export default function Responses({
         }
 
         let result: { type: string; text: string }[] = [];
-        let fc = { name: "", arguments: "" };
-        let functionCallExecuted = false;
+        let tempContent = "";
+        const functionHandler = new FunctionCallHandler();
 
         // ユーザー入力からモデルを抽出
         const specifiedModel = extractModelsFromInput(inputContent);
@@ -331,11 +345,110 @@ export default function Responses({
             ],
             stream: true,
             tool_choice: "auto",
+            tools: [
+              {
+                type: "function",
+                function: {
+                  name: "get_current_weather",
+                  description: "現在の天気情報を取得します",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      location: {
+                        type: "string",
+                        description: "天気を取得する場所（都市名）",
+                      },
+                      unit: {
+                        type: "string",
+                        enum: ["celsius", "fahrenheit"],
+                        description: "温度の単位",
+                      },
+                    },
+                    required: ["location"],
+                  },
+                },
+              },
+              {
+                type: "function",
+                function: {
+                  name: "transfer_funds",
+                  description: "資金を送金します",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      account_to: {
+                        type: "string",
+                        description: "送金先の口座番号",
+                      },
+                      amount: {
+                        type: "number",
+                        description: "送金額（円）",
+                      },
+                    },
+                    required: ["account_to", "amount"],
+                  },
+                },
+              },
+              {
+                type: "function",
+                function: {
+                  name: "search_account",
+                  description: "口座情報を検索します",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      name: {
+                        type: "string",
+                        description: "検索する口座名義人の名前",
+                      },
+                    },
+                    required: ["name"],
+                  },
+                },
+              },
+            ],
           },
           {
             signal: abortController.signal,
           }
         );
+
+        console.log("[API Request] Messages:", {
+          model: modelToUse,
+          messages: [
+            ...pastMessages,
+            {
+              role: "user",
+              content: filteredInputContent,
+            },
+          ],
+          tool_choice: "auto",
+          tools: [
+            {
+              type: "function",
+              function: {
+                name: "get_current_weather",
+                description: "現在の天気情報を取得します",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    location: {
+                      type: "string",
+                      description: "天気を取得する場所（都市名）",
+                    },
+                    unit: {
+                      type: "string",
+                      enum: ["celsius", "fahrenheit"],
+                      description: "温度の単位",
+                    },
+                  },
+                  required: ["location"],
+                },
+              },
+            },
+            // ... 他の関数定義も同��にログ出力
+          ],
+        });
 
         if (stream) {
           for await (const part of stream) {
@@ -345,64 +458,31 @@ export default function Responses({
             const content = part.choices[0]?.delta?.content || "";
             const toolCalls = part.choices[0]?.delta?.tool_calls;
 
+            console.log("[Stream Response]", {
+              content,
+              toolCalls,
+              delta: part.choices[0]?.delta,
+            });
+
             if (toolCalls) {
-              for (const tc of toolCalls) {
-                if (tc.name) {
-                  fc.name += tc;
-                  fc.arguments += tc.arguments;
-                }
-                if (tc.function?.name) {
-                  fc.name += tc.function?.name;
-                }
-                if (tc.function?.arguments) {
-                  fc.arguments += tc.function?.arguments;
-                }
-              }
-            } else {
-              result.push({ type: "text", text: content });
-            }
-
-            if (fc.name && fc.arguments && !functionCallExecuted) {
-              try {
-                const args = JSON.parse(fc.arguments);
-                result.push({
-                  type: "text",
-                  text: `\n\nFunction Call 実行中...: ${fc.name}(${fc.arguments})`,
-                });
-                if (toolFunctions[fc.name]) {
-                  result.push({ type: "text", text: `\n\nFunction Call 完成` });
-                  const functionResult = toolFunctions[fc.name](args);
-                  result.push({
-                    type: "text",
-                    text: `\n\n実行結果:\n${JSON.stringify(
-                      functionResult,
-                      null,
-                      2
-                    )}\n`,
-                  });
-                  functionCallExecuted = true;
-                }
-              } catch (error) {
-                console.error("ファンクションコーの実���エラー:", error);
+              functionHandler.handleToolCalls(toolCalls);
+            } else if (!functionHandler.isAccumulating) {
+              if (content) {
+                tempContent += content;
+                result.push({ type: "text", text: content });
+                updateMessage(messageIndex, responseIndex, result);
               }
             }
 
-            // 'markedResult'の生成と'setMessages'の更新を正
-            /* 修正前
-            const markedResult = await marked(
-              result.map((r) => r.text).join("")
-            );
-            updateMessage(
-              messageIndex,
-              responseIndex,
-              [{ type: "text", text: markedResult }],
-              false,
-              false
-            );
-            */
-
-            // 修正後: 'marked'を使用せずに生のテキストを保存
-            updateMessage(messageIndex, responseIndex, result, false, false);
+            if (functionHandler.isReadyToExecute()) {
+              await functionHandler.execute(
+                toolFunctions,
+                tempContent,
+                updateMessage,
+                messageIndex,
+                responseIndex
+              );
+            }
           }
           setIsAutoScroll(false);
         } else {

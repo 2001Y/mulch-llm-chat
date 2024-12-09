@@ -1371,10 +1371,54 @@ header {
   }
 }
 
-.input-area {
+.settings-input-area {
+  margin-top: 1em;
   display: flex;
-  gap: 0.5em;
+  gap: 0.8em;
   position: relative;
+
+  .model-input {
+    flex: 1;
+    height: 2.8em;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    padding: 0 1em;
+    border-radius: $border-radius;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+
+    &:focus {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.2);
+      outline: none;
+    }
+
+    &::placeholder {
+      color: rgba(255, 255, 255, 0.4);
+    }
+  }
+
+  .add-button {
+    height: 2.8em;
+    padding: 0 1.2em;
+    background: $accent-color;
+    color: #fff;
+    border-radius: $border-radius;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    white-space: nowrap;
+
+    svg {
+      width: 1.2em;
+      height: 1.2em;
+    }
+
+    &:hover {
+      background: darken($accent-color, 10%);
+    }
+  }
 
   .suggestions-list {
     position: absolute;

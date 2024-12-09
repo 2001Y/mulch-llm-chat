@@ -396,7 +396,7 @@ export default function ModelInputModal({
             </li>
           ))}
         </ul>
-        <form onSubmit={handleSubmit} className="input-area">
+        <form onSubmit={handleSubmit} className="settings-input-area">
           <input
             ref={newModelInputRef}
             type="text"
