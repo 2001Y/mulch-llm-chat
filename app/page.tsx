@@ -11,177 +11,35 @@ import useStorageState from "hooks/useLocalStorage";
 import Header from "components/Header";
 import ChatList from "components/ChatList";
 import BentoFeatures from "components/BentoFeatures";
-import { PAID_MODELS, FREE_MODELS } from "@/lib/models";
 
 export default function ChatListPage() {
   const {
-    models,
-    setModels,
     selectedModels,
     setSelectedModels,
-    chatInput,
-    setChatInput,
+    messages,
+    setMessages,
     isGenerating,
-    handleSend,
-    handleNewChat,
+    setIsGenerating,
     isModalOpen,
     handleOpenModal,
     handleCloseModal,
+    handleNewChat,
+    handleSend,
   } = useChatLogic();
 
   const [accessToken, setAccessToken] = useAccessToken();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [demoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO || "");
-  const [demoModels] = useState<string[]>([
-    "google/gemma-2-9b-it:free",
-    "google/gemma-7b-it:free",
-    "meta-llama/llama-3-8b-instruct:free",
-    "openchat/openchat-7b:free",
-  ]);
-  const [tools, setTools] = useStorageState("tools", [
-    {
-      type: "function",
-      function: {
-        name: "get_current_weather",
-        description: "現在の天気を取得する",
-        parameters: {
-          type: "object",
-          properties: {
-            location: {
-              type: "string",
-              description: "場所（例：東京）",
-            },
-            unit: {
-              type: "string",
-              enum: ["celsius", "fahrenheit"],
-              description: "温度の単位",
-              default: "celsius",
-            },
-          },
-          required: ["location"],
-        },
-      },
-    },
-    {
-      type: "function",
-      function: {
-        name: "transfer_funds",
-        description: "振込を行う",
-        parameters: {
-          type: "object",
-          properties: {
-            account_to: {
-              type: "string",
-              description: "送金先の口座番号",
-            },
-            amount: {
-              type: "number",
-              description: "送金額",
-            },
-          },
-          required: ["account_to", "amount"],
-        },
-      },
-    },
-    {
-      type: "function",
-      function: {
-        name: "search_account",
-        description: "名前から口座名を検索する",
-        parameters: {
-          type: "object",
-          properties: {
-            name: {
-              type: "string",
-              description: "検索する名前（姓または名）",
-            },
-          },
-          required: ["name"],
-        },
-      },
-    },
-  ]);
-
-  type ToolFunction = (args: any) => any;
-
-  const [toolFunctions, setToolFunctions] = useStorageState<
-    Record<string, ToolFunction>
-  >("toolFunctions", {
-    get_current_weather: (args: any) => {
-      const { location = "Tokyo", unit = "celsius" } = args;
-      const randomTemperature = () => (Math.random() * 40 - 10).toFixed(1);
-      const randomWeather = () => {
-        const weatherConditions = ["晴れ", "曇り", "雨", "雪"];
-        return weatherConditions[
-          Math.floor(Math.random() * weatherConditions.length)
-        ];
-      };
-
-      const temperature = randomTemperature();
-      const weather = randomWeather();
-
-      return {
-        location: location,
-        temperature:
-          unit === "fahrenheit"
-            ? ((parseFloat(temperature) * 9) / 5 + 32).toFixed(1)
-            : temperature,
-        unit: unit,
-        weather: weather,
-      };
-    },
-    transfer_funds: (args: any) => {
-      const { account_to, amount } = args;
-      return {
-        status: "success",
-        message: `振込が成功しました: ${amount}円を送金しました。`,
-      };
-    },
-    search_account: (args: any) => {
-      const { name } = args;
-      const accounts = [
-        { name: "田中太郎", account: "1234567890" },
-        { name: "田中花子", account: "2345678901" },
-        { name: "田中一郎", account: "3456789012" },
-        { name: "佐次郎", account: "4567890123" },
-        { name: "鈴木三郎", account: "5678901234" },
-      ];
-
-      const matchedAccounts = accounts.filter((account) =>
-        account.name.includes(name)
-      );
-
-      if (matchedAccounts.length === 0) {
-        return { message: "該当する口座が見つかりませんでした。" };
-      }
-
-      return {
-        message: "以下の口座が見つかりました：",
-        accounts: matchedAccounts.map(
-          (account) => `${account.name}: ${account.account}`
-        ),
-      };
-    },
-  });
-
-  const router = useRouter();
-
-  const [chats] = useStorageState<string[]>("chats", []);
+  const [tools, setTools] = useStorageState("tools");
+  const [models, setModels] = useStorageState("models");
+  const [toolFunctions, setToolFunctions] = useStorageState("toolFunctions");
+  const [chatInput, setChatInput] = useState<
+    { type: string; text?: string; image_url?: { url: string } }[]
+  >([{ type: "text", text: "" }]);
   const [hasActualChats, setHasActualChats] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     setIsLoggedIn(!!accessToken);
-  }, [accessToken]);
-
-  useEffect(() => {
-    if (accessToken) {
-      setModels([...PAID_MODELS]);
-      setSelectedModels([...PAID_MODELS]);
-    } else {
-      setModels([...FREE_MODELS]);
-      setSelectedModels([...FREE_MODELS]);
-    }
   }, [accessToken]);
 
   useEffect(() => {
@@ -224,8 +82,7 @@ export default function ChatListPage() {
 
   const handleLogout = () => {
     setAccessToken("");
-    setModels(demoModels);
-    setSelectedModels(demoModels);
+    setSelectedModels([]);
   };
 
   useEffect(() => {
@@ -240,30 +97,9 @@ export default function ChatListPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleNewChat]);
 
-  // const handleLogin = () => {
-  //   const isProduction = process.env.NODE_ENV === "production";
-  //   const redirectUri = isProduction
-  //     ? "https://mulch-llm-chat.vercel.app"
-  //     : "https://3000.2001y.dev";
-  //   const openRouterAuthUrl = `https://openrouter.ai/auth?callback_url=${redirectUri}`;
-  //   const width = 800;
-  //   const height = 600;
-  //   const left = (window.screen.width - width) / 2;
-  //   const top = (window.screen.height - height) / 2;
-  //   window.open(
-  //     openRouterAuthUrl,
-  //     "_blank",
-  //     `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`
-  //   );
-  // };
-
   return (
     <>
-      <Header
-        setIsModalOpen={handleOpenModal}
-        isLoggedIn={isLoggedIn}
-        // onLogin={handleLogin}
-      />
+      <Header setIsModalOpen={handleOpenModal} isLoggedIn={isLoggedIn} />
 
       {(!isMobile || (isMobile && !hasActualChats)) && <BentoFeatures />}
 
@@ -285,24 +121,20 @@ export default function ChatListPage() {
         messageIndex={0}
         handleResetAndRegenerate={() => {}}
         handleSaveOnly={() => {}}
-        isInitialScreen={true}
-        handleStopAllGeneration={() => {}}
         isGenerating={isGenerating}
+        handleStopAllGeneration={() => {}}
+        isInitialScreen={!hasActualChats}
       />
 
       <ModelInputModal
-        models={isLoggedIn ? models : demoModels}
-        setModels={isLoggedIn ? setModels : () => {}}
+        models={models}
+        setModels={setModels}
         isModalOpen={isModalOpen}
         closeModal={handleCloseModal}
-        tools={tools}
-        setTools={setTools}
-        toolFunctions={toolFunctions}
-        setToolFunctions={
-          setToolFunctions as unknown as (
-            toolFunctions: Record<string, Function>
-          ) => void
-        }
+        // tools={tools}
+        // setTools={setTools}
+        // toolFunctions={toolFunctions}
+        // setToolFunctions={setToolFunctions}
       />
     </>
   );

@@ -41,22 +41,7 @@ export function useChatLogic() {
   const handleOpenModal = useCallback(() => setIsModalOpen(true), []);
   const handleCloseModal = useCallback(() => setIsModalOpen(false), []);
 
-  // ページロード時にroomIdがない場合は新しいチャットページにリダイレクト
-  // useEffect(() => {
-  //   if (!roomId) {
-  //     const newChatId = Date.now().toString();
-  //     router.push(`/${newChatId}`);
-  //   }
-  // }, [roomId, router]);
-
-  const [models, setModels] = useStorageState<string[]>("models", [
-    "anthropic/claude-3.5-sonnet",
-    "openai/gpt-4o",
-    "google/gemini-pro-1.5",
-    "cohere/command-r-plus",
-    "qwen/qwen-2.5-72b-instruct",
-    "mistralai/mistral-large",
-  ]);
+  const [models, setModels] = useStorageState("models");
   const [selectedModels, setSelectedModels] = useState<string[]>(models);
   const [chatInput, setChatInput] = useState<any[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -67,9 +52,8 @@ export function useChatLogic() {
   const [isAutoScroll, setIsAutoScroll] = useState(true);
 
   // roomIdが確定してからストレージを初期化
-  const [storedMessages, setStoredMessages] = useStorageState<Message[]>(
-    `chatMessages_${roomId || "default"}`,
-    []
+  const [storedMessages, setStoredMessages] = useStorageState(
+    `chatMessages_${roomId || "default"}`
   );
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -82,7 +66,7 @@ export function useChatLogic() {
 
   // ローカルストレージからメッジ読み込む
   useEffect(() => {
-    if (storedMessages.length > 0 && !initialLoadComplete) {
+    if (storedMessages && storedMessages.length > 0 && !initialLoadComplete) {
       console.log(`ルーム ${roomId} の以前のメッセージを復元:`, storedMessages);
       setMessages(storedMessages);
       setInitialLoadComplete(true);
@@ -256,7 +240,7 @@ export function useChatLogic() {
 
     const modelMatches = textContent.match(/@(\S+)/g) || [];
     return modelMatches
-      .map((match: string) => match.slice(1)) // '@'��削除
+      .map((match: string) => match.slice(1)) // '@'削除
       .map((shortId: string) => {
         const matchedModel = AllModels.find(
           (model) => model.shortId === shortId
@@ -273,7 +257,7 @@ export function useChatLogic() {
         if (item.type === "text" && item.text) {
           return {
             ...item,
-            text: item.text.replace(/@\S+/g, "").trim(), // 全てのモデル指定を削除
+            text: item.text.replace(/@\S+/g, "").trim(), // 全てモデル指定を削除
           };
         }
         return item;
@@ -391,7 +375,7 @@ export function useChatLogic() {
       });
 
       try {
-        // 過去のメッセージを取得し、null���を除
+        // 過去のメッセージを取得し、nullを除
         const pastMessages = messages
           .slice(0, messageIndex) // 現在のメッセージより前のメッセージのみを取得
           .flatMap((msg) => {
@@ -441,7 +425,7 @@ export function useChatLogic() {
         // 入力をクリーンアップ
         const cleanedInputContent = cleanInputContent(inputContent);
 
-        console.log("[fetchChatResponse] API呼び出し開始", {
+        console.log("[fetchChatResponse] API��び出し開始", {
           model: modelToUse,
           cleanedInputContent,
         });
@@ -480,7 +464,7 @@ export function useChatLogic() {
         let resultText = "";
 
         if (stream) {
-          console.log("[fetchChatResponse] ストリーム受信開始");
+          console.log("[fetchChatResponse] トリーム受信開始");
           for await (const part of stream) {
             if (abortController.signal.aborted) {
               throw new DOMException("Aborted", "AbortError");
@@ -658,23 +642,25 @@ export function useChatLogic() {
     [messages, updateMessage]
   );
 
+  const [toolFunctions, setToolFunctions] = useStorageState("toolFunctions");
+
   return {
     models,
     setModels,
     selectedModels,
     setSelectedModels,
-    chatInput,
-    setChatInput,
     messages,
     setMessages,
     isGenerating,
     setIsGenerating,
-    handleSend,
-    handleNewChat,
-    handleStopAllGeneration,
-    handleResetAndRegenerate,
     isModalOpen,
     handleOpenModal,
     handleCloseModal,
+    toolFunctions,
+    setToolFunctions,
+    chatInput,
+    setChatInput,
+    handleSend,
+    handleNewChat,
   };
 }

@@ -1,16 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import ModelSuggestions from "./ModelSuggestions";
-import { ToolFunction } from "hooks/useChatLogic";
+import useStorageState from "hooks/useLocalStorage";
 
 interface ModelInputModalProps {
   models: string[];
   setModels: (models: string[]) => void;
   isModalOpen: boolean;
   closeModal: () => void;
-  tools: Tool[];
-  setTools: (tools: Tool[]) => void;
-  toolFunctions: Record<string, ToolFunction>;
-  setToolFunctions: (toolFunctions: Record<string, ToolFunction>) => void;
 }
 
 interface Tool {
@@ -32,10 +28,6 @@ export default function ModelInputModal({
   setModels,
   isModalOpen,
   closeModal,
-  tools,
-  setTools,
-  toolFunctions,
-  setToolFunctions,
 }: ModelInputModalProps) {
   const [newModel, setNewModel] = useState<string>("");
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -54,6 +46,9 @@ export default function ModelInputModal({
   const dragOverItem = useRef<number | null>(null);
 
   const newModelInputRef = useRef<HTMLInputElement>(null);
+
+  const [tools, setTools] = useStorageState("tools");
+  const [toolFunctions, setToolFunctions] = useStorageState("toolFunctions");
 
   useEffect(() => {
     if (newModel.length > 0) {
@@ -105,7 +100,7 @@ export default function ModelInputModal({
     });
     setEditingIndex(tools.length);
     setEditingToolDefinition(JSON.stringify(newTool, null, 2));
-    setEditingToolFunction('() => console.log("新しい関数")');
+    setEditingToolFunction("() => console.log('新しい関数')");
   };
 
   const handleEditModel = (index: number) => {
@@ -136,7 +131,9 @@ export default function ModelInputModal({
     const updatedTools = tools.filter((_, i) => i !== index);
     setTools(updatedTools);
     const deletedTool = tools[index];
-    const updatedToolFunctions = { ...toolFunctions };
+    const updatedToolFunctions = {
+      ...toolFunctions,
+    };
     delete updatedToolFunctions[deletedTool.function.name];
     setToolFunctions(updatedToolFunctions);
   };
@@ -156,12 +153,10 @@ export default function ModelInputModal({
     setEditingIndex(index);
     const tool = tools[index];
     setEditingToolDefinition(JSON.stringify(tool, null, 2));
-    // toolFunctions[tool.function.name]が存在しない場合のチェックを追加
-    const functionString = toolFunctions[tool.function.name]
-      ? toolFunctions[tool.function.name].toString()
-      : "() => {}";
+    const functionString = toolFunctions[tool.function.name] || "() => {}";
     setEditingToolFunction(functionString);
   };
+
   const handleSaveEditedTool = () => {
     if (editingIndex !== null) {
       try {
@@ -175,20 +170,22 @@ export default function ModelInputModal({
           !parsedTool.function.description ||
           !parsedTool.function.parameters
         ) {
-          throw new Error("ツール義の構造が不正です。");
+          throw new Error("ツール定義の構造が不正です。");
         }
 
-        let parsedFunction;
+        // 関数の構文チ��ックと変換
+        let functionImplementation;
         try {
-          parsedFunction = new Function(`return ${editingToolFunction}`)();
+          functionImplementation = new Function(
+            `return ${editingToolFunction}`
+          )();
+          if (typeof functionImplementation !== "function") {
+            throw new Error("関数として評価できません。");
+          }
         } catch (functionError: any) {
           throw new Error(
             "ツール関数の構文が不正です: " + functionError.message
           );
-        }
-
-        if (typeof parsedFunction !== "function") {
-          throw new Error("ツール関数が有効な関数ではありません。");
         }
 
         // 更新処理
@@ -196,9 +193,14 @@ export default function ModelInputModal({
         updatedTools[editingIndex] = parsedTool;
         setTools(updatedTools);
 
-        const updatedToolFunctions = { ...toolFunctions };
-        updatedToolFunctions[parsedTool.function.name] = parsedFunction;
+        const updatedToolFunctions = {
+          ...toolFunctions,
+        };
+        updatedToolFunctions[parsedTool.function.name] = functionImplementation;
         setToolFunctions(updatedToolFunctions);
+
+        // イベントを発火して関数の更新を通知
+        window.dispatchEvent(new Event("toolFunctionsUpdated"));
 
         setEditingIndex(null);
         setEditingToolDefinition("");

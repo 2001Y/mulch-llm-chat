@@ -13,7 +13,6 @@ import hljs from "highlight.js";
 import { useParams } from "next/navigation";
 import TurndownService from "turndown";
 import { FunctionCallHandler } from "../utils/functionCallHandler";
-import { MessageContent } from "../types/chat";
 
 marked.use(
   markedHighlight({
@@ -25,35 +24,26 @@ marked.use(
   })
 );
 
-// JSONパース用のヘルパー関数
-const safeJSONParse = (text: string) => {
-  try {
-    // 引用符で囲まれていない文字列を修正
-    const fixedText = text.replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":');
-    return JSON.parse(fixedText);
-  } catch (e) {
-    console.error("[JSON Parse Error]", { text, error: e });
-    throw new Error(`JSON解析エラー: ${text}`);
-  }
-};
+interface ResponsesProps {
+  openai: any;
+  models: string[];
+  selectedModels: string[];
+  setSelectedModels: React.Dispatch<React.SetStateAction<string[]>>;
+  messages: any[];
+  setMessages: React.Dispatch<React.SetStateAction<any[]>>;
+}
 
 export default function Responses({
   openai,
   models,
   selectedModels,
   setSelectedModels,
-  toolFunctions,
   messages,
   setMessages,
-}: {
-  openai: any;
-  models: string[];
-  selectedModels: string[];
-  setSelectedModels: React.Dispatch<React.SetStateAction<string[]>>;
-  toolFunctions: Record<string, (args: any) => any>;
-  messages: any[];
-  setMessages: React.Dispatch<React.SetStateAction<any[]>>;
-}) {
+}: ResponsesProps) {
+  const [tools] = useStorageState("tools");
+  const [toolFunctions] = useStorageState("toolFunctions");
+
   const params = useParams();
   const roomId = params.id as string;
 
@@ -69,9 +59,8 @@ export default function Responses({
   const [chatInput, setChatInput] = useState<
     { type: string; text?: string; image_url?: { url: string } }[]
   >([]);
-  const [storedMessages, setStoredMessages] = useStorageState<any[]>(
-    `chatMessages_${roomId}`,
-    []
+  const [storedMessages, setStoredMessages] = useStorageState(
+    `chatMessages_${roomId}`
   );
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
@@ -170,7 +159,7 @@ export default function Responses({
         if (item.type === "text" && item.text) {
           return {
             ...item,
-            text: item.text.replace(/@\S+/g, "").trim(), // 全てのモデル指定を削除
+            text: item.text.replace(/@\S+/g, "").trim(), // 全てのモデ��指定を削除
           };
         }
         return item;
@@ -345,68 +334,7 @@ export default function Responses({
             ],
             stream: true,
             tool_choice: "auto",
-            tools: [
-              {
-                type: "function",
-                function: {
-                  name: "get_current_weather",
-                  description: "現在の天気情報を取得します",
-                  parameters: {
-                    type: "object",
-                    properties: {
-                      location: {
-                        type: "string",
-                        description: "天気を取得する場所（都市名）",
-                      },
-                      unit: {
-                        type: "string",
-                        enum: ["celsius", "fahrenheit"],
-                        description: "温度の単位",
-                      },
-                    },
-                    required: ["location"],
-                  },
-                },
-              },
-              {
-                type: "function",
-                function: {
-                  name: "transfer_funds",
-                  description: "資金を送金します",
-                  parameters: {
-                    type: "object",
-                    properties: {
-                      account_to: {
-                        type: "string",
-                        description: "送金先の口座番号",
-                      },
-                      amount: {
-                        type: "number",
-                        description: "送金額（円）",
-                      },
-                    },
-                    required: ["account_to", "amount"],
-                  },
-                },
-              },
-              {
-                type: "function",
-                function: {
-                  name: "search_account",
-                  description: "口座情報を検索します",
-                  parameters: {
-                    type: "object",
-                    properties: {
-                      name: {
-                        type: "string",
-                        description: "検索する口座名義人の名前",
-                      },
-                    },
-                    required: ["name"],
-                  },
-                },
-              },
-            ],
+            tools,
           },
           {
             signal: abortController.signal,
@@ -423,31 +351,7 @@ export default function Responses({
             },
           ],
           tool_choice: "auto",
-          tools: [
-            {
-              type: "function",
-              function: {
-                name: "get_current_weather",
-                description: "現在の天気情報を取得します",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    location: {
-                      type: "string",
-                      description: "天気を取得する場所（都市名）",
-                    },
-                    unit: {
-                      type: "string",
-                      enum: ["celsius", "fahrenheit"],
-                      description: "温度の単位",
-                    },
-                  },
-                  required: ["location"],
-                },
-              },
-            },
-            // ... 他の関数定義も同��にログ出力
-          ],
+          tools,
         });
 
         if (stream) {
@@ -475,8 +379,13 @@ export default function Responses({
             }
 
             if (functionHandler.isReadyToExecute()) {
+              const parsedToolFunctions: Record<string, (args: any) => any> =
+                {};
+              for (const [key, value] of Object.entries(toolFunctions)) {
+                parsedToolFunctions[key] = new Function(`return ${value}`)();
+              }
               await functionHandler.execute(
-                toolFunctions,
+                parsedToolFunctions,
                 tempContent,
                 updateMessage,
                 messageIndex,
@@ -601,7 +510,7 @@ export default function Responses({
     const modelsToUse =
       specifiedModels.length > 0 ? specifiedModels : selectedModels;
 
-    // モデルに送信する際にのみクリーンアップ
+    // モデルに送信する際にのみ���リーンアップ
     const cleanedUserMessage = cleanInputContent(userMessage);
 
     const newMessages = [...messages].slice(0, messageIndex + 1);

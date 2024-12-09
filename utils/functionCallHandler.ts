@@ -115,9 +115,9 @@ export class FunctionCallHandler {
       updateMessage(messageIndex, responseIndex, tempResult);
 
       if (toolFunctions[this.name]) {
-        const functionResult = await Promise.resolve(
-          toolFunctions[this.name](args)
-        );
+        // 文字列から関数に変換
+        const fn = new Function(`return ${toolFunctions[this.name]}`)();
+        const functionResult = await Promise.resolve(fn(args));
         console.log("[Function Result]", {
           name: this.name,
           result: functionResult,

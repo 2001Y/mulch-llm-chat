@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from "react";
-import useLocalStorage from "hooks/useLocalStorage";
 import { toast } from "sonner";
 import ModelSuggestions from "./ModelSuggestions";
 
@@ -25,6 +24,7 @@ interface InputSectionProps {
   isInitialScreen: boolean;
   handleStopAllGeneration: () => void;
   isGenerating: boolean;
+  messages?: any[];
 }
 
 export default function InputSection({
@@ -42,8 +42,8 @@ export default function InputSection({
   isInitialScreen,
   handleStopAllGeneration,
   isGenerating,
+  messages,
 }: InputSectionProps) {
-  const [storedMessages] = useLocalStorage<any[]>("chatMessages", []);
   const [isComposing, setIsComposing] = useState(false);
   const [isEdited, setIsEdited] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -51,7 +51,10 @@ export default function InputSection({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const originalMessage = storedMessages[messageIndex]?.user || null;
+  const originalMessage =
+    messages && messageIndex >= 0 && messageIndex < (messages?.length || 0)
+      ? messages[messageIndex]?.user
+      : null;
 
   useEffect(() => {
     if (mainInput) setChatInput([{ type: "text", text: "" }]);
@@ -293,18 +296,19 @@ export default function InputSection({
       </div>
 
       <div className="input-container model-select-area">
-        {models.map((model, idx) => (
-          <div className="model-radio" key={model}>
-            <input
-              type="checkbox"
-              id={`model-${idx}`}
-              value={model}
-              checked={selectedModels.includes(model)}
-              onChange={() => handleModelChange(model)}
-            />
-            <label htmlFor={`model-${idx}`}>{model.split("/")[1]}</label>
-          </div>
-        ))}
+        {Array.isArray(models) &&
+          models.map((model, idx) => (
+            <div className="model-radio" key={model}>
+              <input
+                type="checkbox"
+                id={`model-${idx}`}
+                value={model}
+                checked={selectedModels.includes(model)}
+                onChange={() => handleModelChange(model)}
+              />
+              <label htmlFor={`model-${idx}`}>{model.split("/")[1]}</label>
+            </div>
+          ))}
       </div>
 
       <div className="input-container input-actions">
@@ -423,7 +427,8 @@ export default function InputSection({
                       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
                     </svg>
                     <span>
-                      Send to <code>{selectedModels[0].split("/")[1]}</code>
+                      Send to{" "}
+                      <code>{selectedModels[0]?.split("/")[1] || "model"}</code>
                       <span className="shortcut">⌘⏎</span>
                     </span>
                   </button>
