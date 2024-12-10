@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from "react";
 import { toast } from "sonner";
 import ModelSuggestions from "./ModelSuggestions";
+import useStorageState from "hooks/useLocalStorage";
+import Image from "next/image";
 
 interface InputSectionProps {
-  models: string[];
   mainInput: boolean;
   chatInput: { type: string; text?: string; image_url?: { url: string } }[];
   setChatInput: React.Dispatch<
@@ -13,10 +14,9 @@ interface InputSectionProps {
   >;
   handleSend: (
     event: React.MouseEvent<HTMLButtonElement>,
-    isPrimaryOnly: boolean
+    isPrimaryOnly: boolean,
+    currentInput: { type: string; text?: string; image_url?: { url: string } }[]
   ) => void;
-  selectedModels: string[];
-  setSelectedModels: React.Dispatch<React.SetStateAction<string[]>>;
   isEditMode: boolean;
   messageIndex: number;
   handleResetAndRegenerate: (messageIndex: number) => void;
@@ -28,13 +28,10 @@ interface InputSectionProps {
 }
 
 export default function InputSection({
-  models,
   mainInput,
   chatInput,
   setChatInput,
   handleSend,
-  selectedModels,
-  setSelectedModels,
   isEditMode,
   messageIndex,
   handleResetAndRegenerate,
@@ -50,6 +47,7 @@ export default function InputSection({
   const sectionRef = useRef<HTMLElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [models, setModels] = useStorageState("models");
 
   const originalMessage =
     messages && messageIndex >= 0 && messageIndex < (messages?.length || 0)
@@ -119,16 +117,29 @@ export default function InputSection({
     }
   };
 
-  const handleModelChange = (model: string) => {
+  const handleModelSelect = (modelName: string) => {
     const wasFocused = document.activeElement === inputRef.current;
-    setSelectedModels((prev) => {
-      const isSelected = prev.includes(model);
-      const newSelection = isSelected
-        ? prev.filter((m) => m !== model)
-        : [model, ...prev];
+    // @ts-expect-error
+    setModels((prev) => {
+      if (!prev) return prev;
 
-      return newSelection.length ? newSelection : [models[0]];
+      // @ts-expect-error
+      const updatedModels = prev.map((model) => {
+        if (model.name === modelName) {
+          return { ...model, selected: !model.selected };
+        }
+        return model;
+      });
+
+      // 選択されているモデルがない場合、最初のモデルを選択
+      // @ts-expect-error
+      if (!updatedModels.some((model) => model.selected)) {
+        updatedModels[0].selected = true;
+      }
+
+      return updatedModels;
     });
+
     if (wasFocused) {
       setTimeout(() => inputRef.current?.focus(), 0);
     }
@@ -138,8 +149,9 @@ export default function InputSection({
     event: React.MouseEvent<HTMLButtonElement>,
     isPrimaryOnly: boolean
   ) => {
-    handleSend(event, isPrimaryOnly);
+    const currentInput = [...chatInput];
     setChatInput([{ type: "text", text: "" }]);
+    handleSend(event, isPrimaryOnly, currentInput);
   };
 
   const handleImageSelect = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -251,9 +263,12 @@ export default function InputSection({
             .filter((item) => item.type === "image_url")
             .map((image, idx) => (
               <div key={idx} className="image-preview">
-                <img
-                  src={image.image_url?.url}
+                <Image
+                  src={image.image_url?.url || ""}
                   alt={`選択された画像 ${idx + 1}`}
+                  width={200}
+                  height={200}
+                  style={{ objectFit: "contain" }}
                 />
                 <button onClick={() => removeImage(idx + 1)}>×</button>
               </div>
@@ -297,16 +312,16 @@ export default function InputSection({
 
       <div className="input-container model-select-area">
         {Array.isArray(models) &&
-          models.map((model, idx) => (
-            <div className="model-radio" key={model}>
+          models?.map((model, idx) => (
+            <div className="model-radio" key={model.name}>
               <input
                 type="checkbox"
                 id={`model-${idx}`}
-                value={model}
-                checked={selectedModels.includes(model)}
-                onChange={() => handleModelChange(model)}
+                value={model.name}
+                checked={model.selected}
+                onChange={() => handleModelSelect(model.name)}
               />
-              <label htmlFor={`model-${idx}`}>{model.split("/")[1]}</label>
+              <label htmlFor={`model-${idx}`}>{model.name.split("/")[1]}</label>
             </div>
           ))}
       </div>
@@ -428,7 +443,13 @@ export default function InputSection({
                     </svg>
                     <span>
                       Send to{" "}
-                      <code>{selectedModels[0]?.split("/")[1] || "model"}</code>
+                      <code>
+                        {(Array.isArray(models) &&
+                          models
+                            ?.find((model) => model.selected)
+                            ?.name.split("/")[1]) ||
+                          "model"}
+                      </code>
                       <span className="shortcut">⌘⏎</span>
                     </span>
                   </button>

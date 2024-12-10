@@ -3,7 +3,7 @@ import { useParams, useRouter } from "next/navigation";
 import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
-import useStorageState from "hooks/useLocalStorage";
+import useStorageState, { storage } from "hooks/useLocalStorage";
 import useAccessToken from "hooks/useAccessToken";
 import { useOpenAI } from "hooks/useOpenAI";
 import { generateId } from "@/utils/generateId";
@@ -36,13 +36,20 @@ export function useChatLogic() {
   const params = useParams();
   const roomId = params?.id as string | undefined;
 
-  // 設定モーダルの状態管理を追加
+  // 設定モーダルの状態管理を追���
   const [isModalOpen, setIsModalOpen] = useState(false);
   const handleOpenModal = useCallback(() => setIsModalOpen(true), []);
   const handleCloseModal = useCallback(() => setIsModalOpen(false), []);
 
   const [models, setModels] = useStorageState("models");
-  const [selectedModels, setSelectedModels] = useState<string[]>(models);
+  const [selectedModels, setSelectedModels] = useState<string[]>(
+    models
+      ? [
+          ...(models.login?.map((m) => m.name) || []),
+          ...(models.noLogin?.map((m) => m.name) || []),
+        ]
+      : []
+  );
   const [chatInput, setChatInput] = useState<any[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -206,31 +213,6 @@ export function useChatLogic() {
     [setMessages, setStoredMessages, storedMessages]
   );
 
-  // 新しいチャットを作成する
-  const handleNewChat = useCallback(() => {
-    // 新しいチャットIDを作成
-    const newChatId = generateId(6);
-
-    // 初期状態のメッセージを作成
-    const initialMessage = {
-      user: [{ type: "text", text: "" }],
-      llm: [],
-      timestamp: Date.now(),
-    };
-
-    // ローカルストレージに保存
-    setStoredMessages([initialMessage]);
-
-    // デフォルトのストレージを削除（トップページ用）
-    localStorage.removeItem("chatMessages_default");
-
-    // チャットリストの更新を通知
-    window.dispatchEvent(new Event("chatListUpdate"));
-
-    // チャットページに遷移
-    router.push(`/${newChatId}`);
-  }, [router, setStoredMessages]);
-
   // extractModelsFromInput 関数
   const extractModelsFromInput = (inputContent: any): string[] => {
     const textContent = inputContent
@@ -268,14 +250,19 @@ export function useChatLogic() {
   // モデル選択のロジックを共通化する関数
   const determineModelsToUse = useCallback(
     (userInput: any[], isPrimaryOnly: boolean) => {
+      const loginState = accessToken ? "login" : "noLogin";
       const specifiedModels = extractModelsFromInput(userInput);
+      const selectedModels = models[loginState]
+        .filter((model) => model.selected)
+        .map((model) => model.name);
+
       return isPrimaryOnly
         ? [selectedModels[0]]
         : specifiedModels.length > 0
         ? specifiedModels
         : selectedModels;
     },
-    [extractModelsFromInput, selectedModels]
+    [extractModelsFromInput, models, accessToken]
   );
 
   // メッセージ作成のロジックを共通化する関数
@@ -300,21 +287,33 @@ export function useChatLogic() {
       event:
         | React.FormEvent<HTMLFormElement>
         | React.MouseEvent<HTMLButtonElement>,
-      isPrimaryOnly = false
+      isPrimaryOnly = false,
+      savedInput?: any[]
     ) => {
       event.preventDefault();
       if (isGenerating) return;
 
-      const modelsToUse = determineModelsToUse(chatInput, isPrimaryOnly);
-      const newMessage = createMessage(chatInput, modelsToUse);
+      const inputToUse = savedInput || chatInput;
+      const modelsToUse = determineModelsToUse(inputToUse, isPrimaryOnly);
+      const newMessage = createMessage(inputToUse, modelsToUse);
 
       // 新規チャットの場合（トップページからの送信）
       if (!roomId) {
         const newChatId = generateId(6);
         const newStorageKey = `chatMessages_${newChatId}`;
-        localStorage.setItem(newStorageKey, JSON.stringify([newMessage]));
-        localStorage.removeItem("chatMessages_default");
+
+        console.log("Saving to localStorage:", {
+          chatInput,
+          modelsToUse,
+          newMessage,
+          storedContent: JSON.stringify([newMessage]),
+        });
+
+        storage.set(newStorageKey, [newMessage]);
+        storage.remove("chatMessages_default");
         window.dispatchEvent(new Event("chatListUpdate"));
+
+        // 直接ルーティングを実行
         router.push(`/${newChatId}`);
         return;
       }
@@ -325,7 +324,7 @@ export function useChatLogic() {
       setAbortControllers(newAbortControllers);
       setMessages((prevMessages) => [...prevMessages, newMessage]);
 
-      // チャットリストを更新（ストレージ保存後に実行）
+      // チャットリスト��更新（ストレージ保存後に実行）
       setStoredMessages([...messages, newMessage]);
       window.dispatchEvent(new Event("chatListUpdate"));
 
@@ -335,7 +334,7 @@ export function useChatLogic() {
           messages.length,
           index,
           newAbortControllers[index],
-          chatInput
+          inputToUse
         );
       });
 
@@ -425,7 +424,7 @@ export function useChatLogic() {
         // 入力をクリーンアップ
         const cleanedInputContent = cleanInputContent(inputContent);
 
-        console.log("[fetchChatResponse] API��び出し開始", {
+        console.log("[fetchChatResponse] APIび出し開始", {
           model: modelToUse,
           cleanedInputContent,
         });
@@ -661,6 +660,5 @@ export function useChatLogic() {
     chatInput,
     setChatInput,
     handleSend,
-    handleNewChat,
   };
 }

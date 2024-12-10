@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import ChatList from "../components/ChatList";
+import { storage } from "hooks/useLocalStorage";
 
 export default function Sidebar() {
   const [hasChats, setHasChats] = useState(false);
@@ -12,7 +13,7 @@ export default function Sidebar() {
         (key) =>
           key.startsWith("chatMessages_") &&
           key !== "chatMessages_default" &&
-          JSON.parse(localStorage.getItem(key) || "[]").some((msg: any) =>
+          (storage.get(key) || []).some((msg: any) =>
             msg.user?.some((u: any) => u.text?.trim())
           )
       );

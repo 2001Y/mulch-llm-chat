@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import ModelSuggestions from "./ModelSuggestions";
 import useStorageState from "hooks/useLocalStorage";
+import { useChatLogic } from "hooks/useChatLogic";
 
 interface ModelInputModalProps {
-  models: string[];
-  setModels: (models: string[]) => void;
-  isModalOpen: boolean;
   closeModal: () => void;
 }
 
@@ -23,12 +21,21 @@ interface OpenRouterModel {
   name: string;
 }
 
-export default function ModelInputModal({
-  models,
-  setModels,
-  isModalOpen,
-  closeModal,
-}: ModelInputModalProps) {
+export default function ModelInputModal() {
+  const { isModalOpen, handleCloseModal: closeModal } = useChatLogic();
+
+  const [storedModels, setStoredModels] = useStorageState("models");
+  const models = storedModels
+    ? [
+        ...(storedModels.login?.map((m) => m.name) || []),
+        ...(storedModels.noLogin?.map((m) => m.name) || []),
+      ]
+    : [];
+  const setModels = (newModels: string[]) => {
+    const loginModels = newModels.map((name) => ({ name, selected: true }));
+    setStoredModels({ login: loginModels, noLogin: [] });
+  };
+
   const [newModel, setNewModel] = useState<string>("");
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingModelIndex, setEditingModelIndex] = useState<number | null>(
@@ -173,7 +180,7 @@ export default function ModelInputModal({
           throw new Error("ツール定義の構造が不正です。");
         }
 
-        // 関数の構文チ��ックと変換
+        // 関数の構文チックと変換
         let functionImplementation;
         try {
           functionImplementation = new Function(

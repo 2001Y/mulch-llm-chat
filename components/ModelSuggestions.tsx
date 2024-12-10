@@ -101,50 +101,48 @@ export default function ModelSuggestions({
   );
 
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
+    (event: React.KeyboardEvent | KeyboardEvent) => {
       if (suggestions.length === 0) return;
 
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
         setActiveSuggestionIndex((prev) =>
           prev < suggestions.length - 1 ? prev + 1 : 0
         );
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
         setActiveSuggestionIndex((prev) =>
           prev > 0 ? prev - 1 : suggestions.length - 1
         );
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        e.stopPropagation();
+      } else if (event.key === "Enter") {
+        event.preventDefault();
+        event.stopPropagation();
         if (
           activeSuggestionIndex !== -1 &&
           activeSuggestionIndex < suggestions.length
         ) {
           handleSuggestionSelect(suggestions[activeSuggestionIndex].id);
         }
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
         setSuggestions([]);
         setActiveSuggestionIndex(-1);
         inputRef.current?.blur();
       }
     },
-    [suggestions, activeSuggestionIndex, handleSuggestionSelect]
+    [suggestions, activeSuggestionIndex, handleSuggestionSelect, inputRef]
   );
 
   useEffect(() => {
     const currentInput = inputRef.current;
     if (currentInput) {
-      const typedHandleKeyDown = (e: Event) => {
-        if (e instanceof KeyboardEvent) {
-          handleKeyDown(e as unknown as React.KeyboardEvent);
-        }
-      };
-      currentInput.addEventListener("keydown", typedHandleKeyDown);
+      currentInput.addEventListener("keydown", handleKeyDown as EventListener);
       return () => {
-        currentInput.removeEventListener("keydown", typedHandleKeyDown);
+        currentInput.removeEventListener(
+          "keydown",
+          handleKeyDown as EventListener
+        );
       };
     }
   }, [handleKeyDown, inputRef]);

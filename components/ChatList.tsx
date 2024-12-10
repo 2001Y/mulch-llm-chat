@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import styles from "@/styles/ChatList.module.scss";
 import { useChats } from "hooks/useLocalStorage";
+import { storage } from "hooks/useLocalStorage";
 import { navigateWithTransition } from "@/utils/navigation";
 
 interface ChatItem {
@@ -24,7 +25,7 @@ export default function ChatList() {
     const chatItems: ChatItem[] = [];
     chatIds.forEach((chatId) => {
       const key = `chatMessages_${chatId}`;
-      const chatData = JSON.parse(localStorage.getItem(key) || "[]");
+      const chatData = storage.get(key) || [];
       if (chatData.length > 0) {
         const firstMessage = chatData[0];
 
@@ -56,7 +57,7 @@ export default function ChatList() {
   const handleDelete = (chatId: string, event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    localStorage.removeItem(`chatMessages_${chatId}`);
+    storage.remove(`chatMessages_${chatId}`);
     setChats((prevChats) => prevChats.filter((chat) => chat.id !== chatId));
     setActiveMenu(null);
     window.dispatchEvent(new Event("chatListUpdate"));

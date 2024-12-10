@@ -1,21 +1,19 @@
-import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
-import useAccessToken from "hooks/useAccessToken";
 import Link from "next/link";
 import { navigateWithTransition } from "@/utils/navigation";
+import { storage } from "hooks/useLocalStorage";
+import Image from "next/image";
+import { useChatLogic } from "hooks/useChatLogic";
 
-interface HeaderProps {
-  setIsModalOpen: (isOpen: boolean) => void;
-  isLoggedIn: boolean;
-}
-
-export default function Header({ setIsModalOpen, isLoggedIn }: HeaderProps) {
+export default function Header() {
+  const { handleOpenModal } = useChatLogic();
   const router = useRouter();
   const pathname = usePathname();
-  const [accessToken, setAccessToken] = useAccessToken();
+  const isLoggedIn = !!storage.getAccessToken();
 
   const handleLogout = () => {
-    setAccessToken("");
+    storage.remove("accessToken");
+    window.dispatchEvent(new Event("tokenChange"));
   };
 
   const handleNavigation = (e: React.MouseEvent, href: string) => {
@@ -84,7 +82,7 @@ export default function Header({ setIsModalOpen, isLoggedIn }: HeaderProps) {
         {isLoggedIn ? (
           <>
             <button onClick={handleLogout}>Logout</button>
-            <div onClick={() => setIsModalOpen(true)} className="setting">
+            <div onClick={() => handleOpenModal()} className="setting">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"

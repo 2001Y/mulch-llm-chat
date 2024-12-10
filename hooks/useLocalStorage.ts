@@ -2,11 +2,67 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import defaultValues from "../config/localStorage.json";
 
-// アクセストークンの状態を取得する関数
-const getAccessToken = () => {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("accessToken");
+// ストレージユーティリティ関数
+export const storage = {
+  get: (key: string) => {
+    if (typeof window === "undefined") return null;
+    const item = localStorage.getItem(key);
+    if (
+      !item ||
+      item === '""' ||
+      item === "null" ||
+      item === "undefined" ||
+      item === ""
+    ) {
+      return undefined;
+    }
+    try {
+      const parsed = JSON.parse(item);
+      if (
+        parsed === null ||
+        parsed === "" ||
+        parsed === undefined ||
+        (Array.isArray(parsed) && parsed.length === 0) ||
+        (typeof parsed === "object" && Object.keys(parsed).length === 0)
+      ) {
+        return undefined;
+      }
+      return parsed;
+    } catch (error) {
+      console.error(`Failed to parse stored data for ${key}:`, error);
+      return undefined;
+    }
+  },
+
+  set: (key: string, value: any) => {
+    if (typeof window === "undefined") return;
+    if (
+      value === undefined ||
+      value === null ||
+      value === "" ||
+      (Array.isArray(value) && value.length === 0) ||
+      (typeof value === "object" && Object.keys(value).length === 0)
+    ) {
+      localStorage.removeItem(key);
+      return;
+    }
+    localStorage.setItem(key, JSON.stringify(value));
+  },
+
+  remove: (key: string) => {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(key);
+  },
+
+  getAccessToken: () => {
+    if (typeof window === "undefined") return null;
+    const token = storage.get("accessToken");
+    return token && token !== "" ? token : null;
+  },
 };
+
+// アクセストークンの状態を取得する関数
+const getAccessToken = () => storage.getAccessToken();
 
 // キーを生成する関数
 const generateStorageKey = (baseKey: string) => {
@@ -24,34 +80,13 @@ const generateStorageKey = (baseKey: string) => {
   return `${baseKey}_${hasToken ? "login" : "noLogin"}`;
 };
 
-// データを取得する関数
-const getStorageData = (baseKey: string) => {
-  const storageKey = generateStorageKey(baseKey);
-  const item = localStorage.getItem(storageKey);
-
-  if (item) {
-    const parsedItem = JSON.parse(item);
-    const defaultValue = (defaultValues as any)[baseKey];
-
-    // login/noLoginの切り替えが必要な場合のみ、状態に応じた値を返す
-    if (
-      defaultValue &&
-      typeof defaultValue === "object" &&
-      "login" in defaultValue &&
-      "noLogin" in defaultValue
-    ) {
-      return !!getAccessToken() ? defaultValue.login : defaultValue.noLogin;
-    }
-
-    return parsedItem;
-  }
-  return null;
-};
-
 interface StorageState {
   accessToken: string;
   tools: any[];
-  models: string[];
+  models: {
+    login: Array<{ name: string; selected: boolean }>;
+    noLogin: Array<{ name: string; selected: boolean }>;
+  };
   toolFunctions: Record<string, (args: any) => any>;
   chats: string[];
   [key: `chatMessages_${string}`]: any[];
@@ -60,115 +95,98 @@ interface StorageState {
 export default function useStorageState<K extends keyof StorageState>(
   key: K
 ): [StorageState[K], (value: StorageState[K]) => void] {
-  const [storedValue, setStoredValue] = useState<StorageState[K]>(() => {
-    // サーバーサイドでもクライアントサイドと同じロジックを使用
-    const defaultValue = (defaultValues as any)[key];
-
-    if (
-      defaultValue &&
-      typeof defaultValue === "object" &&
-      "login" in defaultValue &&
-      "noLogin" in defaultValue
-    ) {
-      // サーバーサイドではデフォルトでnoLoginの値を使用
-      return defaultValue.noLogin;
-    }
-
-    return defaultValue;
-  });
-
-  const isInitialized = useRef(false);
-
-  // クライアントサイドでの初期化
+  const [storedValue, setStoredValue] = useState<StorageState[K]>(
+    () => (defaultValues as any)[key] as StorageState[K]
+  );
+  // クライアントサイドでの初期化とアクセストークンの監視
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    try {
-      const data = getStorageData(key as string);
-      if (data !== null) {
+    // データを取得する関数
+    const getStorageData = (baseKey: string, login: boolean) => {
+      const storageKey = `${baseKey}_${login ? "login" : "noLogin"}`;
+      return storage.get(storageKey);
+    };
+
+    const defaultValue = (defaultValues as any)[key];
+    const requiresLoginState =
+      defaultValue &&
+      typeof defaultValue === "object" &&
+      "login" in defaultValue &&
+      "noLogin" in defaultValue;
+
+    if (requiresLoginState) {
+      // ログイン状態と非ログイン状態の両方のデータを取得
+      const loginData = getStorageData(key as string, true);
+      const noLoginData = getStorageData(key as string, false);
+
+      // ログイン状態に応じて適切な値を設定
+      const currentValue = !!getAccessToken() ? loginData : noLoginData;
+      setStoredValue(currentValue);
+
+      // 現在の状態のデータを保存
+      const currentStorageKey = `${key}_${
+        !!getAccessToken() ? "login" : "noLogin"
+      }`;
+      if (!localStorage.getItem(currentStorageKey)) {
+        localStorage.setItem(currentStorageKey, JSON.stringify(currentValue));
+      }
+    } else {
+      // ログイン状態に依存しないデータの場合
+      const data = getStorageData(key as string, false);
+      setStoredValue(data);
+
+      // データが存在しない場合、デフォルト値を保存
+      if (!localStorage.getItem(key as string)) {
+        localStorage.setItem(key as string, JSON.stringify(defaultValue));
+      }
+    }
+
+    // アクセストークンの変更を監視
+    const handleTokenChange = () => {
+      if (requiresLoginState) {
+        const loginData = getStorageData(key as string, true);
+        const noLoginData = getStorageData(key as string, false);
+        setStoredValue(!!getAccessToken() ? loginData : noLoginData);
+      } else {
+        const data = getStorageData(key as string, false);
         setStoredValue(data);
-      }
-    } catch (error) {
-      console.error(`🚨 [useLocalStorage] 初期化エラー:`, error);
-    }
-  }, [key]);
-
-  useEffect(() => {
-    if (!isInitialized.current) {
-      isInitialized.current = true;
-      return;
-    }
-
-    try {
-      if (typeof window !== "undefined") {
-        const storageKey = generateStorageKey(key as string);
-        if (storedValue === undefined || storedValue === null) {
-          localStorage.removeItem(storageKey);
-          console.log(
-            `🗑️ [useLocalStorage] キー "${storageKey}" を削除しました`
-          );
-        } else {
-          localStorage.setItem(storageKey, JSON.stringify(storedValue));
-          console.log(
-            `📝 [useLocalStorage] キー "${storageKey}" の値を保存しました:`,
-            storedValue
-          );
-        }
-      }
-    } catch (error) {
-      console.error(
-        `🚨 [useLocalStorage] ローカルストレージへの書き込みエラー:`,
-        error
-      );
-    }
-  }, [key, storedValue]);
-
-  // アクセストークンの変更を監視
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "accessToken") {
-        // アクセストークンが変更された場合、値を再読み込み
-        const data = getStorageData(key as string);
-        if (data !== null) {
-          setStoredValue(data);
-        }
       }
     };
 
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+    // 両方のイベントをリッスン
+    window.addEventListener("storage", (e) => {
+      if (e.key === "accessToken") {
+        handleTokenChange();
+      }
+    });
+    window.addEventListener("tokenChange", handleTokenChange);
+
+    return () => {
+      window.removeEventListener("storage", handleTokenChange);
+      window.removeEventListener("tokenChange", handleTokenChange);
+    };
   }, [key]);
 
   const setValue = useCallback(
     (value: StorageState[K]) => {
-      const storageKey = generateStorageKey(key as string);
-      const defaultValue = (defaultValues as any)[key];
-      const requiresLoginState =
-        defaultValue &&
-        typeof defaultValue === "object" &&
-        "login" in defaultValue &&
-        "noLogin" in defaultValue;
+      if (
+        value === undefined ||
+        value === null ||
+        value === "" ||
+        (Array.isArray(value) && value.length === 0) ||
+        (typeof value === "object" && Object.keys(value).length === 0)
+      ) {
+        storage.remove(`${key}_login`);
+        storage.remove(`${key}_noLogin`);
+        storage.remove(key as string);
+        setStoredValue(undefined as any);
+        return;
+      }
 
       setStoredValue(value);
-
-      if (value === undefined || value === null) {
-        localStorage.removeItem(storageKey);
-      } else {
-        // login/noLoginの切り替えが必要な場合のみ、現在の状態を維持
-        if (requiresLoginState) {
-          const currentValue = localStorage.getItem(storageKey);
-          const parsedCurrentValue = currentValue
-            ? JSON.parse(currentValue)
-            : {};
-          const newValue = {
-            ...parsedCurrentValue,
-            [!!getAccessToken() ? "login" : "noLogin"]: value,
-          };
-          localStorage.setItem(storageKey, JSON.stringify(newValue));
-        } else {
-          localStorage.setItem(storageKey, JSON.stringify(value));
-        }
-      }
+      const storageKey = generateStorageKey(key as string);
+      storage.set(storageKey, value);
     },
     [key]
   );

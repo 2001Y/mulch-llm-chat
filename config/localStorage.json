@@ -1,19 +1,48 @@
 {
-  "accessToken": "",
   "models": {
     "login": [
-      "anthropic/claude-3.5-sonnet",
-      "openai/gpt-4o",
-      "google/gemini-pro-1.5",
-      "cohere/command-r-plus",
-      "qwen/qwen-2.5-72b-instruct",
-      "mistralai/mistral-large"
+      {
+        "name": "anthropic/claude-3.5-sonnet",
+        "selected": true
+      },
+      {
+        "name": "openai/gpt-4o",
+        "selected": false
+      },
+      {
+        "name": "google/gemini-pro-1.5",
+        "selected": false
+      },
+      {
+        "name": "cohere/command-r-plus",
+        "selected": false
+      },
+      {
+        "name": "qwen/qwen-2.5-72b-instruct",
+        "selected": false
+      },
+      {
+        "name": "mistralai/mistral-large",
+        "selected": false
+      }
     ],
     "noLogin": [
-      "google/gemma-2-9b-it:free",
-      "google/gemma-7b-it:free",
-      "meta-llama/llama-3-8b-instruct:free",
-      "openchat/openchat-7b:free"
+      {
+        "name": "google/gemma-2-9b-it:free",
+        "selected": true
+      },
+      {
+        "name": "google/gemma-7b-it:free",
+        "selected": false
+      },
+      {
+        "name": "meta-llama/llama-3-8b-instruct:free",
+        "selected": false
+      },
+      {
+        "name": "openchat/openchat-7b:free",
+        "selected": false
+      }
     ]
   },
   "tools": [
@@ -82,6 +111,6 @@
   "toolFunctions": {
     "get_current_weather": "(args) => { const { location = \"Tokyo\", unit = \"celsius\" } = args; const randomTemperature = () => (Math.random() * 40 - 10).toFixed(1); const randomWeather = () => { const weatherConditions = [\"晴れ\", \"曇り\", \"雨\", \"雪\"]; return weatherConditions[Math.floor(Math.random() * weatherConditions.length)]; }; const temperature = randomTemperature(); const weather = randomWeather(); return { location: location, temperature: unit === \"fahrenheit\" ? ((parseFloat(temperature) * 9) / 5 + 32).toFixed(1) : temperature, unit: unit, weather: weather, }; }",
     "transfer_funds": "(args) => { const { account_to, amount } = args; return { status: \"success\", message: `振込が成功しました: ${amount}円を送金しました。`, }; }",
-    "search_account": "(args) => { const { name } = args; const accounts = [ { name: \"田中太郎\", account: \"1234567890\" }, { name: \"田中花子\", account: \"2345678901\" }, { name: \"田中一郎\", account: \"3456789012\" }, { name: \"佐藤次郎\", account: \"4567890123\" }, { name: \"鈴木三郎\", account: \"5678901234\" }, ]; const matchedAccounts = accounts.filter((account) => account.name.includes(name)); if (matchedAccounts.length === 0) { return { message: \"該当する口座が見つかりませんでした。\" }; } return { message: \"以下の口座が見つかりました：\", accounts: matchedAccounts.map( (account) => `${account.name}: ${account.account}` ), }; }"
+    "search_account": "(args) => { const { name } = args; const accounts = [ { name: \"田中太郎\", account: \"1234567890\" }, { name: \"田中花子\", account: \"2345678901\" }, { name: \"田一郎\", account: \"3456789012\" }, { name: \"佐藤次郎\", account: \"4567890123\" }, { name: \"鈴木三郎\", account: \"5678901234\" }, ]; const matchedAccounts = accounts.filter((account) => account.name.includes(name)); if (matchedAccounts.length === 0) { return { message: \"該当する口座が見つかりませんでした。\" }; } return { message: \"以下の口座が見つかりました：\", accounts: matchedAccounts.map( (account) => `${account.name}: ${account.account}` ), }; }"
   }
 }

@@ -13,6 +13,10 @@ import hljs from "highlight.js";
 import { useParams } from "next/navigation";
 import TurndownService from "turndown";
 import { FunctionCallHandler } from "../utils/functionCallHandler";
+import { useOpenAI } from "hooks/useOpenAI";
+import useAccessToken from "hooks/useAccessToken";
+import { useChatLogic } from "hooks/useChatLogic";
+import { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 marked.use(
   markedHighlight({
@@ -24,25 +28,34 @@ marked.use(
   })
 );
 
-interface ResponsesProps {
-  openai: any;
-  models: string[];
-  selectedModels: string[];
-  setSelectedModels: React.Dispatch<React.SetStateAction<string[]>>;
-  messages: any[];
-  setMessages: React.Dispatch<React.SetStateAction<any[]>>;
-}
+// 型定義を追加
+type MessageContent = {
+  type: string;
+  text?: string;
+  image_url?: { url: string };
+};
 
-export default function Responses({
-  openai,
-  models,
-  selectedModels,
-  setSelectedModels,
-  messages,
-  setMessages,
-}: ResponsesProps) {
+type ChatMessage = {
+  role: "user" | "assistant" | "system" | "tool" | "function";
+  content?: string | MessageContent[] | null | undefined;
+};
+
+export default function Responses() {
+  const [accessToken, setAccessToken] = useAccessToken();
+  const [demoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO || "");
+
+  const { selectedModels, setSelectedModels, messages, setMessages } =
+    useChatLogic();
+
   const [tools] = useStorageState("tools");
   const [toolFunctions] = useStorageState("toolFunctions");
+  const [storedModels] = useStorageState("models");
+  const models = storedModels
+    ? [
+        ...(storedModels.login?.map((m) => m.name) || []),
+        ...(storedModels.noLogin?.map((m) => m.name) || []),
+      ]
+    : [];
 
   const params = useParams();
   const roomId = params.id as string;
@@ -66,9 +79,13 @@ export default function Responses({
 
   const MemoizedInputSection = useMemo(() => React.memo(InputSection), []);
 
+  const openai = useOpenAI(
+    (typeof accessToken === "string" ? accessToken : "") || demoAccessToken
+  );
+
   // メッセージを復元するuseEffect
   useEffect(() => {
-    if (storedMessages.length > 0 && !initialLoadComplete) {
+    if (storedMessages && storedMessages.length > 0 && !initialLoadComplete) {
       console.log(`ルーム ${roomId} の以前のメッセージを復元:`, storedMessages);
       setMessages(storedMessages);
       setInitialLoadComplete(true);
@@ -159,7 +176,7 @@ export default function Responses({
         if (item.type === "text" && item.text) {
           return {
             ...item,
-            text: item.text.replace(/@\S+/g, "").trim(), // 全てのモデ��指定を削除
+            text: item.text.replace(/@\S+/g, "").trim(), // 全てのモデル指定を削除
           };
         }
         return item;
@@ -245,59 +262,61 @@ export default function Responses({
       });
 
       try {
-        const pastMessages = messages
-          .flatMap((msg) => {
-            const userContent = Array.isArray(msg.user)
-              ? msg.user.filter(
-                  (item: {
-                    type: string;
-                    text?: string;
-                    image_url?: { url: string };
-                  }) =>
-                    (item.type === "text" && item.text?.trim()) ||
-                    (item.type === "image_url" && item.image_url?.url)
-                )
-              : msg.user;
+        const pastMessages = messages.flatMap((msg) => {
+          const userContent = Array.isArray(msg.user)
+            ? msg.user.filter(
+                (item) =>
+                  (item.type === "text" && item.text?.trim()) ||
+                  (item.type === "image_url" && item.image_url?.url)
+              )
+            : msg.user;
 
-            const userMessage =
-              userContent.length > 0
-                ? { role: "user", content: userContent }
-                : null;
+          const userMessage: ChatMessage | null =
+            userContent.length > 0
+              ? { role: "user", content: userContent }
+              : null;
 
-            const selectedResponses = msg.llm
-              .filter((llm: any) => llm.selected)
-              .sort(
-                (a: any, b: any) =>
-                  (a.selectedOrder || 0) - (b.selectedOrder || 0)
-              );
+          const selectedResponses = msg.llm
+            .filter((llm: any) => llm.selected)
+            .sort(
+              (a: any, b: any) =>
+                (a.selectedOrder || 0) - (b.selectedOrder || 0)
+            );
 
-            const responseMessages =
-              selectedResponses.length > 0
-                ? selectedResponses.map((llm: any) => ({
+          const responseMessages: ChatMessage[] =
+            selectedResponses.length > 0
+              ? selectedResponses.map((llm: any) => ({
+                  role: "assistant",
+                  content: llm.text?.trim()
+                    ? [{ type: "text", text: llm.text.trim() }]
+                    : [],
+                }))
+              : msg.llm.find((llm: any) => llm.model === model)?.text?.trim()
+              ? [
+                  {
                     role: "assistant",
-                    content: llm.text?.trim()
-                      ? [{ type: "text", text: llm.text.trim() }]
-                      : [],
-                  }))
-                : msg.llm.find((llm: any) => llm.model === model)?.text?.trim()
-                ? [
-                    {
-                      role: "assistant",
-                      content: [
-                        {
-                          type: "text",
-                          text: msg.llm
-                            .find((llm: any) => llm.model === model)
-                            .text.trim(),
-                        },
-                      ],
-                    },
-                  ]
-                : [];
+                    content: [
+                      {
+                        type: "text",
+                        text: msg.llm
+                          .find((llm: any) => llm.model === model)
+                          .text.trim(),
+                      },
+                    ],
+                  },
+                ]
+              : [];
 
-            return [userMessage, ...responseMessages].filter(Boolean);
-          })
-          .filter((message) => message.content && message.content.length > 0);
+          return [userMessage, ...responseMessages].filter(
+            (msg): msg is ChatCompletionMessageParam =>
+              msg !== null &&
+              (msg.role === "user" ||
+                msg.role === "assistant" ||
+                msg.role === "system") &&
+              msg.content !== null &&
+              msg.content !== undefined
+          );
+        });
 
         // inputContentのフィルタリング
         const filteredInputContent = Array.isArray(inputContent)
@@ -510,7 +529,7 @@ export default function Responses({
     const modelsToUse =
       specifiedModels.length > 0 ? specifiedModels : selectedModels;
 
-    // モデルに送信する際にのみ���リーンアップ
+    // モデルに送信する際にのみクリーンアップ
     const cleanedUserMessage = cleanInputContent(userMessage);
 
     const newMessages = [...messages].slice(0, messageIndex + 1);
@@ -678,7 +697,6 @@ export default function Responses({
           return (
             <div key={messageIndex} className="message-block">
               <MemoizedInputSection
-                models={models}
                 chatInput={message.user}
                 setChatInput={(newInput) =>
                   updateMessage(messageIndex, null, newInput)
@@ -686,8 +704,6 @@ export default function Responses({
                 handleSend={(event, isPrimaryOnly) =>
                   handleSend(event, isPrimaryOnly)
                 }
-                selectedModels={selectedModels}
-                setSelectedModels={setSelectedModels}
                 isEditMode={true}
                 messageIndex={messageIndex}
                 handleResetAndRegenerate={handleResetAndRegenerate}
@@ -813,12 +829,9 @@ export default function Responses({
 
       <InputSection
         mainInput={true}
-        models={models}
         chatInput={chatInput}
         setChatInput={setChatInput}
         handleSend={(event, isPrimaryOnly) => handleSend(event, isPrimaryOnly)}
-        selectedModels={selectedModels}
-        setSelectedModels={setSelectedModels}
         isEditMode={false}
         messageIndex={0}
         handleResetAndRegenerate={() => {}}
