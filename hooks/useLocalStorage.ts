@@ -95,9 +95,46 @@ interface StorageState {
 export default function useStorageState<K extends keyof StorageState>(
   key: K
 ): [StorageState[K], (value: StorageState[K]) => void] {
-  const [storedValue, setStoredValue] = useState<StorageState[K]>(
-    () => (defaultValues as any)[key] as StorageState[K]
-  );
+  const [storedValue, setStoredValue] = useState<StorageState[K]>(() => {
+    // デフォルト値を取得
+    const defaultValue = (defaultValues as any)[key];
+
+    // クライアントサイドでない場合はデフォルト値を返す
+    if (typeof window === "undefined") return defaultValue;
+
+    // ログイン状態に依存するデータかどうかを確認
+    const requiresLoginState =
+      defaultValue &&
+      typeof defaultValue === "object" &&
+      "login" in defaultValue &&
+      "noLogin" in defaultValue;
+
+    if (requiresLoginState) {
+      // ログイン状態に応じたキーを生成
+      const hasToken = !!storage.getAccessToken();
+      const storageKey = `${key}_${hasToken ? "login" : "noLogin"}`;
+
+      // ストレージから値を取得
+      const storedData = storage.get(storageKey);
+
+      // ストレージに値がない場合、デフォルト値を使用
+      if (!storedData) {
+        const defaultStateData = defaultValue[hasToken ? "login" : "noLogin"];
+        storage.set(storageKey, defaultStateData);
+        return defaultValue;
+      }
+
+      return {
+        login: hasToken ? storedData : defaultValue.login,
+        noLogin: !hasToken ? storedData : defaultValue.noLogin,
+      };
+    }
+
+    // 通常のデータの場合
+    const storedData = storage.get(key as string);
+    return storedData !== undefined ? storedData : defaultValue;
+  });
+
   // クライアントサイドでの初期化とアクセストークンの監視
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -116,12 +153,10 @@ export default function useStorageState<K extends keyof StorageState>(
       "noLogin" in defaultValue;
 
     if (requiresLoginState) {
-      // ログイン状態と非ログイン状態の両方のデータを取得
-      const loginData = getStorageData(key as string, true);
-      const noLoginData = getStorageData(key as string, false);
-
       // ログイン状態に応じて適切な値を設定
-      const currentValue = !!getAccessToken() ? loginData : noLoginData;
+      const currentValue = !!getAccessToken()
+        ? getStorageData(key as string, true)
+        : getStorageData(key as string, false);
       setStoredValue(currentValue);
 
       // 現在の状態のデータを保存
