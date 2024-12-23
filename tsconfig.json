@@ -1,7 +1,13 @@
 {
   "compilerOptions": {
-    "types": ["bun-types"],
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "types": [
+      "bun-types"
+    ],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -15,13 +21,16 @@
     "incremental": true,
     "baseUrl": "./",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ]
     },
     "plugins": [
       {
         "name": "next"
       }
-    ]
+    ],
+    "target": "ES2017"
   },
   "include": [
     "next-env.d.ts",
@@ -32,5 +41,8 @@
     "app/page.jsx",
     ".next/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "_trash"]
+  "exclude": [
+    "node_modules",
+    "_trash"
+  ]
 }

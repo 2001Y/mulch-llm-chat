@@ -1,9 +1,14 @@
-import React, { useState, useEffect, useCallback, RefObject } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  MutableRefObject,
+} from "react";
 
 interface ModelSuggestionsProps {
   inputValue: string;
   onSelectSuggestion: (suggestion: string) => void;
-  inputRef: RefObject<HTMLInputElement | HTMLTextAreaElement>;
+  inputRef: MutableRefObject<HTMLInputElement | HTMLTextAreaElement | null>;
   className?: string;
 }
 

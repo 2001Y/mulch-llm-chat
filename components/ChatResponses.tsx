@@ -15,8 +15,15 @@ import TurndownService from "turndown";
 import { FunctionCallHandler } from "../utils/functionCallHandler";
 import { useOpenAI } from "hooks/useOpenAI";
 import useAccessToken from "hooks/useAccessToken";
-import { useChatLogic } from "hooks/useChatLogic";
-import { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import {
+  ChatCompletionMessageParam,
+  ChatCompletionUserMessageParam,
+  ChatCompletionAssistantMessageParam,
+  ChatCompletionSystemMessageParam,
+  ChatCompletionToolMessageParam,
+  ChatCompletionFunctionMessageParam,
+  ChatCompletionContentPart,
+} from "openai/resources/chat/completions";
 
 marked.use(
   markedHighlight({
@@ -38,28 +45,43 @@ type MessageContent = {
 type ChatMessage = {
   role: "user" | "assistant" | "system" | "tool" | "function";
   content?: string | MessageContent[] | null | undefined;
+  name?: string;
+  tool_call_id?: string;
 };
+
+interface Message {
+  user: MessageContent[];
+  llm: Array<{
+    role: string;
+    model: string;
+    text: string;
+    selected: boolean;
+    isGenerating?: boolean;
+    selectedOrder?: number;
+  }>;
+  timestamp?: number;
+  edited?: boolean;
+}
+
+interface ModelItem {
+  name: string;
+  selected: boolean;
+}
+
+type ModelsState = ModelItem[];
 
 export default function Responses() {
   const [accessToken, setAccessToken] = useAccessToken();
   const [demoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO || "");
 
-  const { selectedModels, setSelectedModels, messages, setMessages } =
-    useChatLogic();
-
+  const [models, setModels] = useStorageState("models");
   const [tools] = useStorageState("tools");
   const [toolFunctions] = useStorageState("toolFunctions");
-  const [storedModels] = useStorageState("models");
-  const models = storedModels
-    ? [
-        ...(storedModels.login?.map((m) => m.name) || []),
-        ...(storedModels.noLogin?.map((m) => m.name) || []),
-      ]
-    : [];
 
   const params = useParams();
   const roomId = params.id as string;
 
+  const [messages, setMessages] = useState<Message[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [AllModels, setAllModels] = useState<
     { fullId: string; shortId: string }[]
@@ -107,7 +129,14 @@ export default function Responses() {
     messages.forEach((message, messageIndex) => {
       message.llm.forEach(
         (
-          response: { isGenerating: boolean; text: string; model: string },
+          response: {
+            role: string;
+            model: string;
+            text: string;
+            selected: boolean;
+            isGenerating?: boolean;
+            selectedOrder?: number;
+          },
           responseIndex: number
         ) => {
           if (response.isGenerating && !response.text) {
@@ -219,11 +248,14 @@ export default function Responses() {
           if (toggleSelected) {
             if (llmResponse.selected) {
               llmResponse.selected = false;
+              const currentOrder = llmResponse.selectedOrder;
               delete llmResponse.selectedOrder;
               message.llm = message.llm.map((resp: any) => {
                 if (
                   resp.selected &&
-                  resp.selectedOrder > llmResponse.selectedOrder
+                  resp.selectedOrder !== undefined &&
+                  currentOrder !== undefined &&
+                  resp.selectedOrder > currentOrder
                 ) {
                   return { ...resp, selectedOrder: resp.selectedOrder - 1 };
                 }
@@ -271,9 +303,30 @@ export default function Responses() {
               )
             : msg.user;
 
-          const userMessage: ChatMessage | null =
+          const convertToContentParts = (
+            content: MessageContent[]
+          ): ChatCompletionContentPart[] => {
+            return content.map((item) => {
+              if (item.type === "text" && item.text) {
+                return {
+                  type: "text",
+                  text: item.text,
+                };
+              } else if (item.type === "image_url" && item.image_url) {
+                return {
+                  type: "image_url",
+                  image_url: {
+                    url: item.image_url.url,
+                  },
+                };
+              }
+              throw new Error(`Unsupported content type: ${item.type}`);
+            });
+          };
+
+          const userMessage: ChatCompletionUserMessageParam | null =
             userContent.length > 0
-              ? { role: "user", content: userContent }
+              ? { role: "user", content: convertToContentParts(userContent) }
               : null;
 
           const selectedResponses = msg.llm
@@ -283,7 +336,7 @@ export default function Responses() {
                 (a.selectedOrder || 0) - (b.selectedOrder || 0)
             );
 
-          const responseMessages: ChatMessage[] =
+          const responseMessages: ChatCompletionAssistantMessageParam[] =
             selectedResponses.length > 0
               ? selectedResponses.map((llm: any) => ({
                   role: "assistant",
@@ -298,9 +351,10 @@ export default function Responses() {
                     content: [
                       {
                         type: "text",
-                        text: msg.llm
-                          .find((llm: any) => llm.model === model)
-                          .text.trim(),
+                        text:
+                          msg.llm
+                            .find((llm: any) => llm.model === model)
+                            ?.text?.trim() || "",
                       },
                     ],
                   },
@@ -308,13 +362,12 @@ export default function Responses() {
               : [];
 
           return [userMessage, ...responseMessages].filter(
-            (msg): msg is ChatCompletionMessageParam =>
-              msg !== null &&
-              (msg.role === "user" ||
-                msg.role === "assistant" ||
-                msg.role === "system") &&
-              msg.content !== null &&
-              msg.content !== undefined
+            (
+              msg
+            ): msg is
+              | ChatCompletionUserMessageParam
+              | ChatCompletionAssistantMessageParam =>
+              msg !== null && msg.content !== null && msg.content !== undefined
           );
         });
 
@@ -520,12 +573,18 @@ export default function Responses() {
     }
   };
 
+  const getSelectedModels = (models: ModelsState | null): string[] => {
+    if (!models) return [];
+    return models.filter((model) => model.selected).map((model) => model.name);
+  };
+
   const handleResetAndRegenerate = async (messageIndex: number) => {
     setIsGenerating(true);
     const userMessage = messages[messageIndex].user;
 
     // ユーザー入力からモデルを抽出
     const specifiedModels = extractModelsFromInput(userMessage);
+    const selectedModels = getSelectedModels(models);
     const modelsToUse =
       specifiedModels.length > 0 ? specifiedModels : selectedModels;
 
@@ -629,6 +688,7 @@ export default function Responses() {
 
       // ユーザー入力からモデルを抽出
       const specifiedModels = extractModelsFromInput(chatInput);
+      const selectedModels = getSelectedModels(models);
       const modelsToUse = isPrimaryOnly
         ? [selectedModels[0]]
         : specifiedModels.length > 0
@@ -670,7 +730,7 @@ export default function Responses() {
     [
       chatInput,
       messages,
-      selectedModels,
+      models,
       extractModelsFromInput,
       cleanInputContent,
       fetchChatResponse,
@@ -714,19 +774,11 @@ export default function Responses() {
                 isGenerating={isGenerating}
               />
               <div className="scroll_area">
-                {message.llm.map(
-                  (
-                    response: {
-                      role: string;
-                      model: string;
-                      text: string;
-                      selected: boolean;
-                      isGenerating: boolean;
-                    },
-                    responseIndex: number
-                  ) => (
+                {message.llm.map((response, responseIndex) => {
+                  const isGenerating = response.isGenerating ?? false;
+                  return (
                     <div
-                      key={responseIndex}
+                      key={response.model}
                       className={`response ${response.role} ${
                         hasSelectedResponse && !response.selected
                           ? "unselected"
@@ -738,12 +790,10 @@ export default function Responses() {
                         <div className="response-controls">
                           <button
                             className={
-                              response.isGenerating
-                                ? "stop-button"
-                                : "regenerate-button"
+                              isGenerating ? "stop-button" : "regenerate-button"
                             }
                             onClick={() =>
-                              response.isGenerating
+                              isGenerating
                                 ? handleStop(messageIndex, responseIndex)
                                 : handleRegenerate(
                                     messageIndex,
@@ -752,7 +802,7 @@ export default function Responses() {
                                   )
                             }
                           >
-                            {response.isGenerating ? (
+                            {isGenerating ? (
                               <svg
                                 xmlns="http://www.w3.org/2000/svg"
                                 width="20"
@@ -797,7 +847,7 @@ export default function Responses() {
                             {response.selected
                               ? selectedResponses.length > 1
                                 ? selectedResponses.findIndex(
-                                    (r: any) => r === response
+                                    (r) => r === response
                                   ) + 1
                                 : "✓"
                               : ""}
@@ -819,8 +869,8 @@ export default function Responses() {
                         }}
                       />
                     </div>
-                  )
-                )}
+                  );
+                })}
               </div>
             </div>
           );

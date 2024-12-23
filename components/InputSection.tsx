@@ -3,8 +3,9 @@ import { toast } from "sonner";
 import ModelSuggestions from "./ModelSuggestions";
 import useStorageState from "hooks/useLocalStorage";
 import Image from "next/image";
+import { useParams } from "next/navigation";
 
-interface InputSectionProps {
+interface Props {
   mainInput: boolean;
   chatInput: { type: string; text?: string; image_url?: { url: string } }[];
   setChatInput: React.Dispatch<
@@ -15,7 +16,11 @@ interface InputSectionProps {
   handleSend: (
     event: React.MouseEvent<HTMLButtonElement>,
     isPrimaryOnly: boolean,
-    currentInput: { type: string; text?: string; image_url?: { url: string } }[]
+    currentInput?: {
+      type: string;
+      text?: string;
+      image_url?: { url: string };
+    }[]
   ) => void;
   isEditMode: boolean;
   messageIndex: number;
@@ -24,7 +29,6 @@ interface InputSectionProps {
   isInitialScreen: boolean;
   handleStopAllGeneration: () => void;
   isGenerating: boolean;
-  messages?: any[];
 }
 
 export default function InputSection({
@@ -39,19 +43,40 @@ export default function InputSection({
   isInitialScreen,
   handleStopAllGeneration,
   isGenerating,
-  messages,
-}: InputSectionProps) {
-  const [isComposing, setIsComposing] = useState(false);
-  const [isEdited, setIsEdited] = useState(false);
+}: Props) {
+  const [models, setModels] = useStorageState("models");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isComposing, setIsComposing] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [models, setModels] = useStorageState("models");
+  const [isEdited, setIsEdited] = useState(false);
+  const params = useParams();
+  const roomId = params?.id as string | undefined;
+  const [storedMessages] = useStorageState(
+    `chatMessages_${roomId || "default"}` as `chatMessages_${string}`
+  );
+
+  const handleModelSelect = (modelName: string) => {
+    const wasFocused = document.activeElement === inputRef.current;
+
+    setModels(
+      (models ?? []).map((model) => ({
+        name: model.name,
+        selected: model.name === modelName ? !model.selected : model.selected,
+      }))
+    );
+
+    if (wasFocused) {
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  };
 
   const originalMessage =
-    messages && messageIndex >= 0 && messageIndex < (messages?.length || 0)
-      ? messages[messageIndex]?.user
+    storedMessages &&
+    messageIndex >= 0 &&
+    messageIndex < (storedMessages?.length || 0)
+      ? storedMessages[messageIndex]?.user
       : null;
 
   useEffect(() => {
@@ -96,6 +121,14 @@ export default function InputSection({
     }
   };
 
+  const checkSuggestionVisibility = (cursorPosition: number, text: string) => {
+    const textBeforeCursor = text.slice(0, cursorPosition);
+
+    const hasActiveSuggestion = /@[^@\s\u3000]*$/.test(textBeforeCursor);
+
+    setShowSuggestions(hasActiveSuggestion);
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
     setChatInput((prev) => {
@@ -104,44 +137,28 @@ export default function InputSection({
       newInput[0] = { ...newInput[0], text };
       return newInput;
     });
-    setShowSuggestions(/@[^@\s]*$/.test(text));
+
+    checkSuggestionVisibility(e.target.selectionStart || 0, text);
+  };
+
+  const handleSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
+    const target = e.target as HTMLTextAreaElement;
+    checkSuggestionVisibility(target.selectionStart || 0, target.value);
   };
 
   const selectSuggestion = (selectedModel: string) => {
     if (inputRef.current) {
-      const text = inputRef.current.value.replace(
-        /@[^@]*$/,
-        `@${selectedModel.split("/")[1]} `
-      );
-      setChatInput([{ type: "text", text }]);
-    }
-  };
+      const cursorPosition = inputRef.current.selectionStart || 0;
+      const textBeforeCursor = inputRef.current.value.slice(0, cursorPosition);
+      const textAfterCursor = inputRef.current.value.slice(cursorPosition);
 
-  const handleModelSelect = (modelName: string) => {
-    const wasFocused = document.activeElement === inputRef.current;
-    // @ts-expect-error
-    setModels((prev) => {
-      if (!prev) return prev;
+      const newText =
+        textBeforeCursor.replace(
+          /@[^@\s\u3000]*$/,
+          `@${selectedModel.split("/")[1]} `
+        ) + textAfterCursor;
 
-      // @ts-expect-error
-      const updatedModels = prev.map((model) => {
-        if (model.name === modelName) {
-          return { ...model, selected: !model.selected };
-        }
-        return model;
-      });
-
-      // 選択されているモデルがない場合、最初のモデルを選択
-      // @ts-expect-error
-      if (!updatedModels.some((model) => model.selected)) {
-        updatedModels[0].selected = true;
-      }
-
-      return updatedModels;
-    });
-
-    if (wasFocused) {
-      setTimeout(() => inputRef.current?.focus(), 0);
+      setChatInput([{ type: "text", text: newText }]);
     }
   };
 
@@ -278,6 +295,7 @@ export default function InputSection({
           ref={inputRef}
           value={chatInput[0]?.text || ""}
           onChange={handleInputChange}
+          onSelect={handleSelect}
           onKeyDown={handleKeyDown}
           onCompositionStart={() => setIsComposing(true)}
           onCompositionEnd={(e) => {
@@ -297,10 +315,13 @@ export default function InputSection({
             inputValue={(() => {
               const input = inputRef.current;
               if (!input) return "";
+
               const cursorPosition = input.selectionStart || 0;
               const textBeforeCursor =
                 chatInput[0]?.text?.slice(0, cursorPosition) || "";
-              const match = textBeforeCursor.match(/@([^\s]+)(?:\s*)$/);
+
+              const match = textBeforeCursor.match(/@([^@\s\u3000]*)$/);
+
               return match?.[1] || "";
             })()}
             onSelectSuggestion={selectSuggestion}

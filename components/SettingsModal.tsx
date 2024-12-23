@@ -21,19 +21,18 @@ interface OpenRouterModel {
   name: string;
 }
 
+interface ModelItem {
+  name: string;
+  selected: boolean;
+}
+
 export default function ModelInputModal() {
   const { isModalOpen, handleCloseModal: closeModal } = useChatLogic();
 
   const [storedModels, setStoredModels] = useStorageState("models");
-  const models = storedModels
-    ? [
-        ...(storedModels.login?.map((m) => m.name) || []),
-        ...(storedModels.noLogin?.map((m) => m.name) || []),
-      ]
-    : [];
-  const setModels = (newModels: string[]) => {
-    const loginModels = newModels.map((name) => ({ name, selected: true }));
-    setStoredModels({ login: loginModels, noLogin: [] });
+  const models = storedModels || [];
+  const setModels = (newModels: ModelItem[]) => {
+    setStoredModels(newModels);
   };
 
   const [newModel, setNewModel] = useState<string>("");
@@ -85,8 +84,8 @@ export default function ModelInputModal() {
   };
 
   const handleAddModel = () => {
-    if (newModel && !models.includes(newModel)) {
-      setModels([...models, newModel]);
+    if (newModel && !models.some((m) => m.name === newModel)) {
+      setModels([...models, { name: newModel, selected: true }]);
       setNewModel("");
     }
   };
@@ -112,13 +111,16 @@ export default function ModelInputModal() {
 
   const handleEditModel = (index: number) => {
     setEditingModelIndex(index);
-    setEditingModel(models[index]);
+    setEditingModel(models[index].name);
   };
 
   const handleSaveEditedModel = () => {
     if (editingModelIndex !== null && editingModel) {
       const updatedModels = [...models];
-      updatedModels[editingModelIndex] = editingModel;
+      updatedModels[editingModelIndex] = {
+        name: editingModel,
+        selected: models[editingModelIndex].selected,
+      };
       setModels(updatedModels);
       setEditingModelIndex(null);
       setEditingModel("");
@@ -130,8 +132,8 @@ export default function ModelInputModal() {
     setEditingModel("");
   };
 
-  const handleDeleteModel = (modelToDelete: string) => {
-    setModels(models.filter((model) => model !== modelToDelete));
+  const handleDeleteModel = (modelToDelete: ModelItem) => {
+    setModels(models.filter((model) => model.name !== modelToDelete.name));
   };
 
   const handleDeleteTool = (index: number) => {
@@ -303,7 +305,7 @@ export default function ModelInputModal() {
         <ul className="model-list">
           {models.map((model, index) => (
             <li
-              key={model}
+              key={model.name}
               draggable
               onDragStart={(e) => handleDragStart(e, index)}
               onDragEnter={(e) => handleDragEnter(e, index)}
@@ -361,7 +363,7 @@ export default function ModelInputModal() {
                 </>
               ) : (
                 <>
-                  <span className="model-name">{model}</span>
+                  <span className="model-name">{model.name}</span>
                   <div className="model-buttons">
                     <button
                       onClick={() => handleEditModel(index)}

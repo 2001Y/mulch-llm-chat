@@ -3,7 +3,7 @@ import { useParams, useRouter } from "next/navigation";
 import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
-import useStorageState, { storage } from "hooks/useLocalStorage";
+import useStorageState, { storage, StorageState } from "hooks/useLocalStorage";
 import useAccessToken from "hooks/useAccessToken";
 import { useOpenAI } from "hooks/useOpenAI";
 import { generateId } from "@/utils/generateId";
@@ -36,20 +36,12 @@ export function useChatLogic() {
   const params = useParams();
   const roomId = params?.id as string | undefined;
 
-  // 設定モーダルの状態管理を追���
+  // 設定モーダルの状��管理を追加
   const [isModalOpen, setIsModalOpen] = useState(false);
   const handleOpenModal = useCallback(() => setIsModalOpen(true), []);
   const handleCloseModal = useCallback(() => setIsModalOpen(false), []);
 
-  const [models, setModels] = useStorageState("models");
-  const [selectedModels, setSelectedModels] = useState<string[]>(
-    models
-      ? [
-          ...(models.login?.map((m) => m.name) || []),
-          ...(models.noLogin?.map((m) => m.name) || []),
-        ]
-      : []
-  );
+  const [models, setModels] = useStorageState<"models">("models");
   const [chatInput, setChatInput] = useState<any[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -71,12 +63,17 @@ export function useChatLogic() {
   >([]);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
-  // ローカルストレージからメッジ読み込む
+  // メッセージ読み込む
   useEffect(() => {
     if (storedMessages && storedMessages.length > 0 && !initialLoadComplete) {
-      console.log(`ルーム ${roomId} の以前のメッセージを復元:`, storedMessages);
+      console.log(`[DEBUG] ルーム ${roomId} のメッセージ読み込み:`, {
+        storedMessages,
+        roomId,
+        initialLoadComplete,
+      });
       setMessages(storedMessages);
       setInitialLoadComplete(true);
+      console.log("[DEBUG] メッセージ読み込み完了");
     }
   }, [storedMessages, roomId, initialLoadComplete]);
 
@@ -250,11 +247,20 @@ export function useChatLogic() {
   // モデル選択のロジックを共通化する関数
   const determineModelsToUse = useCallback(
     (userInput: any[], isPrimaryOnly: boolean) => {
-      const loginState = accessToken ? "login" : "noLogin";
       const specifiedModels = extractModelsFromInput(userInput);
-      const selectedModels = models[loginState]
-        .filter((model) => model.selected)
-        .map((model) => model.name);
+
+      // モデルの選択状態を確認
+      const selectedModels = models
+        ? models.filter((model) => model.selected).map((model) => model.name)
+        : [];
+
+      // 選択されたモデルが空の場合のフォールバック
+      if (selectedModels.length === 0) {
+        console.log(
+          "[DEBUG] 選択されたモデルが見つかりません。デフォルトモデルを使用します。"
+        );
+        return ["anthropic/claude-2"]; // デフォルトモデル
+      }
 
       return isPrimaryOnly
         ? [selectedModels[0]]
@@ -262,10 +268,10 @@ export function useChatLogic() {
         ? specifiedModels
         : selectedModels;
     },
-    [extractModelsFromInput, models, accessToken]
+    [extractModelsFromInput, models]
   );
 
-  // メッセージ作成のロジックを共通化する関数
+  // メッセージ作成のロジックを共通する関数
   const createMessage = useCallback(
     (userInput: any[], modelsToUse: string[]) => ({
       user: userInput,
@@ -302,19 +308,23 @@ export function useChatLogic() {
         const newChatId = generateId(6);
         const newStorageKey = `chatMessages_${newChatId}`;
 
-        console.log("Saving to localStorage:", {
+        console.log("[DEBUG] 新規チャット作成:", {
+          newChatId,
+          newStorageKey,
+          newMessage,
           chatInput,
           modelsToUse,
-          newMessage,
-          storedContent: JSON.stringify([newMessage]),
         });
 
         storage.set(newStorageKey, [newMessage]);
         storage.remove("chatMessages_default");
         window.dispatchEvent(new Event("chatListUpdate"));
 
+        console.log("[DEBUG] ストレージ保存完了");
+
         // 直接ルーティングを実行
         router.push(`/${newChatId}`);
+        console.log("[DEBUG] ルーティング実行完了:", newChatId);
         return;
       }
 
@@ -324,7 +334,7 @@ export function useChatLogic() {
       setAbortControllers(newAbortControllers);
       setMessages((prevMessages) => [...prevMessages, newMessage]);
 
-      // チャットリスト��更新（ストレージ保存後に実行）
+      // チャットリスト更新（ストレージ保存後に実行）
       setStoredMessages([...messages, newMessage]);
       window.dispatchEvent(new Event("chatListUpdate"));
 
@@ -353,7 +363,7 @@ export function useChatLogic() {
     ]
   );
 
-  // チャットのレスポンスを取得る関数
+  // チャットのレスポンスを取得する関数
   const fetchChatResponse = useCallback(
     async (
       model: string,
@@ -583,19 +593,31 @@ export function useChatLogic() {
     setChatInput(newInput);
   }, []);
 
-  const handleModelSelect = useCallback((model: string) => {
-    setSelectedModels((prevModels) => {
-      if (prevModels.includes(model)) {
-        return prevModels.filter((m) => m !== model);
-      } else {
-        return [...prevModels, model];
-      }
-    });
-  }, []);
+  const handleModelSelect = useCallback(
+    (modelName: string) => {
+      const currentModels = models ?? [];
+      setModels(
+        currentModels.map((model) => ({
+          ...model,
+          selected: model.name === modelName ? !model.selected : model.selected,
+        }))
+      );
+    },
+    [models]
+  );
 
-  const handlePrimaryModelSelect = useCallback((model: string) => {
-    setSelectedModels([model]);
-  }, []);
+  const handlePrimaryModelSelect = useCallback(
+    (modelName: string) => {
+      const currentModels = models ?? [];
+      setModels(
+        currentModels.map((model) => ({
+          ...model,
+          selected: model.name === modelName,
+        }))
+      );
+    },
+    [models]
+  );
 
   // handleResetAndRegenerateも共通化したロジックを使用するように修正
   const handleResetAndRegenerate = useCallback(
@@ -646,8 +668,6 @@ export function useChatLogic() {
   return {
     models,
     setModels,
-    selectedModels,
-    setSelectedModels,
     messages,
     setMessages,
     isGenerating,
@@ -660,5 +680,7 @@ export function useChatLogic() {
     chatInput,
     setChatInput,
     handleSend,
+    handleModelSelect,
+    handlePrimaryModelSelect,
   };
 }
