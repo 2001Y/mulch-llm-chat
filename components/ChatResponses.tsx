@@ -434,11 +434,11 @@ export default function Responses() {
             const content = part.choices[0]?.delta?.content || "";
             const toolCalls = part.choices[0]?.delta?.tool_calls;
 
-            console.log("[Stream Response]", {
-              content,
-              toolCalls,
-              delta: part.choices[0]?.delta,
-            });
+            // console.log("[Stream Response]", {
+            //   content,
+            //   toolCalls,
+            //   delta: part.choices[0]?.delta,
+            // });
 
             if (toolCalls) {
               functionHandler.handleToolCalls(toolCalls);

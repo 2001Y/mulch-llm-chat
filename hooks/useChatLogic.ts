@@ -160,7 +160,7 @@ export function useChatLogic() {
           }
         } else {
           const llmResponse = { ...message.llm[responseIndex] };
-          console.log("Current llmResponse:", llmResponse);
+          // console.log("Current llmResponse:", llmResponse);
           if (content !== undefined) {
             if (typeof content === "function") {
               const updatedContent = content(llmResponse.text);
@@ -482,11 +482,11 @@ export function useChatLogic() {
             resultText += content;
 
             const markedResult = marked(resultText);
-            console.log("[fetchChatResponse] メッセージ更新", {
-              messageIndex,
-              responseIndex,
-              contentLength: content.length,
-            });
+            // console.log("[fetchChatResponse] メッセージ更新", {
+            //   messageIndex,
+            //   responseIndex,
+            //   contentLength: content.length,
+            // });
             updateMessage(
               messageIndex,
               responseIndex,
