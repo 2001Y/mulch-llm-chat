@@ -70,12 +70,6 @@ interface ModelItem {
 
 type ModelsState = ModelItem[];
 
-interface ModelCapabilities {
-  streaming: boolean;
-  function_calling: boolean;
-  tools: boolean;
-}
-
 export default function Responses() {
   const [accessToken, setAccessToken] = useAccessToken();
   const [demoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO || "");
@@ -127,7 +121,7 @@ export default function Responses() {
     }
   }, [messages, initialLoadComplete, setStoredMessages]);
 
-  // 完了��成を再開するuseEffect
+  // 完了生成を再開するuseEffect
   useEffect(() => {
     if (!initialLoadComplete) return;
 
@@ -285,31 +279,6 @@ export default function Responses() {
     [setMessages, setStoredMessages, storedMessages, roomId]
   );
 
-  const getModelCapabilities = async (
-    modelId: string
-  ): Promise<ModelCapabilities> => {
-    try {
-      const response = await fetch("https://openrouter.ai/api/v1/models");
-      const data = await response.json();
-      const model = data.data.find((m: any) => m.id === modelId);
-
-      return {
-        streaming: model?.supported_features?.includes("streaming") ?? false,
-        function_calling:
-          model?.supported_features?.includes("function_calling") ?? false,
-        tools: model?.supported_features?.includes("tools") ?? false,
-      };
-    } catch (error) {
-      console.error("Failed to fetch model capabilities:", error);
-      // デフォルトで安全な値を返す
-      return {
-        streaming: false,
-        function_calling: false,
-        tools: false,
-      };
-    }
-  };
-
   const fetchChatResponse = useCallback(
     async (
       model: string,
@@ -402,6 +371,7 @@ export default function Responses() {
           );
         });
 
+        // inputContentのフィルタリング
         const filteredInputContent = Array.isArray(inputContent)
           ? inputContent.filter(
               (item) =>
@@ -419,15 +389,31 @@ export default function Responses() {
         let tempContent = "";
         const functionHandler = new FunctionCallHandler();
 
+        // ユーザー入力からモデルを抽出
         const specifiedModel = extractModelsFromInput(inputContent);
         const modelToUse =
           specifiedModel.length > 0 ? specifiedModel[0] : model;
 
-        // モデルの機能をチェック
-        const capabilities = await getModelCapabilities(modelToUse);
+        const stream = await openai?.chat.completions.create(
+          {
+            model: modelToUse,
+            messages: [
+              ...pastMessages,
+              {
+                role: "user",
+                content: filteredInputContent,
+              },
+            ],
+            stream: true,
+            tool_choice: "auto",
+            tools,
+          },
+          {
+            signal: abortController.signal,
+          }
+        );
 
-        // 基本的なリクエストパラメータ
-        const requestParams: any = {
+        console.log("[API Request] Messages:", {
           model: modelToUse,
           messages: [
             ...pastMessages,
@@ -436,124 +422,67 @@ export default function Responses() {
               content: filteredInputContent,
             },
           ],
-        };
-
-        // ストリーミングがサポートされている場合のみ追加
-        if (capabilities.streaming) {
-          requestParams.stream = true;
-        }
-
-        // ツールとfunction_callingがサポートされている場合のみ追加
-        if (capabilities.tools && capabilities.function_calling) {
-          requestParams.tool_choice = "auto";
-          requestParams.tools = tools;
-        }
-
-        console.log("[API Request] Messages:", {
-          ...requestParams,
-          capabilities,
+          tool_choice: "auto",
+          tools,
         });
 
-        if (capabilities.streaming) {
-          // ストリーミングモード
-          const stream = await openai?.chat.completions.create(requestParams, {
-            signal: abortController.signal,
-          });
+        if (stream) {
+          for await (const part of stream) {
+            if (abortController.signal.aborted) {
+              throw new DOMException("Aborted", "AbortError");
+            }
+            const content = part.choices[0]?.delta?.content || "";
+            const toolCalls = part.choices[0]?.delta?.tool_calls;
 
-          if (stream) {
-            if ("then" in stream) {
-              // 非ストリーミングレスポンスの場合
-              const response = await stream;
-              const content = response.choices[0]?.message?.content || "";
-              updateMessage(messageIndex, responseIndex, [
-                { type: "text", text: content },
-              ]);
-            } else {
-              // ストリーミングレスポンスの場合
-              for await (const part of stream as any) {
-                if (abortController.signal.aborted) {
-                  throw new DOMException("Aborted", "AbortError");
-                }
-                const content = part.choices[0]?.delta?.content || "";
-                const toolCalls = part.choices[0]?.delta?.tool_calls;
+            console.log("[Stream Response]", {
+              content,
+              toolCalls,
+              delta: part.choices[0]?.delta,
+            });
 
-                console.log("[Stream Response]", {
-                  content,
-                  toolCalls,
-                  delta: part.choices[0]?.delta,
-                });
-
-                if (toolCalls && capabilities.tools) {
-                  functionHandler.handleToolCalls(toolCalls);
-                } else if (!functionHandler.isAccumulating) {
-                  if (content) {
-                    tempContent += content;
-                    result.push({ type: "text", text: content });
-                    updateMessage(messageIndex, responseIndex, result);
-                  }
-                }
-
-                if (functionHandler.isReadyToExecute() && capabilities.tools) {
-                  const parsedToolFunctions: Record<
-                    string,
-                    (args: any) => any
-                  > = {};
-                  for (const [key, value] of Object.entries(toolFunctions)) {
-                    parsedToolFunctions[key] = new Function(
-                      `return ${value}`
-                    )();
-                  }
-                  await functionHandler.execute(
-                    parsedToolFunctions,
-                    tempContent,
-                    updateMessage,
-                    messageIndex,
-                    responseIndex
-                  );
-                }
+            if (toolCalls) {
+              functionHandler.handleToolCalls(toolCalls);
+            } else if (!functionHandler.isAccumulating) {
+              if (content) {
+                tempContent += content;
+                result.push({ type: "text", text: content });
+                updateMessage(messageIndex, responseIndex, result);
               }
             }
-            setIsAutoScroll(false);
-          } else {
-            console.error("ストリームの作成に失敗しました");
-            updateMessage(
-              messageIndex,
-              responseIndex,
-              [
-                {
-                  type: "text",
-                  text: "エラー: レスポンスの生成に失敗しました",
-                },
-              ],
-              false,
-              false
-            );
-          }
-        } else {
-          // 非ストリーミングモード
-          const response = await openai?.chat.completions.create(
-            requestParams,
-            { signal: abortController.signal }
-          );
 
-          if (response) {
-            const content = response.choices[0]?.message?.content || "";
-            updateMessage(messageIndex, responseIndex, [
-              { type: "text", text: content },
-            ]);
-          } else {
-            throw new Error("レスポンスの生成に失敗しました");
+            if (functionHandler.isReadyToExecute()) {
+              const parsedToolFunctions: Record<string, (args: any) => any> =
+                {};
+              for (const [key, value] of Object.entries(toolFunctions)) {
+                parsedToolFunctions[key] = new Function(`return ${value}`)();
+              }
+              await functionHandler.execute(
+                parsedToolFunctions,
+                tempContent,
+                updateMessage,
+                messageIndex,
+                responseIndex
+              );
+            }
           }
+          setIsAutoScroll(false);
+        } else {
+          console.error("ストリームの作成に失敗しした");
+          updateMessage(
+            messageIndex,
+            responseIndex,
+            [{ type: "text", text: "エラー: レスポンスの生成に失敗しました" }],
+            false,
+            false
+          );
         }
       } catch (error: any) {
         if (error.name !== "AbortError") {
           console.error("Error fetching response from model:", model, error);
-          const errorMessage =
-            error.response?.data?.error?.message || error.message;
           updateMessage(
             messageIndex,
             responseIndex,
-            [{ type: "text", text: `エラー: ${errorMessage}` }],
+            [{ type: "text", text: `エラー: ${error.message}` }],
             false,
             false
           );
