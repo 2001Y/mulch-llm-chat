@@ -177,6 +177,18 @@ function BentoGrid({
   const initialScrollSetRef = useRef(false);
   const [repeatCount, setRepeatCount] = useState(3);
 
+  // hideBentoGridイベントのリスナーを追加
+  useEffect(() => {
+    const handleHideBentoGrid = () => {
+      setIsVisible(false);
+    };
+
+    window.addEventListener("hideBentoGrid", handleHideBentoGrid);
+    return () => {
+      window.removeEventListener("hideBentoGrid", handleHideBentoGrid);
+    };
+  }, []);
+
   // ウィンドウのリサイズを監視し、必要に応じてセット数を調整
   useEffect(() => {
     const checkAndAdjustSets = () => {
@@ -213,7 +225,7 @@ function BentoGrid({
     // 中央のセットにスクロール + アイテム幅の半分をオフセット
     let middleSetPosition = grid.scrollWidth / 3 - itemWidth / 2;
 
-    // 奇数番目のグリッドの場合、さらにアイテム幅の半分を追加
+    // 奇数番目のグリッド��場合、さらにアイテム幅の半分を追加
     if (index % 2 === 1) {
       middleSetPosition += itemWidth / 2;
     }

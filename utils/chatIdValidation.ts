@@ -1,8 +1,9 @@
 export const validateAndNormalizeChatId = (id: string) => {
+  const decodedId = decodeURIComponent(id);
   // チャットIDのフォーマット検証
-  const isValidFormat = /^[a-zA-Z0-9-_]+$/.test(id);
+  const isValidFormat = /^[a-zA-Z0-9-_$#]+$/.test(decodedId);
   if (!isValidFormat) {
-    console.error("Invalid chat ID format:", id);
+    console.error("Invalid chat ID format:", decodedId);
     return false;
   }
 
@@ -11,15 +12,17 @@ export const validateAndNormalizeChatId = (id: string) => {
     key.startsWith("chatMessages_")
   );
 
-  const exactMatch = allChatKeys.find((key) => key === `chatMessages_${id}`);
+  const exactMatch = allChatKeys.find(
+    (key) => key === `chatMessages_${decodedId}`
+  );
 
   const partialMatches = allChatKeys.filter(
-    (key) => key.includes(id) && key !== `chatMessages_${id}`
+    (key) => key.includes(decodedId) && key !== `chatMessages_${decodedId}`
   );
 
   if (partialMatches.length > 0) {
     console.warn("Partial ID matches found:", {
-      requestedId: id,
+      requestedId: decodedId,
       partialMatches,
     });
   }

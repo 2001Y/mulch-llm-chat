@@ -34,9 +34,11 @@ export function useChatLogic() {
   const openai = useOpenAI(accessToken);
   const router = useRouter();
   const params = useParams();
-  const roomId = params?.id as string | undefined;
+  const roomId = params?.id
+    ? decodeURIComponent(params.id as string)
+    : undefined;
 
-  // 設定モーダルの状��管理を追加
+  // 設定モーダルの状管理を追加
   const [isModalOpen, setIsModalOpen] = useState(false);
   const handleOpenModal = useCallback(() => setIsModalOpen(true), []);
   const handleCloseModal = useCallback(() => setIsModalOpen(false), []);
@@ -66,7 +68,7 @@ export function useChatLogic() {
   // メッセージ読み込む
   useEffect(() => {
     if (storedMessages && storedMessages.length > 0 && !initialLoadComplete) {
-      console.log(`[DEBUG] ルーム ${roomId} のメッセージ読み込み:`, {
+      console.log(`[DEBUG] ルーム ${roomId} のメッセージ���み込み:`, {
         storedMessages,
         roomId,
         initialLoadComplete,
@@ -315,6 +317,9 @@ export function useChatLogic() {
           chatInput,
           modelsToUse,
         });
+
+        // 即座にbento-gridを非表示にするためのイベントを発火
+        window.dispatchEvent(new Event("hideBentoGrid"));
 
         storage.set(newStorageKey, [newMessage]);
         storage.remove("chatMessages_default");
@@ -619,7 +624,7 @@ export function useChatLogic() {
     [models]
   );
 
-  // handleResetAndRegenerateも共通化したロジックを使用するように修正
+  // handleResetAndRegenerateも共通化したロジックを使用するように���正
   const handleResetAndRegenerate = useCallback(
     (messageIndex: number) => {
       setIsGenerating(true);

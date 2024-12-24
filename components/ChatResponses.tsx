@@ -79,7 +79,7 @@ export default function Responses() {
   const [toolFunctions] = useStorageState("toolFunctions");
 
   const params = useParams();
-  const roomId = params.id as string;
+  const roomId = decodeURIComponent(params.id as string);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
