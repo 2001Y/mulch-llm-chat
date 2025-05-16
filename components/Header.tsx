@@ -44,13 +44,15 @@ function AuthButton() {
 
   return (
     <>
-      {isLoggedIn ? (
-        <button onClick={handleLogout}>Logout</button>
-      ) : (
-        <button onClick={handleLogin} className="login">
-          Login with OpenRouter
-        </button>
-      )}
+      <div className="auth-button">
+        {isLoggedIn ? (
+          <button onClick={handleLogout}>Logout</button>
+        ) : (
+          <button onClick={handleLogin} className="login">
+            Login with OpenRouter
+          </button>
+        )}
+      </div>
       <div
         onClick={() => {
           console.log("[DEBUG] Settings icon clicked");
