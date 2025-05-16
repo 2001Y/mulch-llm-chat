@@ -2,16 +2,16 @@
 
 import { useEffect, useState } from "react";
 import "@/styles/chat.scss";
-import { useChatLogic } from "hooks/useChatLogic";
 import InputSection from "components/InputSection";
 import ModelInputModal from "components/SettingsModal";
 import { storage } from "hooks/useLocalStorage";
 import Header from "components/Header";
 import ChatList from "components/ChatList";
 import BentoFeatures from "components/BentoFeatures";
+import { ChatLogicProvider, useChatLogicContext } from "contexts/ChatLogicContext";
 
-export default function ChatListPage() {
-  const { isGenerating, handleSend } = useChatLogic();
+function ChatListPageContent() {
+  const { isGenerating, handleSend } = useChatLogicContext();
 
   const [chatInput, setChatInput] = useState<
     { type: string; text?: string; image_url?: { url: string } }[]
@@ -85,5 +85,13 @@ export default function ChatListPage() {
 
       <ModelInputModal />
     </>
+  );
+}
+
+export default function ChatListPage() {
+  return (
+    <ChatLogicProvider>
+      <ChatListPageContent />
+    </ChatLogicProvider>
   );
 }
