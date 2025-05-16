@@ -12,7 +12,13 @@ export default function useAccessToken() {
     }
   }, [accessToken, previousAccessToken]);
 
+  const isDevelopment = process.env.NODE_ENV === "development";
+
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      return; // Skip on server-side rendering
+    }
+
     const fetchAccessToken = async (code: string) => {
       try {
         const response = await fetch("https://openrouter.ai/api/v1/auth/keys", {
@@ -38,20 +44,20 @@ export default function useAccessToken() {
       }
     };
 
-    if (typeof window !== "undefined") {
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get("code");
-      const ssnb = urlParams.get("ssnb");
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get("code");
+    const ssnb = urlParams.get("ssnb");
 
-      if (code && !accessToken) {
-        fetchAccessToken(code);
-      }
+    if (code && !accessToken) {
+      fetchAccessToken(code);
+    }
 
-      if (ssnb) {
-        const newAccessToken = process.env.NEXT_PUBLIC_SSNB;
-        if (typeof newAccessToken === "string") {
-          setAccessToken(newAccessToken);
-        }
+    const isVercelPreview = window.location.hostname.includes("vercel.app");
+    
+    if (ssnb || isDevelopment || isVercelPreview) {
+      const newAccessToken = process.env.NEXT_PUBLIC_SSNB;
+      if (typeof newAccessToken === "string") {
+        setAccessToken(newAccessToken);
       }
     }
   }, [accessToken, setAccessToken]);

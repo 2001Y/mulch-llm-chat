@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import ModelSuggestions from "./ModelSuggestions";
 import useStorageState from "hooks/useLocalStorage";
-import { useChatLogic } from "hooks/useChatLogic";
+import { useChatLogicContext } from "contexts/ChatLogicContext";
 
 interface ModelInputModalProps {
   closeModal: () => void;
@@ -27,7 +27,7 @@ interface ModelItem {
 }
 
 export default function ModelInputModal() {
-  const { isModalOpen, handleCloseModal: closeModal } = useChatLogic();
+  const { isModalOpen, handleCloseModal: closeModal } = useChatLogicContext();
 
   // デバッグ用ログの追加
   useEffect(() => {
@@ -287,24 +287,25 @@ export default function ModelInputModal() {
     }
   };
 
-  if (!isModalOpen) return null;
-
   return (
     <>
       {isModalOpen && (
         <div className="model-input-modal-overlay" onClick={handleOverlayClick}>
           <div className="model-input-modal">
-            <h2>設定</h2>
-            <span
-              className="close-button"
-              onClick={() => {
-                console.log("[DEBUG] Close button clicked");
-                closeModal();
-              }}
-            >
-              ×
-            </span>
-            <h3>Model</h3>
+            <div className="modal-header">
+              <h2>設定</h2>
+              <span
+                className="close-button"
+                onClick={() => {
+                  console.log("[DEBUG] Close button clicked");
+                  closeModal();
+                }}
+              >
+                ×
+              </span>
+            </div>
+            <div className="modal-content">
+              <h3>Model</h3>
             <ul className="model-list">
               {models.map((model, index) => (
                 <li
@@ -556,6 +557,7 @@ export default function ModelInputModal() {
               </svg>
               新しいツールを追加
             </button>
+            </div>
           </div>
         </div>
       )}

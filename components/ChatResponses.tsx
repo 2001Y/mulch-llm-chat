@@ -15,6 +15,7 @@ import TurndownService from "turndown";
 import { FunctionCallHandler } from "../utils/functionCallHandler";
 import { useOpenAI } from "hooks/useOpenAI";
 import useAccessToken from "hooks/useAccessToken";
+import { useChatLogicContext } from "contexts/ChatLogicContext";
 import {
   ChatCompletionMessageParam,
   ChatCompletionUserMessageParam,
@@ -87,7 +88,7 @@ export default function Responses() {
     { fullId: string; shortId: string }[]
   >([]);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const { isGenerating, setIsGenerating } = useChatLogicContext();
   const [abortControllers, setAbortControllers] = useState<AbortController[]>(
     []
   );
