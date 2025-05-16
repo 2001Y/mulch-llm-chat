@@ -518,11 +518,12 @@ header {
     font-size: 0.9em;
     opacity: 0.8;
 
-    &:before,
-    &:after {
-      content: '"';
-      opacity: 0.5;
-    }
+    // Removed quotation marks that were causing code decoding issues
+    // &:before,
+    // &:after {
+    //   content: '"';
+    //   opacity: 0.5;
+    // }
   }
 
   .action-button,
