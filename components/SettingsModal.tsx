@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import ModelSuggestions from "./ModelSuggestions";
 import useStorageState from "hooks/useLocalStorage";
 import { useChatLogic } from "hooks/useChatLogic";
+import ClientOnlyWrapper from "./ClientOnlyWrapper";
 
 interface ModelInputModalProps {
   closeModal: () => void;
@@ -287,21 +288,20 @@ export default function ModelInputModal() {
     }
   };
 
-  if (!isModalOpen) return null;
-
   return (
     <>
       {isModalOpen && (
-        <div className="model-input-modal-overlay" onClick={handleOverlayClick}>
-          <div className="model-input-modal">
-            <h2>設定</h2>
-            <span
-              className="close-button"
-              onClick={() => {
-                console.log("[DEBUG] Close button clicked");
-                closeModal();
-              }}
-            >
+        <ClientOnlyWrapper>
+          <div className="modal-overlay" onClick={handleOverlayClick}>
+            <div className="modal-content">
+              <h2>設定</h2>
+              <span
+                className="close-button"
+                onClick={() => {
+                  console.log("[DEBUG] Close button clicked");
+                  closeModal();
+                }}
+              >
               ×
             </span>
             <h3>Model</h3>
@@ -557,7 +557,8 @@ export default function ModelInputModal() {
               新しいツールを追加
             </button>
           </div>
-        </div>
+          </div>
+        </ClientOnlyWrapper>
       )}
     </>
   );
