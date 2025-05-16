@@ -42,9 +42,15 @@ function AuthButton() {
     );
   };
 
-  return isLoggedIn ? (
+  return (
     <>
-      <button onClick={handleLogout}>Logout</button>
+      {isLoggedIn ? (
+        <button onClick={handleLogout}>Logout</button>
+      ) : (
+        <button onClick={handleLogin} className="login">
+          Login with OpenRouter
+        </button>
+      )}
       <div
         onClick={() => {
           console.log("[DEBUG] Settings icon clicked");
@@ -70,10 +76,6 @@ function AuthButton() {
         </svg>
       </div>
     </>
-  ) : (
-    <button onClick={handleLogin} className="login">
-      Login with OpenRouter
-    </button>
   );
 }
 
