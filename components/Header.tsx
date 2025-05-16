@@ -81,18 +81,18 @@ function AuthButton() {
 
 function FreeVersionBadge() {
   const [mounted, setMounted] = useState(false);
+  const [isFreeVersion, setIsFreeVersion] = useState(true);
 
   useEffect(() => {
     setMounted(true);
+    setIsFreeVersion(!storage.getAccessToken());
   }, []);
 
-  if (!mounted) {
-    return null;
-  }
-
-  return !storage.getAccessToken() ? (
-    <div className="free-version">Free Version</div>
-  ) : null;
+  return (
+    <ClientOnlyWrapper>
+      {isFreeVersion && <div className="free-version">Free Version</div>}
+    </ClientOnlyWrapper>
+  );
 }
 
 export default function Header() {
