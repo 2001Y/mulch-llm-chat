@@ -32,7 +32,8 @@ export default function ClientOnly() {
         (!(event.target as HTMLElement).closest(".model-select-area") &&
           !(event.target as HTMLElement).closest(".responses-container") &&
           !(event.target as HTMLElement).closest(".chat-input-area") &&
-          !(event.target as HTMLElement).closest(".modal-content"))
+          !(event.target as HTMLElement).closest(".modal-content") &&
+          !(event.target as HTMLElement).closest(".model-input-modal"))
       ) {
         event.preventDefault();
       }
