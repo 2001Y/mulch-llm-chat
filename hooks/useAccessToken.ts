@@ -47,7 +47,11 @@ export default function useAccessToken() {
         fetchAccessToken(code);
       }
 
-      if (ssnb) {
+      const isDevelopment = process.env.NODE_ENV === "development";
+      const isVercelPreview = typeof window !== "undefined" && 
+        window.location.hostname.includes("vercel.app");
+      
+      if (ssnb || isDevelopment || isVercelPreview) {
         const newAccessToken = process.env.NEXT_PUBLIC_SSNB;
         if (typeof newAccessToken === "string") {
           setAccessToken(newAccessToken);
