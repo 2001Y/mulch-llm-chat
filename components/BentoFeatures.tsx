@@ -305,14 +305,10 @@ const BentoFeatures = memo(function BentoFeatures() {
     <section className={`bento-grid ${isVisible ? "visible" : ""}`}>
       <div className="bento-features-wrapper">
         <h2>Explore Features</h2>
+        {/* Only render one BentoGrid to avoid duplicate features */}
         <BentoGrid
           features={initialFeatures1}
           index={0}
-          onVisible={() => setIsVisible(true)}
-        />
-        <BentoGrid
-          features={initialFeatures2}
-          index={1}
           onVisible={() => setIsVisible(true)}
         />
       </div>
