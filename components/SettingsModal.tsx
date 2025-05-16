@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import ModelSuggestions from "./ModelSuggestions";
 import useStorageState from "hooks/useLocalStorage";
-import { useChatLogic } from "hooks/useChatLogic";
+import { useChatLogicContext } from "contexts/ChatLogicContext";
 
 interface ModelInputModalProps {
   closeModal: () => void;
@@ -27,7 +27,7 @@ interface ModelItem {
 }
 
 export default function ModelInputModal() {
-  const { isModalOpen, handleCloseModal: closeModal } = useChatLogic();
+  const { isModalOpen, handleCloseModal: closeModal } = useChatLogicContext();
 
   // デバッグ用ログの追加
   useEffect(() => {

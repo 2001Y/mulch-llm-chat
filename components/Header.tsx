@@ -3,12 +3,12 @@ import Link from "next/link";
 import { navigateWithTransition } from "@/utils/navigation";
 import { storage } from "hooks/useLocalStorage";
 import Image from "next/image";
-import { useChatLogic } from "hooks/useChatLogic";
+import { useChatLogicContext } from "contexts/ChatLogicContext";
 import { useEffect, useState } from "react";
 
 function AuthButton() {
   const [mounted, setMounted] = useState(false);
-  const { handleOpenModal } = useChatLogic();
+  const { handleOpenModal } = useChatLogicContext();
 
   useEffect(() => {
     setMounted(true);
