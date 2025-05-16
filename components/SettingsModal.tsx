@@ -291,7 +291,6 @@ export default function ModelInputModal() {
 
   return (
     <>
-      {isModalOpen && (
         <div className="model-input-modal-overlay" onClick={handleOverlayClick}>
           <div className="model-input-modal">
             <h2>設定</h2>
@@ -558,7 +557,6 @@ export default function ModelInputModal() {
             </button>
           </div>
         </div>
-      )}
     </>
   );
 }
