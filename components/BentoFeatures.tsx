@@ -284,16 +284,14 @@ function BentoGrid({
 
   return (
     <div className={`grid ${isVisible ? "visible" : ""}`} ref={gridRef}>
-      {Array(repeatCount)
-        .fill(initialFeatures)
-        .flat()
-        .map((feature, index) => (
-          <div key={index} className="bento-item">
-            <div className="icon">{feature.icon}</div>
-            <h3>{feature.title}</h3>
-            <p>{feature.description}</p>
-          </div>
-        ))}
+      {/* Limit to just one set of features to avoid duplication */}
+      {initialFeatures.map((feature, index) => (
+        <div key={`feature-${index}`} className="bento-item">
+          <div className="icon">{feature.icon}</div>
+          <h3>{feature.title}</h3>
+          <p>{feature.description}</p>
+        </div>
+      ))}
     </div>
   );
 }

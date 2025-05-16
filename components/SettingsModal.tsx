@@ -288,8 +288,6 @@ export default function ModelInputModal() {
     }
   };
 
-  if (!isModalOpen) return null;
-
   return (
     <>
       {isModalOpen && (
