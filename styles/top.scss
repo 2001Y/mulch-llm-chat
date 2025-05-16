@@ -5,6 +5,8 @@ $accent-color: #0f3460;
 $text-color: #e94560;
 $font-family: "Roboto", sans-serif;
 
+@use "sass:color";
+
 // Mixins
 @mixin responsive-container {
   max-width: 1200px;
@@ -70,7 +72,7 @@ body {
         transition: background-color 0.3s;
 
         &:hover {
-          background-color: darken($accent-color, 10%);
+          background-color: color.adjust($accent-color, $lightness: -10%);
         }
       }
     }
@@ -125,7 +127,7 @@ body {
           color: #ffffff;
 
           &:hover {
-            background-color: darken($accent-color, 10%);
+            background-color: color.adjust($accent-color, $lightness: -10%);
           }
         }
 
@@ -135,7 +137,7 @@ body {
           border: 2px solid $text-color;
 
           &:hover {
-            background-color: rgba($text-color, 0.1);
+            background-color: color.adjust($accent-color, $lightness: -10%);
           }
         }
       }

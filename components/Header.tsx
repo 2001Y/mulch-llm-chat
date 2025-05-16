@@ -45,7 +45,15 @@ function AuthButton() {
   return isLoggedIn ? (
     <>
       <button onClick={handleLogout}>Logout</button>
-      <div onClick={() => handleOpenModal()} className="setting">
+      <div
+        onClick={() => {
+          console.log("[DEBUG] Settings icon clicked");
+          console.log("[DEBUG] handleOpenModal:", handleOpenModal);
+          handleOpenModal();
+          console.log("[DEBUG] After handleOpenModal called");
+        }}
+        className="setting"
+      >
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="24"
@@ -69,10 +77,30 @@ function AuthButton() {
   );
 }
 
+function FreeVersionBadge() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
+
+  return !storage.getAccessToken() ? (
+    <div className="free-version">Free Version</div>
+  ) : null;
+}
+
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
-  const showBackButton = pathname !== "/" && window.innerWidth <= 768;
+  const [showBackButton, setShowBackButton] = useState(false);
+
+  useEffect(() => {
+    setShowBackButton(pathname !== "/" && window.innerWidth <= 768);
+  }, [pathname]);
 
   const handleNavigation = (e: React.MouseEvent, href: string) => {
     e.preventDefault();
@@ -120,9 +148,7 @@ export default function Header() {
       <div className="header-side">
         <AuthButton />
       </div>
-      {!storage.getAccessToken() && (
-        <div className="free-version">Free Version</div>
-      )}
+      <FreeVersionBadge />
     </header>
   );
 }

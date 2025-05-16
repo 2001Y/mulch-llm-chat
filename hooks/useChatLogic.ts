@@ -40,8 +40,16 @@ export function useChatLogic() {
 
   // 設定モーダルの状管理を追加
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const handleOpenModal = useCallback(() => setIsModalOpen(true), []);
-  const handleCloseModal = useCallback(() => setIsModalOpen(false), []);
+  const handleOpenModal = useCallback(() => {
+    console.log("[DEBUG] useChatLogic - handleOpenModal called");
+    setIsModalOpen(true);
+    console.log("[DEBUG] useChatLogic - isModalOpen set to true");
+  }, []);
+  const handleCloseModal = useCallback(() => {
+    console.log("[DEBUG] useChatLogic - handleCloseModal called");
+    setIsModalOpen(false);
+    console.log("[DEBUG] useChatLogic - isModalOpen set to false");
+  }, []);
 
   const [models, setModels] = useStorageState<"models">("models");
   const [chatInput, setChatInput] = useState<any[]>([]);
@@ -68,7 +76,7 @@ export function useChatLogic() {
   // メッセージ読み込む
   useEffect(() => {
     if (storedMessages && storedMessages.length > 0 && !initialLoadComplete) {
-      console.log(`[DEBUG] ルーム ${roomId} のメッセージ���み込み:`, {
+      console.log(`[DEBUG] ルーム ${roomId} のメッセージ読み込み:`, {
         storedMessages,
         roomId,
         initialLoadComplete,
@@ -624,7 +632,7 @@ export function useChatLogic() {
     [models]
   );
 
-  // handleResetAndRegenerateも共通化したロジックを使用するように���正
+  // handleResetAndRegenerateも共通化したロジックを使用するように正
   const handleResetAndRegenerate = useCallback(
     (messageIndex: number) => {
       setIsGenerating(true);

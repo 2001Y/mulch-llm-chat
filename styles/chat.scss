@@ -1,5 +1,5 @@
-@import "variables";
-@import "~highlight.js/styles/github-dark.css";
+@use "sass:color";
+@use "variables" as *;
 
 /* リセットCSS */
 *,
@@ -163,7 +163,7 @@ header {
       small {
         font-size: 0.5em;
         line-height: 0.5em;
-        color: mix(#fff, #000, 45%);
+        color: color.mix(#fff, #000, 45%);
       }
     }
   }
@@ -207,11 +207,11 @@ header {
       transition: background-color 0.3s ease;
 
       &:hover {
-        background-color: darken($accent-color, 10%);
+        background-color: color.adjust($accent-color, $lightness: -10%);
       }
 
       &:active {
-        background-color: darken($accent-color, 20%);
+        background-color: color.adjust($accent-color, $lightness: -20%);
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
       }
     }
@@ -289,8 +289,8 @@ header {
     .open-modal-button {
       height: $modal-button_height;
       padding: 0 1em;
-      color: mix(#fff, #000, 70%);
-      background: rgba(mix(#fff, #000, 10%), $background-opacity);
+      color: color.mix(#fff, #000, 70%);
+      background: rgba(color.mix(#fff, #000, 10%), $background-opacity);
       backdrop-filter: blur($blur-intensity);
       display: flex;
       align-items: center;
@@ -317,7 +317,7 @@ header {
     }
 
     &.model-select-area {
-      color: mix(#fff, #000, 70%);
+      color: color.mix(#fff, #000, 70%);
       // display: flex;
       gap: 0.5em;
       // width: 100vw;
@@ -362,7 +362,7 @@ header {
           display: flex;
           align-items: center;
           padding: 0.6em;
-          background: rgba(mix(#fff, #000, 10%), $background-opacity);
+          background: rgba(color.mix(#fff, #000, 10%), $background-opacity);
           backdrop-filter: blur($blur-intensity);
           border-radius: $border-radius;
           box-shadow: $shadow;
@@ -374,7 +374,7 @@ header {
             min-height: 1.5em;
             aspect-ratio: 1/1;
             border-radius: 50%;
-            background: mix(#fff, #000, 20%);
+            background: color.mix(#fff, #000, 20%);
             margin-right: 0.5em;
           }
         }
@@ -401,7 +401,7 @@ header {
       );
       max-height: $maxHeight;
       max-width: 100%;
-      background: rgba(mix(#fff, #000, 10%), $background-opacity);
+      background: rgba(color.mix(#fff, #000, 10%), $background-opacity);
       backdrop-filter: blur($blur-intensity);
       border-radius: $border-radius;
       box-shadow: $shadow;
@@ -421,7 +421,7 @@ header {
         resize: none;
 
         &::placeholder {
-          color: mix(#fff, #000, 30%);
+          color: color.mix(#fff, #000, 30%);
         }
       }
 
@@ -430,7 +430,7 @@ header {
         max-height: 40px;
         aspect-ratio: 1/1;
         margin: 0.5em;
-        background: mix(#fff, $accent-color, 10%);
+        background: color.mix(#fff, $accent-color, 10%);
         border-radius: calc($border-radius - 0.25em);
       }
 
@@ -449,7 +449,7 @@ header {
           display: block;
           width: 100%;
           height: 2rem;
-          background: rgba(mix(#fff, #000, 10%), $background-opacity);
+          background: rgba(color.mix(#fff, #000, 10%), $background-opacity);
           border-radius: $border-radius;
           position: absolute;
           top: 50%;
@@ -527,7 +527,7 @@ header {
 
   .action-button,
   .shortcut-area {
-    color: mix(#fff, #000, 70%);
+    color: color.mix(#fff, #000, 70%);
     padding: $button-padding-vertical $button-padding-horizontal;
     display: flex;
     align-items: center;
@@ -548,13 +548,13 @@ header {
   }
 
   .action-button {
-    background-color: rgba(mix(#fff, #000, 10%), $background-opacity);
+    background-color: rgba(color.mix(#fff, #000, 10%), $background-opacity);
     backdrop-filter: blur($blur-intensity);
     border-radius: $border-radius;
     transition: background-color 0.3s, color 0.3s;
 
     &:hover {
-      background-color: mix(#fff, #000, 15%);
+      background-color: color.mix(#fff, #000, 15%);
       color: #fff;
     }
 
@@ -583,16 +583,16 @@ header {
 
       &.active {
         background-color: rgba(
-          mix($bg_body, #00ff00, 80%),
+          color.mix($bg_body, #00ff00, 80%),
           $background-opacity
         );
         backdrop-filter: blur($blur-intensity);
-        border: 1px solid mix($bg_body, #00ff00, 60%);
+        border: 1px solid color.mix($bg_body, #00ff00, 60%);
         color: #00ff00;
 
         &:hover {
-          background-color: mix($bg_body, #00ff00, 70%);
-          border-color: mix($bg_body, #00ff00, 40%);
+          background-color: color.mix($bg_body, #00ff00, 70%);
+          border-color: color.mix($bg_body, #00ff00, 40%);
           color: #ffffff;
         }
       }
@@ -601,14 +601,17 @@ header {
     &.stop-button {
       display: block;
       transition: background-color 0.3s, border-color 0.3s, color 0.3s;
-      background-color: rgba(mix($bg_body, #ff0000, 80%), $background-opacity);
+      background-color: rgba(
+        color.mix($bg_body, #ff0000, 80%),
+        $background-opacity
+      );
       backdrop-filter: blur($blur-intensity);
-      border: 1px solid mix($bg_body, #ff0000, 60%);
+      border: 1px solid color.mix($bg_body, #ff0000, 60%);
       color: #ff0000;
 
       &:hover {
-        background-color: mix($bg_body, #ff0000, 70%);
-        border-color: mix($bg_body, #ff0000, 40%);
+        background-color: color.mix($bg_body, #ff0000, 70%);
+        border-color: color.mix($bg_body, #ff0000, 40%);
         color: #ffffff;
       }
     }
@@ -625,7 +628,7 @@ header {
     &.save-only-button {
       border: 1px solid rgba(255, 255, 255, 0.245);
       display: none;
-      background-color: rgba(mix(#fff, #000, 10%), $background-opacity);
+      background-color: rgba(color.mix(#fff, #000, 10%), $background-opacity);
       backdrop-filter: blur($blur-intensity);
 
       &:hover {
@@ -830,8 +833,8 @@ header {
         button {
           font-size: $button-font-size;
           padding: $button-padding-vertical $button-padding-horizontal;
-          background-color: mix(#fff, #000, 10%);
-          color: mix(#fff, #000, 70%);
+          background-color: color.mix(#fff, #000, 10%);
+          color: color.mix(#fff, #000, 70%);
           border-radius: $border-radius;
           margin-top: $button-padding-vertical;
           transition: background-color 0.3s, color 0.3s;
@@ -839,7 +842,7 @@ header {
           position: relative;
 
           &:hover {
-            background-color: mix(#fff, #000, 15%);
+            background-color: color.mix(#fff, #000, 15%);
             color: #fff;
           }
 
@@ -848,7 +851,7 @@ header {
             border: 1px solid rgba(255, 255, 255, 0.2);
 
             &:hover {
-              background-color: mix(#fff, #000, 20%);
+              background-color: color.mix(#fff, #000, 20%);
               border-color: rgba(255, 255, 255, 0.4);
             }
           }
@@ -1029,7 +1032,7 @@ header {
       display: inline-flex;
       align-items: center;
       padding: 0.5em 1em;
-      background-color: mix($bg_body, #fff, 90%);
+      background-color: color.mix($bg_body, #fff, 90%);
       color: rgba(255, 255, 255, 0.7);
       border-radius: 20px;
       cursor: pointer;
@@ -1054,7 +1057,7 @@ header {
       }
 
       &:hover {
-        background-color: mix($bg_body, #fff, 80%);
+        background-color: color.mix($bg_body, #fff, 80%);
         color: rgba(255, 255, 255, 0.9);
       }
     }
@@ -1076,7 +1079,7 @@ header {
 }
 
 .modal-content {
-  background: mix(#fff, #000, 15%);
+  background: color.mix(#fff, #000, 15%);
   padding: 3vw 4vw;
   padding-bottom: max(env(safe-area-inset-bottom), 5vw);
   $border-radius: $border-radius * 1.5;
@@ -1416,7 +1419,7 @@ header {
     }
 
     &:hover {
-      background: darken($accent-color, 10%);
+      background: color.adjust($accent-color, $lightness: -10%);
     }
   }
 
@@ -1512,7 +1515,7 @@ button {
     color: #fff;
 
     &:hover {
-      background-color: darken($accent-color, 10%);
+      background-color: color.adjust($accent-color, $lightness: -10%);
     }
   }
 
@@ -1533,7 +1536,7 @@ button {
     color: #fff;
 
     &:hover {
-      background-color: darken($accent-color, 10%);
+      background-color: color.adjust($accent-color, $lightness: -10%);
     }
   }
 }
@@ -1694,7 +1697,7 @@ textarea[data-fieldsizing="content"] {
   position: absolute;
   bottom: 10em;
   left: 1.5em;
-  background: mix(#fff, #000, 10%);
+  background: color.mix(#fff, #000, 10%);
   border-radius: $border-radius;
   box-shadow: $shadow;
   max-height: 10em;
@@ -1732,7 +1735,7 @@ textarea[data-fieldsizing="content"] {
     cursor: pointer;
 
     &.active {
-      background-color: mix(#fff, #000, 20%);
+      background-color: color.mix(#fff, #000, 20%);
     }
 
     input {
@@ -1760,7 +1763,7 @@ textarea[data-fieldsizing="content"] {
 //     backdrop-filter: blur(10px);
 //     box-shadow: $shadow;
 //     margin-bottom: 1em;
-//     color: mix(#fff, #000, 70%);
+//     color: color.mix(#fff, #000, 70%);
 //     position: fixed;
 //     top: calc($height_header + 1em);
 //     left: 1em;
@@ -1768,7 +1771,7 @@ textarea[data-fieldsizing="content"] {
 //     z-index: 100;
 
 //     .shortcut {
-//       color: mix(#fff, #000, 70%);
+//       color: color.mix(#fff, #000, 70%);
 //       opacity: 0.5;
 //       font-size: 0.9em;
 //       padding: $button-padding-vertical $button-padding-horizontal;
@@ -1891,7 +1894,7 @@ textarea[data-fieldsizing="content"] {
             color: #fff;
 
             &:hover {
-              background: darken($accent-color, 10%);
+              background: color.adjust($accent-color, $lightness: -10%);
             }
           }
 
@@ -1947,7 +1950,7 @@ textarea[data-fieldsizing="content"] {
       }
 
       &:hover {
-        background: darken($accent-color, 10%);
+        background: color.adjust($accent-color, $lightness: -10%);
       }
     }
   }
@@ -1971,7 +1974,7 @@ textarea[data-fieldsizing="content"] {
     }
 
     &:hover {
-      background: darken($accent-color, 10%);
+      background: color.adjust($accent-color, $lightness: -10%);
     }
   }
 }

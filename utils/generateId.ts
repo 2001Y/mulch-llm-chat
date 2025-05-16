@@ -1,8 +1,10 @@
+import { nanoid } from "nanoid";
+
 export function generateId(length: number = 8): string {
-  const chars =
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_$";
-  return Array.from(
-    { length },
-    () => chars[Math.floor(Math.random() * chars.length)]
-  ).join("");
+  // サーバーサイドでは固定のプレフィックスを持つIDを生成
+  if (typeof window === "undefined") {
+    return `ssr-${nanoid(length)}`;
+  }
+  // クライアントサイドでは通常のnanoidを使用
+  return nanoid(length);
 }

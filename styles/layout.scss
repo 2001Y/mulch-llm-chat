@@ -1,4 +1,5 @@
-@import "variables";
+@use "sass:color";
+@use "variables" as *;
 
 .layout {
   display: flex;
