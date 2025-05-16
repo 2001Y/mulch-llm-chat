@@ -284,14 +284,16 @@ function BentoGrid({
 
   return (
     <div className={`grid ${isVisible ? "visible" : ""}`} ref={gridRef}>
-      {/* Limit to just one set of features to avoid duplication */}
-      {initialFeatures.map((feature, index) => (
-        <div key={`feature-${index}`} className="bento-item">
-          <div className="icon">{feature.icon}</div>
-          <h3>{feature.title}</h3>
-          <p>{feature.description}</p>
-        </div>
-      ))}
+      {Array(repeatCount)
+        .fill(initialFeatures)
+        .flat()
+        .map((feature, index) => (
+          <div key={index} className="bento-item">
+            <div className="icon">{feature.icon}</div>
+            <h3>{feature.title}</h3>
+            <p>{feature.description}</p>
+          </div>
+        ))}
     </div>
   );
 }
@@ -303,10 +305,14 @@ const BentoFeatures = memo(function BentoFeatures() {
     <section className={`bento-grid ${isVisible ? "visible" : ""}`}>
       <div className="bento-features-wrapper">
         <h2>Explore Features</h2>
-        {/* Only render one BentoGrid to avoid duplicate features */}
         <BentoGrid
           features={initialFeatures1}
           index={0}
+          onVisible={() => setIsVisible(true)}
+        />
+        <BentoGrid
+          features={initialFeatures2}
+          index={1}
           onVisible={() => setIsVisible(true)}
         />
       </div>
