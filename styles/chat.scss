@@ -1992,6 +1992,7 @@ textarea[data-fieldsizing="content"] {
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  overflow: hidden; /* Prevent overlay from scrolling */
   
   @media (max-width: 768px) {
     align-items: flex-start;
@@ -2003,7 +2004,8 @@ textarea[data-fieldsizing="content"] {
   width: 90%;
   max-width: 600px;
   max-height: 90vh;
-  overflow-y: auto;
+  overflow-y: auto; /* Enable vertical scrolling */
+  overflow-x: hidden; /* Hide horizontal scrollbar */
   background-color: $bg_body;
   color: #fff;
   border-radius: $border-radius;
@@ -2011,6 +2013,8 @@ textarea[data-fieldsizing="content"] {
   position: relative;
   box-shadow: $shadow;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column; /* Stack children vertically */
   
   @media (max-width: 768px) {
     width: 100%;
