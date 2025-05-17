@@ -97,7 +97,7 @@ const escapeCodeBlocks = (markdown: string): string => {
   });
 };
 
-export default function Responses() {
+export default function Responses({ readOnly = false, initialMessages = null }) {
   const [accessToken, setAccessToken] = useAccessToken();
   const [demoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO || "");
 
@@ -134,12 +134,15 @@ export default function Responses() {
 
   // メッセージを復元するuseEffect
   useEffect(() => {
-    if (storedMessages && storedMessages.length > 0 && !initialLoadComplete) {
+    if (initialMessages) {
+      setMessages(initialMessages);
+      setInitialLoadComplete(true);
+    } else if (storedMessages && storedMessages.length > 0 && !initialLoadComplete) {
       console.log(`ルーム ${roomId} の以前のメッセージを復元:`, storedMessages);
       setMessages(storedMessages);
       setInitialLoadComplete(true);
     }
-  }, [storedMessages, roomId, initialLoadComplete, setMessages]);
+  }, [storedMessages, roomId, initialLoadComplete, setMessages, initialMessages]);
 
   // メッセージが更新されたらローカルストレージに保存
   useEffect(() => {
@@ -772,7 +775,7 @@ export default function Responses() {
       <div
         className={`responses-container ${
           messages.length === 0 ? "initial-screen" : ""
-        }`}
+        } ${readOnly ? "read-only" : ""}`}
         ref={containerRef}
         translate="no"
       >
@@ -817,6 +820,7 @@ export default function Responses() {
                     >
                       <div className="meta">
                         <small>{response.model}</small>
+                        {!readOnly && (
                         <div className="response-controls">
                           <button
                             className={
@@ -883,17 +887,20 @@ export default function Responses() {
                               : ""}
                           </div>
                         </div>
+                        )}
                       </div>
                       <div
                         className="markdown-content"
-                        contentEditable
-                        onBlur={(e) =>
-                          handleEdit(
-                            messageIndex,
-                            responseIndex,
-                            (e.target as HTMLDivElement).innerHTML
-                          )
-                        }
+                        contentEditable={!readOnly}
+                        onBlur={(e) => {
+                          if (!readOnly) {
+                            handleEdit(
+                              messageIndex,
+                              responseIndex,
+                              (e.target as HTMLDivElement).innerHTML
+                            );
+                          }
+                        }}
                         dangerouslySetInnerHTML={{
                           __html: markedInstance.parse(response.text || ""),
                         }}
@@ -907,19 +914,21 @@ export default function Responses() {
         })}
       </div>
 
-      <InputSection
-        mainInput={true}
-        chatInput={chatInput}
-        setChatInput={setChatInput}
-        handleSend={(event, isPrimaryOnly) => handleSend(event, isPrimaryOnly)}
-        isEditMode={false}
-        messageIndex={0}
-        handleResetAndRegenerate={() => {}}
-        handleSaveOnly={() => {}}
-        isInitialScreen={messages.length === 0}
-        handleStopAllGeneration={handleStopAllGeneration}
-        isGenerating={isGenerating}
-      />
+      {!readOnly && (
+        <InputSection
+          mainInput={true}
+          chatInput={chatInput}
+          setChatInput={setChatInput}
+          handleSend={(event, isPrimaryOnly) => handleSend(event, isPrimaryOnly)}
+          isEditMode={false}
+          messageIndex={0}
+          handleResetAndRegenerate={() => {}}
+          handleSaveOnly={() => {}}
+          isInitialScreen={messages.length === 0}
+          handleStopAllGeneration={handleStopAllGeneration}
+          isGenerating={isGenerating}
+        />
+      )}
     </>
   );
 }
