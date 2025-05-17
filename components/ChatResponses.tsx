@@ -97,7 +97,11 @@ const escapeCodeBlocks = (markdown: string): string => {
   });
 };
 
-export default function Responses() {
+type ResponsesProps = {
+  readonly?: boolean;
+};
+
+export default function Responses({ readonly = false }: ResponsesProps) {
   const [accessToken, setAccessToken] = useAccessToken();
   const [demoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO || "");
 
@@ -786,23 +790,25 @@ export default function Responses() {
           const hasSelectedResponse = selectedResponses.length > 0;
           return (
             <div key={messageIndex} className="message-block">
-              <MemoizedInputSection
-                chatInput={message.user}
-                setChatInput={(newInput) =>
-                  updateMessage(messageIndex, null, newInput)
-                }
-                handleSend={(event, isPrimaryOnly) =>
-                  handleSend(event, isPrimaryOnly)
-                }
-                isEditMode={true}
-                messageIndex={messageIndex}
-                handleResetAndRegenerate={handleResetAndRegenerate}
-                handleSaveOnly={handleSaveOnly}
-                mainInput={false}
-                isInitialScreen={false}
-                handleStopAllGeneration={handleStopAllGeneration}
-                isGenerating={isGenerating}
-              />
+              {!readonly && (
+                <MemoizedInputSection
+                  chatInput={message.user}
+                  setChatInput={(newInput) =>
+                    updateMessage(messageIndex, null, newInput)
+                  }
+                  handleSend={(event, isPrimaryOnly) =>
+                    handleSend(event, isPrimaryOnly)
+                  }
+                  isEditMode={true}
+                  messageIndex={messageIndex}
+                  handleResetAndRegenerate={handleResetAndRegenerate}
+                  handleSaveOnly={handleSaveOnly}
+                  mainInput={false}
+                  isInitialScreen={false}
+                  handleStopAllGeneration={handleStopAllGeneration}
+                  isGenerating={isGenerating}
+                />
+              )}
               <div className="scroll_area">
                 {message.llm.map((response, responseIndex) => {
                   const isGenerating = response.isGenerating ?? false;
@@ -817,83 +823,87 @@ export default function Responses() {
                     >
                       <div className="meta">
                         <small>{response.model}</small>
-                        <div className="response-controls">
-                          <button
-                            className={
-                              isGenerating ? "stop-button" : "regenerate-button"
-                            }
-                            onClick={() =>
-                              isGenerating
-                                ? handleStop(messageIndex, responseIndex)
-                                : handleRegenerate(
-                                    messageIndex,
-                                    responseIndex,
-                                    response.model
-                                  )
-                            }
-                          >
-                            {isGenerating ? (
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="20"
-                                height="20"
-                                viewBox="0 0 24 24"
-                                fill="currentColor"
-                                stroke="none"
-                              >
-                                <rect
-                                  x="4"
-                                  y="4"
-                                  width="16"
-                                  height="16"
-                                  rx="2"
-                                  ry="2"
-                                />
-                              </svg>
-                            ) : (
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="24"
-                                height="24"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
-                              </svg>
-                            )}
-                          </button>
-                          <div
-                            className={`response-select ${
-                              response.selected ? "selected" : ""
-                            }`}
-                            onClick={() =>
-                              handleSelectResponse(messageIndex, responseIndex)
-                            }
-                          >
-                            {response.selected
-                              ? selectedResponses.length > 1
-                                ? selectedResponses.findIndex(
-                                    (r) => r === response
-                                  ) + 1
-                                : "✓"
-                              : ""}
+                        {!readonly && (
+                          <div className="response-controls">
+                            <button
+                              className={
+                                isGenerating ? "stop-button" : "regenerate-button"
+                              }
+                              onClick={() =>
+                                isGenerating
+                                  ? handleStop(messageIndex, responseIndex)
+                                  : handleRegenerate(
+                                      messageIndex,
+                                      responseIndex,
+                                      response.model
+                                    )
+                              }
+                            >
+                              {isGenerating ? (
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="20"
+                                  height="20"
+                                  viewBox="0 0 24 24"
+                                  fill="currentColor"
+                                  stroke="none"
+                                >
+                                  <rect
+                                    x="4"
+                                    y="4"
+                                    width="16"
+                                    height="16"
+                                    rx="2"
+                                    ry="2"
+                                  />
+                                </svg>
+                              ) : (
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="24"
+                                  height="24"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
+                                </svg>
+                              )}
+                            </button>
+                            <div
+                              className={`response-select ${
+                                response.selected ? "selected" : ""
+                              }`}
+                              onClick={() =>
+                                handleSelectResponse(messageIndex, responseIndex)
+                              }
+                            >
+                              {response.selected
+                                ? selectedResponses.length > 1
+                                  ? selectedResponses.findIndex(
+                                      (r) => r === response
+                                    ) + 1
+                                  : "✓"
+                                : ""}
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                       <div
                         className="markdown-content"
-                        contentEditable
-                        onBlur={(e) =>
-                          handleEdit(
-                            messageIndex,
-                            responseIndex,
-                            (e.target as HTMLDivElement).innerHTML
-                          )
-                        }
+                        contentEditable={!readonly}
+                        onBlur={(e) => {
+                          if (!readonly) {
+                            handleEdit(
+                              messageIndex,
+                              responseIndex,
+                              (e.target as HTMLDivElement).innerHTML
+                            );
+                          }
+                        }}
                         dangerouslySetInnerHTML={{
                           __html: markedInstance.parse(response.text || ""),
                         }}
@@ -907,19 +917,21 @@ export default function Responses() {
         })}
       </div>
 
-      <InputSection
-        mainInput={true}
-        chatInput={chatInput}
-        setChatInput={setChatInput}
-        handleSend={(event, isPrimaryOnly) => handleSend(event, isPrimaryOnly)}
-        isEditMode={false}
-        messageIndex={0}
-        handleResetAndRegenerate={() => {}}
-        handleSaveOnly={() => {}}
-        isInitialScreen={messages.length === 0}
-        handleStopAllGeneration={handleStopAllGeneration}
-        isGenerating={isGenerating}
-      />
+      {!readonly && (
+        <InputSection
+          mainInput={true}
+          chatInput={chatInput}
+          setChatInput={setChatInput}
+          handleSend={(event, isPrimaryOnly) => handleSend(event, isPrimaryOnly)}
+          isEditMode={false}
+          messageIndex={0}
+          handleResetAndRegenerate={() => {}}
+          handleSaveOnly={() => {}}
+          isInitialScreen={messages.length === 0}
+          handleStopAllGeneration={handleStopAllGeneration}
+          isGenerating={isGenerating}
+        />
+      )}
     </>
   );
 }
