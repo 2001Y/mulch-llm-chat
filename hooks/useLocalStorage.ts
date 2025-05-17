@@ -59,6 +59,12 @@ export const storage = {
     const token = storage.get("accessToken");
     return token && token !== "" ? token : null;
   },
+  
+  getGistToken: () => {
+    if (typeof window === "undefined") return null;
+    const token = storage.get("gistToken");
+    return token && token !== "" ? token : null;
+  },
 };
 
 // アクセストークンの状態を取得する関数
