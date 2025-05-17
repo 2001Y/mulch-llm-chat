@@ -5,8 +5,9 @@ import { useParams } from "next/navigation";
 import { fetchFromGist } from "@/utils/gistUtils";
 import ChatResponses from "@/components/ChatResponses";
 import Header from "@/components/Header";
+import { ChatLogicProvider } from "contexts/ChatLogicContext";
 
-export default function SharedChatPage() {
+function SharedChatPageContent() {
   const params = useParams();
   const gistId = params.gistId as string;
   const [chatData, setChatData] = useState<any>(null);
@@ -57,5 +58,13 @@ export default function SharedChatPage() {
         ) : null}
       </div>
     </div>
+  );
+}
+
+export default function SharedChatPage() {
+  return (
+    <ChatLogicProvider>
+      <SharedChatPageContent />
+    </ChatLogicProvider>
   );
 }
