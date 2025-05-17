@@ -6,6 +6,7 @@ import { Toaster } from "sonner";
 import ClientOnly from "components/ClientOnly";
 import Sidebar from "components/Sidebar";
 import "@/styles/layout.scss";
+import "highlight.js/styles/a11y-dark.css";
 
 export const metadata: Metadata = {
   title: "Multi AI Chat | OpenRouter Chat Client",

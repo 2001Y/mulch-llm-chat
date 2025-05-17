@@ -1079,15 +1079,15 @@ header {
 }
 
 .modal-content {
-  background: color.mix(#fff, #000, 15%);
+  // background: color.mix(#fff, #000, 15%);
   padding: 3vw 4vw;
   padding-bottom: max(env(safe-area-inset-bottom), 5vw);
   $border-radius: $border-radius * 1.5;
-  border-radius: $border-radius $border-radius 0 0;
+  // border-radius: $border-radius $border-radius 0 0;
   // max-width: 90%;
   max-height: 95vh;
   overflow-y: auto;
-  width: 30rem;
+  // width: 30rem;
   position: relative;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
 
@@ -1993,7 +1993,7 @@ textarea[data-fieldsizing="content"] {
   align-items: center;
   z-index: 1000;
   overflow: hidden; /* Prevent overlay from scrolling */
-  
+
   @media (max-width: 768px) {
     align-items: flex-start;
     padding-top: 5vh; /* 5% space at the top */
@@ -2014,7 +2014,7 @@ textarea[data-fieldsizing="content"] {
   flex-direction: column; /* Stack children vertically */
   padding: 0; /* Remove padding from container */
   overflow: hidden; /* Hide overflow for container */
-  
+
   @media (max-width: 768px) {
     width: 100%;
     max-width: 100%;
@@ -2039,7 +2039,7 @@ textarea[data-fieldsizing="content"] {
     overflow-x: hidden; /* Hide horizontal scrollbar */
     flex: 1;
     max-height: calc(90vh - 4rem); /* Adjust for header height */
-    
+
     @media (max-width: 768px) {
       max-height: calc(95vh - 4rem); /* Adjust for header height on mobile */
     }
@@ -2069,7 +2069,8 @@ textarea[data-fieldsizing="content"] {
     }
   }
 
-  .model-list, .function-call-list {
+  .model-list,
+  .function-call-list {
     list-style: none;
     padding: 0;
     margin: 0.5rem 0;
@@ -2082,14 +2083,17 @@ textarea[data-fieldsizing="content"] {
       margin-bottom: 0.5rem;
       background-color: rgba(255, 255, 255, 0.05);
       border-radius: 4px;
-      
+
       &.model-edit {
         background-color: rgba(255, 255, 255, 0.1);
       }
     }
   }
 
-  .model-buttons, .tool-buttons, .model-edit-buttons, .tool-edit-buttons {
+  .model-buttons,
+  .tool-buttons,
+  .model-edit-buttons,
+  .tool-edit-buttons {
     display: flex;
     gap: 0.5rem;
   }
@@ -2104,11 +2108,11 @@ textarea[data-fieldsizing="content"] {
     display: flex;
     align-items: center;
     justify-content: center;
-    
+
     &:hover {
       background-color: rgba(255, 255, 255, 0.2);
     }
-    
+
     svg {
       width: 1rem;
       height: 1rem;
@@ -2122,7 +2126,8 @@ textarea[data-fieldsizing="content"] {
     position: relative;
   }
 
-  .model-input, .tool-input {
+  .model-input,
+  .tool-input {
     flex: 1;
     background-color: rgba(255, 255, 255, 0.1);
     color: #fff;
@@ -2152,11 +2157,11 @@ textarea[data-fieldsizing="content"] {
     border-radius: 4px;
     cursor: pointer;
     margin-top: 1rem;
-    
+
     &:hover {
       background-color: darken($accent-color, 10%);
     }
-    
+
     svg {
       width: 1rem;
       height: 1rem;
@@ -2180,17 +2185,18 @@ textarea[data-fieldsizing="content"] {
   max-height: 200px;
   overflow-y: auto;
   margin-top: 0.25rem;
-  
+
   ul {
     list-style: none;
     padding: 0;
     margin: 0;
-    
+
     li {
       padding: 0.5rem;
       cursor: pointer;
-      
-      &:hover, &.active {
+
+      &:hover,
+      &.active {
         background-color: rgba(255, 255, 255, 0.1);
       }
     }

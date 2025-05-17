@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import InputSection from "./InputSection";
 import useStorageState from "hooks/useLocalStorage";
-import { marked } from "marked";
+import { Marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
 import { useParams } from "next/navigation";
@@ -26,7 +26,8 @@ import {
   ChatCompletionContentPart,
 } from "openai/resources/chat/completions";
 
-marked.use(
+// Markedのインスタンスを作成し、拡張機能とオプションを設定
+const markedInstance = new Marked(
   markedHighlight({
     langPrefix: "hljs language-",
     highlight(code, lang) {
@@ -35,6 +36,10 @@ marked.use(
     },
   })
 );
+markedInstance.setOptions({
+  gfm: true,
+  breaks: true,
+});
 
 // 型定義を追加
 type MessageContent = {
@@ -70,6 +75,27 @@ interface ModelItem {
 }
 
 type ModelsState = ModelItem[];
+
+// HTMLタグをエスケープする関数
+const escapeHtml = (unsafe: string): string => {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+};
+
+// コードブロック内のHTMLタグをエスケープする関数
+const escapeCodeBlocks = (markdown: string): string => {
+  // コードブロックに一致する正規表現
+  const codeBlockRegex = /```[\s\S]*?```/g;
+
+  return markdown.replace(codeBlockRegex, (match) => {
+    // コードブロックの内容をエスケープ
+    return match.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  });
+};
 
 export default function Responses() {
   const [accessToken, setAccessToken] = useAccessToken();
@@ -244,6 +270,9 @@ export default function Responses() {
                 : updatedContent;
             } else if (Array.isArray(content)) {
               llmResponse.text = content.map((c: any) => c.text).join("");
+            } else if (typeof content === "string") {
+              // 文字列が直接渡された場合、そのまま設定
+              llmResponse.text = content;
             }
           }
           if (toggleSelected) {
@@ -446,8 +475,8 @@ export default function Responses() {
             } else if (!functionHandler.isAccumulating) {
               if (content) {
                 tempContent += content;
-                result.push({ type: "text", text: content });
-                updateMessage(messageIndex, responseIndex, result);
+                // 修正: エスケープ処理を削除し、生のテキストを渡す
+                updateMessage(messageIndex, responseIndex, tempContent);
               }
             }
 
@@ -866,7 +895,7 @@ export default function Responses() {
                           )
                         }
                         dangerouslySetInnerHTML={{
-                          __html: marked(response.text),
+                          __html: markedInstance.parse(response.text || ""),
                         }}
                       />
                     </div>

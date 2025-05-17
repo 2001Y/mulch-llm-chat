@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { marked } from "marked";
+import { Marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
 import useStorageState, { storage, StorageState } from "hooks/useLocalStorage";
@@ -8,7 +8,8 @@ import useAccessToken from "hooks/useAccessToken";
 import { useOpenAI } from "hooks/useOpenAI";
 import { generateId } from "@/utils/generateId";
 
-marked.use(
+// Markedのインスタンスを作成し、拡張機能とオプションを設定
+const markedInstance = new Marked(
   markedHighlight({
     langPrefix: "hljs language-",
     highlight(code, lang) {
@@ -17,6 +18,10 @@ marked.use(
     },
   })
 );
+markedInstance.setOptions({
+  gfm: true,
+  breaks: true,
+});
 
 export interface ToolFunction {
   (args: any): any;
@@ -179,6 +184,9 @@ export function useChatLogic() {
                 : updatedContent;
             } else if (Array.isArray(content)) {
               llmResponse.text = content.map((c: any) => c.text).join("");
+            } else if (typeof content === "string") {
+              // 文字列が直接渡された場合、そのまま設定
+              llmResponse.text = content;
             }
           }
           if (toggleSelected) {
@@ -494,16 +502,10 @@ export function useChatLogic() {
             const content = part.choices[0]?.delta?.content || "";
             resultText += content;
 
-            const markedResult = marked(resultText);
-            // console.log("[fetchChatResponse] メッセージ更新", {
-            //   messageIndex,
-            //   responseIndex,
-            //   contentLength: content.length,
-            // });
             updateMessage(
               messageIndex,
               responseIndex,
-              [{ type: "text", text: markedResult }],
+              resultText,
               false,
               false
             );
