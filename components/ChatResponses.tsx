@@ -97,9 +97,14 @@ const escapeCodeBlocks = (markdown: string): string => {
   });
 };
 
-export default function Responses({ readOnly = false, initialMessages = null }) {
+interface ResponsesProps {
+  readOnly?: boolean;
+  initialMessages?: any[] | null;
+}
+
+export default function Responses({ readOnly = false, initialMessages = null }: ResponsesProps) {
   const [accessToken, setAccessToken] = useAccessToken();
-  const [demoAccessToken] = useState(process.env.NEXT_PUBLIC_DEMO || "");
+  const [demoAccessToken] = useState<string>(process.env.NEXT_PUBLIC_DEMO || "");
 
   const [models, setModels] = useStorageState("models");
   const [tools] = useStorageState("tools");

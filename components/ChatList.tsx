@@ -22,7 +22,7 @@ export default function ChatList() {
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const { chatIds } = useChats();
-  const [showGistModal, setShowGistModal] = useState(false);
+  const [showGistModal, setShowGistModal] = useState<boolean>(false);
   const [selectedChatForSharing, setSelectedChatForSharing] = useState<string | null>(null);
 
   const loadChats = () => {
@@ -103,11 +103,11 @@ export default function ChatList() {
     
     try {
       const result = await saveToGist(chatId, chatData);
-      if (result.success) {
+      if (result.success && result.url) {
         alert(`チャットを共有しました: ${result.url}`);
         navigator.clipboard.writeText(result.url).catch(console.error);
       } else {
-        alert(`エラー: ${result.message}`);
+        alert(`エラー: ${result.message || "不明なエラー"}`);
       }
     } catch (error) {
       console.error("共有中にエラーが発生しました:", error);

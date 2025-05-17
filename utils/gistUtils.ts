@@ -1,6 +1,14 @@
 import { storage } from "../hooks/useLocalStorage";
 
-export const saveToGist = async (chatId: string, chatData: any) => {
+interface GistSaveResult {
+  success: boolean;
+  message?: string;
+  url?: string;
+  gistUrl?: string;
+  id?: string;
+}
+
+export const saveToGist = async (chatId: string, chatData: any): Promise<GistSaveResult> => {
   const gistToken = storage.getGistToken();
   if (!gistToken) {
     return { success: false, message: "Gistトークンが設定されていません" };
@@ -51,7 +59,13 @@ export const saveToGist = async (chatId: string, chatData: any) => {
   }
 };
 
-export const fetchFromGist = async (gistId: string) => {
+interface GistFetchResult {
+  success: boolean;
+  message?: string;
+  chatData?: any;
+}
+
+export const fetchFromGist = async (gistId: string): Promise<GistFetchResult> => {
   try {
     const response = await fetch(`https://api.github.com/gists/${gistId}`, {
       headers: {

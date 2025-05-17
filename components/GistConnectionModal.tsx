@@ -9,9 +9,9 @@ interface GistConnectionModalProps {
 }
 
 export default function GistConnectionModal({ closeModal, onSuccess }: GistConnectionModalProps) {
-  const [gistToken, setGistToken] = useState("");
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [gistToken, setGistToken] = useState<string>("");
+  const [error, setError] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
