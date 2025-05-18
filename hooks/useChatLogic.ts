@@ -34,7 +34,12 @@ interface Message {
   edited?: boolean;
 }
 
-export function useChatLogic() {
+interface UseChatLogicProps {
+  isShared?: boolean;
+  initialMessages?: any[];
+}
+
+export function useChatLogic({ isShared = false, initialMessages = undefined }: UseChatLogicProps = {}) {
   const [accessToken] = useAccessToken();
   const openai = useOpenAI(accessToken);
   const router = useRouter();
@@ -80,7 +85,13 @@ export function useChatLogic() {
 
   // メッセージ読み込む
   useEffect(() => {
-    if (storedMessages && storedMessages.length > 0 && !initialLoadComplete) {
+    if (initialMessages) {
+      // 共有チャットの場合は初期メッセージを使用
+      setMessages(initialMessages);
+      setInitialLoadComplete(true);
+      console.log("[DEBUG] 共有チャットのメッセージ読み込み完了");
+    } else if (storedMessages && storedMessages.length > 0 && !initialLoadComplete) {
+      // 通常チャットの場合はストレージからメッセージを読み込み
       console.log(`[DEBUG] ルーム ${roomId} のメッセージ読み込み:`, {
         storedMessages,
         roomId,
@@ -90,7 +101,7 @@ export function useChatLogic() {
       setInitialLoadComplete(true);
       console.log("[DEBUG] メッセージ読み込み完了");
     }
-  }, [storedMessages, roomId, initialLoadComplete]);
+  }, [storedMessages, roomId, initialLoadComplete, initialMessages]);
 
   // 覧を取得する useEffect
   useEffect(() => {
@@ -697,5 +708,11 @@ export function useChatLogic() {
     handleSend,
     handleModelSelect,
     handlePrimaryModelSelect,
+    isShared,
+    updateMessage,
+    handleResetAndRegenerate,
+    handleSaveOnly,
+    handleStopAllGeneration,
+    containerRef,
   };
 }

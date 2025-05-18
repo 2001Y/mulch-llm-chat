@@ -1,17 +1,12 @@
 "use client";
 import "@/styles/chat.scss";
-
-import Responses from "components/ChatResponses";
-import Header from "components/Header";
-import SettingsModal from "components/SettingsModal";
+import ChatPage from "components/ChatPage";
 import { ChatLogicProvider } from "contexts/ChatLogicContext";
 
-export default function ChatPage() {
+export default function IndividualChatPage() {
   return (
-    <ChatLogicProvider>
-      <Header />
-      <SettingsModal />
-      <Responses />
+    <ChatLogicProvider isShared={false}>
+      <ChatPage isShared={false} />
     </ChatLogicProvider>
   );
 }

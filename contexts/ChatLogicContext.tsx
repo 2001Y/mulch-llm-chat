@@ -4,8 +4,18 @@ import { useChatLogic } from "hooks/useChatLogic";
 
 const ChatLogicContext = createContext<ReturnType<typeof useChatLogic> | null>(null);
 
-export function ChatLogicProvider({ children }: { children: React.ReactNode }) {
-  const chatLogic = useChatLogic();
+interface ChatLogicProviderProps {
+  children: React.ReactNode;
+  isShared?: boolean;
+  initialMessages?: any[];
+}
+
+export function ChatLogicProvider({ 
+  children, 
+  isShared = false,
+  initialMessages = undefined
+}: ChatLogicProviderProps) {
+  const chatLogic = useChatLogic({ isShared, initialMessages });
 
   return (
     <ChatLogicContext.Provider value={chatLogic}>

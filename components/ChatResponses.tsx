@@ -6,15 +6,10 @@ import React, {
   useMemo,
 } from "react";
 import InputSection from "./InputSection";
-import useStorageState from "hooks/useLocalStorage";
 import { Marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
-import { useParams } from "next/navigation";
 import TurndownService from "turndown";
-import { FunctionCallHandler } from "../utils/functionCallHandler";
-import { useOpenAI } from "hooks/useOpenAI";
-import useAccessToken from "hooks/useAccessToken";
 import { useChatLogicContext } from "contexts/ChatLogicContext";
 import {
   ChatCompletionMessageParam,
@@ -99,680 +94,68 @@ const escapeCodeBlocks = (markdown: string): string => {
 
 interface ResponsesProps {
   readOnly?: boolean;
-  initialMessages?: any[] | null;
 }
 
-export default function Responses({ readOnly = false, initialMessages = null }: ResponsesProps) {
-  const [accessToken, setAccessToken] = useAccessToken();
-  const [demoAccessToken] = useState<string>(process.env.NEXT_PUBLIC_DEMO || "");
+export default function Responses({ readOnly = false }: ResponsesProps) {
+  const {
+    messages,
+    isGenerating,
+    isShared,
+    containerRef,
+    chatInput,
+    setChatInput,
+    handleSend,
+    updateMessage,
+    handleResetAndRegenerate,
+    handleSaveOnly,
+    handleStopAllGeneration,
+  } = useChatLogicContext();
 
-  const [models, setModels] = useStorageState("models");
-  const [tools] = useStorageState("tools");
-  const [toolFunctions] = useStorageState("toolFunctions");
-
-  const params = useParams();
-  const roomId = decodeURIComponent(params.id as string);
-
-  const [messages, setMessages] = useState<Message[]>([]);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [AllModels, setAllModels] = useState<
-    { fullId: string; shortId: string }[]
-  >([]);
-  const [isAutoScroll, setIsAutoScroll] = useState(true);
-  const { isGenerating, setIsGenerating } = useChatLogicContext();
-  const [abortControllers, setAbortControllers] = useState<AbortController[]>(
-    []
-  );
-  const [chatInput, setChatInput] = useState<
+  const [localChatInput, setLocalChatInput] = useState<
     { type: string; text?: string; image_url?: { url: string } }[]
-  >([]);
-  const [storedMessages, setStoredMessages] = useStorageState(
-    `chatMessages_${roomId}`
-  );
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  >([{ type: "text", text: "" }]);
 
   const MemoizedInputSection = useMemo(() => React.memo(InputSection), []);
 
-  const openai = useOpenAI(
-    (typeof accessToken === "string" ? accessToken : "") || demoAccessToken
-  );
+  console.log("[DEBUG ChatResponses] Rendering. messages:", messages);
 
-  // メッセージを復元するuseEffect
-  useEffect(() => {
-    if (initialMessages) {
-      setMessages(initialMessages);
-      setInitialLoadComplete(true);
-    } else if (storedMessages && storedMessages.length > 0 && !initialLoadComplete) {
-      console.log(`ルーム ${roomId} の以前のメッセージを復元:`, storedMessages);
-      setMessages(storedMessages);
-      setInitialLoadComplete(true);
-    }
-  }, [storedMessages, roomId, initialLoadComplete, setMessages, initialMessages]);
-
-  // メッセージが更新されたらローカルストレージに保存
-  useEffect(() => {
-    if (initialLoadComplete) {
-      setStoredMessages(messages);
-    }
-  }, [messages, initialLoadComplete, setStoredMessages]);
-
-  // 完了生成を再開するuseEffect
-  useEffect(() => {
-    if (!initialLoadComplete) return;
-
-    let hasUnfinishedGeneration = false;
-    messages.forEach((message, messageIndex) => {
-      message.llm.forEach(
-        (
-          response: {
-            role: string;
-            model: string;
-            text: string;
-            selected: boolean;
-            isGenerating?: boolean;
-            selectedOrder?: number;
-          },
-          responseIndex: number
-        ) => {
-          if (response.isGenerating && !response.text) {
-            hasUnfinishedGeneration = true;
-            const abortController = new AbortController();
-            setAbortControllers((prevControllers) => {
-              const newControllers = [...prevControllers];
-              newControllers[responseIndex] = abortController;
-              return newControllers;
-            });
-            fetchChatResponse(
-              response.model,
-              messageIndex,
-              responseIndex,
-              abortController,
-              cleanInputContent(message.user)
-            );
-          }
-        }
-      );
-    });
-
-    if (hasUnfinishedGeneration) {
-      setIsGenerating(true);
-    }
-  }, [initialLoadComplete]);
-
-  useEffect(() => {
-    const fetchModels = async () => {
-      try {
-        const response = await fetch("https://openrouter.ai/api/v1/models");
-        const data = await response.json();
-        const modelIds = data.data.map((model: any) => ({
-          fullId: model.id,
-          shortId: model.id.split("/").pop(),
-        }));
-        setAllModels(modelIds);
-      } catch (error) {
-        console.error("モデルリストの取得に失敗しました:", error);
-      }
-    };
-    fetchModels();
-  }, []);
-
-  const extractModelsFromInput = (inputContent: any): string[] => {
-    const textContent = inputContent
-      .filter((item: any) => item.type === "text" && item.text)
-      .map((item: any) => item.text)
-      .join(" ");
-
-    const modelMatches = textContent.match(/@(\S+)/g) || [];
-    return modelMatches
-      .map((match: string) => match.slice(1)) // '@'を削除
-      .map((shortId: string) => {
-        const matchedModel = AllModels.find(
-          (model) => model.shortId === shortId
-        );
-        return matchedModel ? matchedModel.fullId : null;
-      })
-      .filter((model: string | null): model is string => model !== null); // nullを除外
-  };
-
-  const cleanInputContent = (inputContent: any): any => {
-    return inputContent
-      .map((item: any) => {
-        if (item.type === "text" && item.text) {
-          return {
-            ...item,
-            text: item.text.replace(/@\S+/g, "").trim(), // 全てのモデル指定を削除
-          };
-        }
-        return item;
-      })
-      .filter((item: any) => item.text !== "");
-  };
-
-  const updateMessage = useCallback(
+  // 編集ハンドラー
+  const handleEdit = useCallback(
     (
       messageIndex: number,
       responseIndex: number | null,
-      content?: any,
-      toggleSelected?: boolean,
-      saveOnly?: boolean
+      newContent: string
     ) => {
-      setMessages((prevMessages) => {
-        const newMessages = [...prevMessages];
-        const message = { ...newMessages[messageIndex] };
-
-        if (responseIndex === null) {
-          if (content !== undefined) {
-            message.user =
-              typeof content === "function" ? content(message.user) : content;
-            message.edited =
-              JSON.stringify(storedMessages[messageIndex]?.user) !==
-              JSON.stringify(message.user);
-          }
-        } else {
-          const llmResponse = { ...message.llm[responseIndex] };
-          if (content !== undefined) {
-            if (typeof content === "function") {
-              const updatedContent = content(llmResponse.text);
-              llmResponse.text = Array.isArray(updatedContent)
-                ? updatedContent.map((c: any) => c.text).join("")
-                : updatedContent;
-            } else if (Array.isArray(content)) {
-              llmResponse.text = content.map((c: any) => c.text).join("");
-            } else if (typeof content === "string") {
-              // 文字列が直接渡された場合、そのまま設定
-              llmResponse.text = content;
-            }
-          }
-          if (toggleSelected) {
-            if (llmResponse.selected) {
-              llmResponse.selected = false;
-              const currentOrder = llmResponse.selectedOrder;
-              delete llmResponse.selectedOrder;
-              message.llm = message.llm.map((resp: any) => {
-                if (
-                  resp.selected &&
-                  resp.selectedOrder !== undefined &&
-                  currentOrder !== undefined &&
-                  resp.selectedOrder > currentOrder
-                ) {
-                  return { ...resp, selectedOrder: resp.selectedOrder - 1 };
-                }
-                return resp;
-              });
-            } else {
-              const selectedCount = message.llm.filter(
-                (r: any) => r.selected
-              ).length;
-              llmResponse.selected = true;
-              llmResponse.selectedOrder = selectedCount + 1;
-            }
-          }
-          message.llm[responseIndex] = llmResponse;
-        }
-        newMessages[messageIndex] = message;
-        if (saveOnly) setStoredMessages(newMessages);
-        return newMessages;
-      });
+      const turndownService = new TurndownService();
+      const markdownContent = turndownService.turndown(newContent);
+      const newText = [{ type: "text", text: markdownContent }];
+      updateMessage(messageIndex, responseIndex, newText);
     },
-    [setMessages, setStoredMessages, storedMessages, roomId]
+    [updateMessage]
   );
 
-  const fetchChatResponse = useCallback(
-    async (
-      model: string,
-      messageIndex: number,
-      responseIndex: number,
-      abortController: AbortController,
-      inputContent: any
-    ) => {
-      setMessages((prevMessages) => {
-        const newMessages = [...prevMessages];
-        newMessages[messageIndex].llm[responseIndex].isGenerating = true;
-        return newMessages;
-      });
-
-      try {
-        const pastMessages = messages.flatMap((msg) => {
-          const userContent = Array.isArray(msg.user)
-            ? msg.user.filter(
-                (item) =>
-                  (item.type === "text" && item.text?.trim()) ||
-                  (item.type === "image_url" && item.image_url?.url)
-              )
-            : msg.user;
-
-          const convertToContentParts = (
-            content: MessageContent[]
-          ): ChatCompletionContentPart[] => {
-            return content.map((item) => {
-              if (item.type === "text" && item.text) {
-                return {
-                  type: "text",
-                  text: item.text,
-                };
-              } else if (item.type === "image_url" && item.image_url) {
-                return {
-                  type: "image_url",
-                  image_url: {
-                    url: item.image_url.url,
-                  },
-                };
-              }
-              throw new Error(`Unsupported content type: ${item.type}`);
-            });
-          };
-
-          const userMessage: ChatCompletionUserMessageParam | null =
-            userContent.length > 0
-              ? { role: "user", content: convertToContentParts(userContent) }
-              : null;
-
-          const selectedResponses = msg.llm
-            .filter((llm: any) => llm.selected)
-            .sort(
-              (a: any, b: any) =>
-                (a.selectedOrder || 0) - (b.selectedOrder || 0)
-            );
-
-          const responseMessages: ChatCompletionAssistantMessageParam[] =
-            selectedResponses.length > 0
-              ? selectedResponses.map((llm: any) => ({
-                  role: "assistant",
-                  content: llm.text?.trim()
-                    ? [{ type: "text", text: llm.text.trim() }]
-                    : [],
-                }))
-              : msg.llm.find((llm: any) => llm.model === model)?.text?.trim()
-              ? [
-                  {
-                    role: "assistant",
-                    content: [
-                      {
-                        type: "text",
-                        text:
-                          msg.llm
-                            .find((llm: any) => llm.model === model)
-                            ?.text?.trim() || "",
-                      },
-                    ],
-                  },
-                ]
-              : [];
-
-          return [userMessage, ...responseMessages].filter(
-            (
-              msg
-            ): msg is
-              | ChatCompletionUserMessageParam
-              | ChatCompletionAssistantMessageParam =>
-              msg !== null && msg.content !== null && msg.content !== undefined
-          );
-        });
-
-        // inputContentのフィルタリング
-        const filteredInputContent = Array.isArray(inputContent)
-          ? inputContent.filter(
-              (item) =>
-                (item.type === "text" && item.text?.trim()) ||
-                (item.type === "image_url" && item.image_url?.url)
-            )
-          : inputContent;
-
-        if (filteredInputContent.length === 0) {
-          console.error("Invalid input content");
-          return;
-        }
-
-        let result: { type: string; text: string }[] = [];
-        let tempContent = "";
-        const functionHandler = new FunctionCallHandler();
-
-        // ユーザー入力からモデルを抽出
-        const specifiedModel = extractModelsFromInput(inputContent);
-        const modelToUse =
-          specifiedModel.length > 0 ? specifiedModel[0] : model;
-
-        const stream = await openai?.chat.completions.create(
-          {
-            model: modelToUse,
-            messages: [
-              ...pastMessages,
-              {
-                role: "user",
-                content: filteredInputContent,
-              },
-            ],
-            stream: true,
-            tool_choice: "auto",
-            tools,
-          },
-          {
-            signal: abortController.signal,
-          }
-        );
-
-        console.log("[API Request] Messages:", {
-          model: modelToUse,
-          messages: [
-            ...pastMessages,
-            {
-              role: "user",
-              content: filteredInputContent,
-            },
-          ],
-          tool_choice: "auto",
-          tools,
-        });
-
-        if (stream) {
-          for await (const part of stream) {
-            if (abortController.signal.aborted) {
-              throw new DOMException("Aborted", "AbortError");
-            }
-            const content = part.choices[0]?.delta?.content || "";
-            const toolCalls = part.choices[0]?.delta?.tool_calls;
-
-            // console.log("[Stream Response]", {
-            //   content,
-            //   toolCalls,
-            //   delta: part.choices[0]?.delta,
-            // });
-
-            if (toolCalls) {
-              functionHandler.handleToolCalls(toolCalls);
-            } else if (!functionHandler.isAccumulating) {
-              if (content) {
-                tempContent += content;
-                // 修正: エスケープ処理を削除し、生のテキストを渡す
-                updateMessage(messageIndex, responseIndex, tempContent);
-              }
-            }
-
-            if (functionHandler.isReadyToExecute()) {
-              const parsedToolFunctions: Record<string, (args: any) => any> =
-                {};
-              for (const [key, value] of Object.entries(toolFunctions)) {
-                parsedToolFunctions[key] = new Function(`return ${value}`)();
-              }
-              await functionHandler.execute(
-                parsedToolFunctions,
-                tempContent,
-                updateMessage,
-                messageIndex,
-                responseIndex
-              );
-            }
-          }
-          setIsAutoScroll(false);
-        } else {
-          console.error("ストリームの作成に失敗しした");
-          updateMessage(
-            messageIndex,
-            responseIndex,
-            [{ type: "text", text: "エラー: レスポンスの生成に失敗しました" }],
-            false,
-            false
-          );
-        }
-      } catch (error: any) {
-        if (error.name !== "AbortError") {
-          console.error("Error fetching response from model:", model, error);
-          updateMessage(
-            messageIndex,
-            responseIndex,
-            [{ type: "text", text: `エラー: ${error.message}` }],
-            false,
-            false
-          );
-        }
-      } finally {
-        setMessages((prevMessages) => {
-          const newMessages = [...prevMessages];
-          newMessages[messageIndex].llm[responseIndex].isGenerating = false;
-          const allResponsesComplete = newMessages[messageIndex].llm.every(
-            (response: any) => !response.isGenerating
-          );
-          if (allResponsesComplete) setIsGenerating(false);
-          setStoredMessages(newMessages);
-          return newMessages;
-        });
-      }
-    },
-    [
-      messages,
-      openai,
-      updateMessage,
-      setStoredMessages,
-      toolFunctions,
-      extractModelsFromInput,
-    ]
-  );
-
-  const handleStopAllGeneration = () => {
-    abortControllers.forEach((controller) => {
-      try {
-        controller.abort();
-      } catch (error) {
-        console.error("Error while aborting:", error);
-      }
-    });
-    setIsGenerating(false);
-    setMessages((prevMessages) =>
-      prevMessages.map((message) => ({
-        ...message,
-        llm: message.llm.map((response: any) => ({
-          ...response,
-          isGenerating: false,
-        })),
-      }))
-    );
-  };
-
-  const handleStop = (messageIndex: number, responseIndex: number) => {
-    const controller = abortControllers[responseIndex];
-    if (controller) {
-      controller.abort();
-      setMessages((prevMessages) => {
-        const newMessages = [...prevMessages];
-        newMessages[messageIndex].llm[responseIndex].isGenerating = false;
-        return newMessages;
-      });
-    }
-  };
-
-  const handleRegenerate = async (
-    messageIndex: number,
-    responseIndex: number,
-    model: string
-  ) => {
-    const inputContent = messages[messageIndex].user;
-
-    // ユーザー入力からモデルを抽出
-    const specifiedModels = extractModelsFromInput(inputContent);
-    const modelToUse = specifiedModels.length > 0 ? specifiedModels[0] : model;
-
-    // モデルに送信する際にのみリーンアップ
-    const cleanedInputContent = cleanInputContent(inputContent);
-
-    const abortController = new AbortController();
-    setAbortControllers([abortController]);
-    setIsGenerating(true);
-
-    try {
-      await fetchChatResponse(
-        modelToUse,
-        messageIndex,
-        responseIndex,
-        abortController,
-        cleanedInputContent
-      );
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const getSelectedModels = (models: ModelsState | null): string[] => {
-    if (!models) return [];
-    return models.filter((model) => model.selected).map((model) => model.name);
-  };
-
-  const handleResetAndRegenerate = async (messageIndex: number) => {
-    setIsGenerating(true);
-    const userMessage = messages[messageIndex].user;
-
-    // ユーザー入力からモデルを抽出
-    const specifiedModels = extractModelsFromInput(userMessage);
-    const selectedModels = getSelectedModels(models);
-    const modelsToUse =
-      specifiedModels.length > 0 ? specifiedModels : selectedModels;
-
-    // モデルに送信する際にのみクリーンアップ
-    const cleanedUserMessage = cleanInputContent(userMessage);
-
-    const newMessages = [...messages].slice(0, messageIndex + 1);
-    newMessages[messageIndex].llm = modelsToUse.map((model) => ({
-      role: "assistant",
-      model,
-      text: "",
-      selected: false,
-    }));
-
-    setMessages(newMessages);
-
-    const newAbortControllers = modelsToUse.map(() => new AbortController());
-    setAbortControllers(newAbortControllers);
-
-    modelsToUse.forEach((model, index) => {
-      fetchChatResponse(
-        model,
-        messageIndex,
-        index,
-        newAbortControllers[index],
-        cleanedUserMessage
-      );
-    });
-
-    setIsAutoScroll(true);
-  };
-
-  const handleEdit = (
-    messageIndex: number,
-    responseIndex: number | null,
-    newContent: string
-  ) => {
-    const turndownService = new TurndownService();
-    const markdownContent = turndownService.turndown(newContent);
-    const newText = [{ type: "text", text: markdownContent }];
-    updateMessage(messageIndex, responseIndex, newText);
-  };
-
+  // レスポンス選択ハンドラー
   const handleSelectResponse = useCallback(
     (messageIndex: number, responseIndex: number) => {
-      console.log("Before updateMessage:", {
-        messageIndex,
-        responseIndex,
-        response: messages[messageIndex]?.llm[responseIndex],
-        allResponses: messages[messageIndex]?.llm,
-        selectedResponses: messages[messageIndex]?.llm.filter(
-          (r: any) => r.selected
-        ),
-      });
       updateMessage(messageIndex, responseIndex, undefined, true);
-      console.log("After updateMessage called");
     },
-    [updateMessage, messages]
+    [updateMessage]
   );
 
-  const handleSaveOnly = (messageIndex: number) => {
-    const currentMessage = messages[messageIndex];
-    updateMessage(messageIndex, null, currentMessage.user, false, true);
-  };
-
-  const handleScroll = () => {
-    const container = containerRef.current;
-    if (container) {
-      const { scrollTop, scrollHeight, clientHeight } = container;
-      const isScrolledToBottom = scrollHeight - scrollTop - clientHeight < 1;
-      setIsAutoScroll(isScrolledToBottom);
-    }
-  };
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (container) {
-      container.addEventListener("scroll", handleScroll);
-      return () => container.removeEventListener("scroll", handleScroll);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isAutoScroll && containerRef.current) {
-      const container = containerRef.current;
-      const { scrollHeight, clientHeight } = container;
-      container.scrollTop = scrollHeight - clientHeight;
-    }
-  }, [messages, isAutoScroll]);
-
-  const handleSend = useCallback(
-    async (
-      event: React.MouseEvent<HTMLButtonElement>,
-      isPrimaryOnly: boolean = false
-    ) => {
-      event.preventDefault();
-      if (!chatInput.length) return;
-
-      setIsGenerating(true);
-      const newMessageIndex = messages.length;
-
-      // ユーザー入力からモデルを抽出
-      const specifiedModels = extractModelsFromInput(chatInput);
-      const selectedModels = getSelectedModels(models);
-      const modelsToUse = isPrimaryOnly
-        ? [selectedModels[0]]
-        : specifiedModels.length > 0
-        ? specifiedModels
-        : selectedModels;
-
-      // モデルに送信する際にのみクリーンアップ
-      const cleanedChatInput = cleanInputContent(chatInput);
-
-      const newMessage = {
-        user: chatInput,
-        llm: modelsToUse.map((model) => ({
-          role: "assistant",
-          model,
-          text: "",
-          selected: false,
-        })),
-        timestamp: Date.now(),
-      };
-
-      setMessages((prev) => [...prev, newMessage]);
-      setChatInput([]);
-
-      const newAbortControllers = modelsToUse.map(() => new AbortController());
-      setAbortControllers(newAbortControllers);
-
-      modelsToUse.forEach((model, index) => {
-        fetchChatResponse(
-          model,
-          newMessageIndex,
-          index,
-          newAbortControllers[index],
-          cleanedChatInput
-        );
-      });
-
-      setIsAutoScroll(true);
+  // ストリーム中止ハンドラー
+  const handleStop = useCallback(
+    (messageIndex: number, responseIndex: number) => {
+      // このコンポーネントでは利用しない（コンテキストで処理）
     },
-    [
-      chatInput,
-      messages,
-      models,
-      extractModelsFromInput,
-      cleanInputContent,
-      fetchChatResponse,
-    ]
+    []
+  );
+
+  // 再生成ハンドラー
+  const handleRegenerate = useCallback(
+    (messageIndex: number, responseIndex: number, model: string) => {
+      // ここでは再生成は行わない - useChatLogicのメソッドを使うべき
+    },
+    []
   );
 
   return (
@@ -780,11 +163,17 @@ export default function Responses({ readOnly = false, initialMessages = null }: 
       <div
         className={`responses-container ${
           messages.length === 0 ? "initial-screen" : ""
-        } ${readOnly ? "read-only" : ""}`}
+        }`}
         ref={containerRef}
         translate="no"
       >
         {messages.map((message, messageIndex) => {
+          console.log(
+            "[DEBUG ChatResponses] Mapping message:",
+            message,
+            "at index:",
+            messageIndex
+          );
           const selectedResponses = message.llm
             .filter((r: any) => r.selected)
             .sort(
@@ -794,6 +183,7 @@ export default function Responses({ readOnly = false, initialMessages = null }: 
           const hasSelectedResponse = selectedResponses.length > 0;
           return (
             <div key={messageIndex} className="message-block">
+              {/* 常に編集可能なInputSectionを表示 */}
               <MemoizedInputSection
                 chatInput={message.user}
                 setChatInput={(newInput) =>
@@ -811,6 +201,7 @@ export default function Responses({ readOnly = false, initialMessages = null }: 
                 handleStopAllGeneration={handleStopAllGeneration}
                 isGenerating={isGenerating}
               />
+
               <div className="scroll_area">
                 {message.llm.map((response, responseIndex) => {
                   const isGenerating = response.isGenerating ?? false;
@@ -825,7 +216,7 @@ export default function Responses({ readOnly = false, initialMessages = null }: 
                     >
                       <div className="meta">
                         <small>{response.model}</small>
-                        {!readOnly && (
+                        {/* 常にコントロールを表示 */}
                         <div className="response-controls">
                           <button
                             className={
@@ -833,12 +224,8 @@ export default function Responses({ readOnly = false, initialMessages = null }: 
                             }
                             onClick={() =>
                               isGenerating
-                                ? handleStop(messageIndex, responseIndex)
-                                : handleRegenerate(
-                                    messageIndex,
-                                    responseIndex,
-                                    response.model
-                                  )
+                                ? handleStopAllGeneration()
+                                : handleResetAndRegenerate(messageIndex)
                             }
                           >
                             {isGenerating ? (
@@ -892,19 +279,16 @@ export default function Responses({ readOnly = false, initialMessages = null }: 
                               : ""}
                           </div>
                         </div>
-                        )}
                       </div>
                       <div
                         className="markdown-content"
-                        contentEditable={!readOnly}
+                        contentEditable={true}
                         onBlur={(e) => {
-                          if (!readOnly) {
-                            handleEdit(
-                              messageIndex,
-                              responseIndex,
-                              (e.target as HTMLDivElement).innerHTML
-                            );
-                          }
+                          handleEdit(
+                            messageIndex,
+                            responseIndex,
+                            (e.target as HTMLDivElement).innerHTML
+                          );
                         }}
                         dangerouslySetInnerHTML={{
                           __html: markedInstance.parse(response.text || ""),
@@ -918,22 +302,6 @@ export default function Responses({ readOnly = false, initialMessages = null }: 
           );
         })}
       </div>
-
-      {!readOnly && (
-        <InputSection
-          mainInput={true}
-          chatInput={chatInput}
-          setChatInput={setChatInput}
-          handleSend={(event, isPrimaryOnly) => handleSend(event, isPrimaryOnly)}
-          isEditMode={false}
-          messageIndex={0}
-          handleResetAndRegenerate={() => {}}
-          handleSaveOnly={() => {}}
-          isInitialScreen={messages.length === 0}
-          handleStopAllGeneration={handleStopAllGeneration}
-          isGenerating={isGenerating}
-        />
-      )}
     </>
   );
 }
