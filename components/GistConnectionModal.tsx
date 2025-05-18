@@ -1,51 +1,58 @@
 "use client";
 
 import React, { useState } from "react";
-import { storage } from "../hooks/useLocalStorage";
+// import { storage } from "../hooks/useLocalStorage"; // storageはここでは不要になる
 
 interface GistConnectionModalProps {
   closeModal: () => void;
+  // onSuccess はGitHub OAuthフローが完了し、トークンが親コンポーネントで
+  // localStorageに保存された後に呼び出される想定に変更
   onSuccess: () => void;
 }
 
-export default function GistConnectionModal({ closeModal, onSuccess }: GistConnectionModalProps) {
-  const [gistToken, setGistToken] = useState<string>("");
-  const [error, setError] = useState<string>("");
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+export default function GistConnectionModal({
+  closeModal,
+  onSuccess, // onSuccess は残すが、呼び出しタイミングが変わる
+}: GistConnectionModalProps) {
+  const [isLoading, setIsLoading] = useState<boolean>(false); // ローディング表示は残す
+  const [error, setError] = useState<string>(""); // エラー表示も残す
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!gistToken.trim()) {
-      setError("トークンが入力されていません");
-      return;
-    }
-    
+  const handleGitHubLogin = () => {
     setIsLoading(true);
     setError("");
-    
-    try {
-      const response = await fetch("https://api.github.com/gists", {
-        headers: {
-          "Authorization": `Bearer ${gistToken}`,
-          "Accept": "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28"
-        }
-      });
-      
-      if (response.ok) {
-        storage.set("gistToken", gistToken);
-        onSuccess();
-        closeModal();
-      } else {
-        setError("無効なトークンです");
-      }
-    } catch (error) {
-      setError("接続エラーが発生しました");
-      console.error("Gist API接続エラー:", error);
-    } finally {
+    const githubAuthUrl = "/api/auth/github/login"; // 認証開始エンドポイント
+    const width = 600;
+    const height = 700;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+
+    // OAuth認証用のウィンドウを開く
+    const oauthWindow = window.open(
+      githubAuthUrl,
+      "githubOAuth",
+      `width=${width},height=${height},top=${top},left=${left}`
+    );
+
+    // ウィンドウがブロックされたか、正常に開かなかった場合の処理
+    if (
+      !oauthWindow ||
+      oauthWindow.closed ||
+      typeof oauthWindow.closed === "undefined"
+    ) {
+      setError(
+        "GitHub認証ウィンドウを開けませんでした。ポップアップがブロックされていないか確認してください。"
+      );
       setIsLoading(false);
+      return;
     }
+
+    // モーダルを先に閉じる (ユーザー体験向上のため)
+    // closeModal(); // OAuth開始時にモーダルを閉じるか、完了後に閉じるかは検討。
+    // 一旦、完了後に閉じる前提で進める。
+
+    // window.postMessage をリッスンする処理は ChatList.tsx (または呼び出し元) に移動
+    // ここでは、ウィンドウが閉じたことを検知してローディングを解除する程度に留めるか、
+    // ChatList側で成功/失敗を検知してisLoadingを制御する
   };
 
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -59,54 +66,36 @@ export default function GistConnectionModal({ closeModal, onSuccess }: GistConne
       <div className="gist-modal">
         <div className="modal-header">
           <h2>GitHub Gist連携</h2>
-          <span className="close-button" onClick={closeModal}>×</span>
+          <span className="close-button" onClick={closeModal}>
+            ×
+          </span>
         </div>
         <div className="modal-content">
           <p>
             チャットをシェアするためにGitHub Gistと連携します。
-            <a 
-              href="https://github.com/settings/tokens" 
-              target="_blank" 
-              rel="noopener noreferrer"
-            >
-              GitHub Personal Access Token
-            </a>
-            を作成してください。
-            トークンには「gist」スコープが必要です。
+            「GitHubでログイン」ボタンをクリックして認証してください。
           </p>
-          
-          <form onSubmit={handleSubmit}>
-            <div className="input-group">
-              <label htmlFor="gistToken">Gistアクセストークン</label>
-              <input
-                id="gistToken"
-                type="password"
-                value={gistToken}
-                onChange={(e) => setGistToken(e.target.value)}
-                placeholder="ghp_xxxxxxxxxxxxxxxx"
-              />
-            </div>
-            
-            {error && <div className="error-message">{error}</div>}
-            
-            <div className="modal-actions">
-              <button 
-                type="button" 
-                onClick={closeModal} 
-                className="cancel-button"
-                disabled={isLoading}
-              >
-                キャンセル
-              </button>
-              <button 
-                type="submit" 
-                className="submit-button"
-                disabled={isLoading}
-              >
-                {isLoading ? "接続中..." : "連携する"}
-              </button>
-            </div>
-          </form>
+
+          {error && <div className="error-message">{error}</div>}
+
+          <button
+            onClick={handleGitHubLogin}
+            className="github-login-button"
+            disabled={isLoading}
+          >
+            {isLoading ? "認証ウィンドウを開いています..." : "GitHubでログイン"}
+          </button>
+
+          <div className="modal-actions" style={{ marginTop: "1em" }}>
+            <button
+              type="button"
+              onClick={closeModal}
+              className="cancel-button"
+              disabled={isLoading}
+            >
+              キャンセル
+            </button>
+          </div>
         </div>
       </div>
     </div>

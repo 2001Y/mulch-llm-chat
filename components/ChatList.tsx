@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import styles from "@/styles/ChatList.module.scss";
 import { useChats } from "hooks/useLocalStorage";
 import { storage } from "hooks/useLocalStorage";
@@ -19,6 +19,8 @@ interface ChatItem {
 
 export default function ChatList() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const { chatIds } = useChats();
@@ -26,6 +28,46 @@ export default function ChatList() {
   const [selectedChatForSharing, setSelectedChatForSharing] = useState<
     string | null
   >(null);
+
+  const clearUrlQuery = useCallback(() => {
+    const newUrl = pathname;
+    window.history.replaceState(
+      { ...window.history.state, as: newUrl, url: newUrl },
+      "",
+      newUrl
+    );
+  }, [pathname]);
+
+  useEffect(() => {
+    const handleAuthMessage = (event: MessageEvent) => {
+      const { type, token, error } = event.data;
+
+      if (type === "github_oauth_success" && token) {
+        console.log("GitHub OAuth成功 (postMessage):");
+        storage.set("gistToken", token);
+        storage.set("gistOAuthSuccess", "true");
+        setShowGistModal(false);
+        alert("GitHubアカウントとの連携に成功しました。");
+
+        if (selectedChatForSharing) {
+          console.log(
+            `OAuth成功後、チャット ${selectedChatForSharing} の共有を再試行します。`
+          );
+          shareChat(selectedChatForSharing);
+          setSelectedChatForSharing(null);
+        }
+      } else if (type === "github_oauth_error") {
+        console.error("GitHub OAuthエラー (postMessage):", error);
+        alert(`GitHub連携エラー: ${error || "不明なエラー"}`);
+        setShowGistModal(false);
+      }
+    };
+
+    window.addEventListener("message", handleAuthMessage);
+    return () => {
+      window.removeEventListener("message", handleAuthMessage);
+    };
+  }, [selectedChatForSharing]);
 
   useEffect(() => {
     const loadChats = () => {

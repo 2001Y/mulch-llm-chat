@@ -129,4 +129,32 @@
       }
     }
   }
+
+  .separator {
+    text-align: center;
+    margin: 1em 0;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .github-login-button {
+    width: 100%;
+    padding: 0.8em 1.2em;
+    border-radius: $border-radius;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    background-color: #4caf50;
+    color: #fff;
+    text-align: center;
+    margin-top: 0.5em;
+
+    &:hover:not(:disabled) {
+      background-color: color.adjust(#4caf50, $lightness: -10%);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
 }
