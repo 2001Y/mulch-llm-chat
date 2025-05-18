@@ -167,21 +167,19 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
         <Header />
         <SettingsModal />
         <ChatResponses readOnly={isSharedView} />
-        {!isSharedView && (
-          <InputSection
-            mainInput={true}
-            chatInput={chatInput}
-            setChatInput={setChatInput}
-            handleSend={handleSend}
-            isEditMode={false}
-            messageIndex={messages.length}
-            handleResetAndRegenerate={handleResetAndRegenerate}
-            handleSaveOnly={handleSaveOnly}
-            isGenerating={isGenerating}
-            handleStopAllGeneration={handleStopAllGeneration}
-            isInitialScreen={false}
-          />
-        )}
+        <InputSection
+          mainInput={true}
+          chatInput={chatInput}
+          setChatInput={setChatInput}
+          handleSend={handleSend}
+          isEditMode={false}
+          messageIndex={messages.length}
+          handleResetAndRegenerate={handleResetAndRegenerate}
+          handleSaveOnly={handleSaveOnly}
+          isGenerating={isGenerating}
+          handleStopAllGeneration={handleStopAllGeneration}
+          isInitialScreen={false}
+        />
       </>
     );
   }
