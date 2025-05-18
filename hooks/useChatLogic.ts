@@ -37,9 +37,14 @@ interface Message {
 interface UseChatLogicProps {
   isShared?: boolean;
   initialMessages?: any[];
+  initialError?: string | null;
 }
 
-export function useChatLogic({ isShared = false, initialMessages = undefined }: UseChatLogicProps = {}) {
+export function useChatLogic({
+  isShared = false,
+  initialMessages = undefined,
+  initialError = null,
+}: UseChatLogicProps = {}) {
   const [accessToken] = useAccessToken();
   const openai = useOpenAI(accessToken);
   const router = useRouter();
@@ -69,6 +74,7 @@ export function useChatLogic({ isShared = false, initialMessages = undefined }: 
     []
   );
   const [isAutoScroll, setIsAutoScroll] = useState(true);
+  const [error, setError] = useState<string | null>(initialError);
 
   // roomIdが確定してからストレージを初期化
   const [storedMessages, setStoredMessages] = useStorageState(
@@ -85,13 +91,26 @@ export function useChatLogic({ isShared = false, initialMessages = undefined }: 
 
   // メッセージ読み込む
   useEffect(() => {
+    if (!isShared) setError(null);
+
+    if (isShared && initialMessages === undefined && !initialError) {
+      console.log("[DEBUG] 共有チャットの initialMessages 待機中");
+      setInitialLoadComplete(false);
+      return;
+    }
+
     if (initialMessages) {
       // 共有チャットの場合は初期メッセージを使用
       setMessages(initialMessages);
       setInitialLoadComplete(true);
+      if (!initialError) setError(null);
       console.log("[DEBUG] 共有チャットのメッセージ読み込み完了");
-    } else if (storedMessages && storedMessages.length > 0 && !initialLoadComplete) {
-      // 通常チャットの場合はストレージからメッセージを読み込み
+    } else if (
+      roomId &&
+      storedMessages &&
+      storedMessages.length > 0 &&
+      !initialLoadComplete
+    ) {
       console.log(`[DEBUG] ルーム ${roomId} のメッセージ読み込み:`, {
         storedMessages,
         roomId,
@@ -99,9 +118,25 @@ export function useChatLogic({ isShared = false, initialMessages = undefined }: 
       });
       setMessages(storedMessages);
       setInitialLoadComplete(true);
+      if (!initialError) setError(null);
       console.log("[DEBUG] メッセージ読み込み完了");
+    } else if (roomId && !storedMessages && !initialLoadComplete) {
+      setMessages([]);
+      setInitialLoadComplete(true);
+      console.log("[DEBUG] 新規チャットまたは空のチャット");
+    } else if (!roomId && !isShared) {
+      setMessages([]);
+      setInitialLoadComplete(true);
+      console.log("[DEBUG] ルートページ、メッセージなし");
     }
-  }, [storedMessages, roomId, initialLoadComplete, initialMessages]);
+  }, [
+    storedMessages,
+    roomId,
+    initialLoadComplete,
+    initialMessages,
+    isShared,
+    initialError,
+  ]);
 
   // 覧を取得する useEffect
   useEffect(() => {
@@ -532,17 +567,24 @@ export function useChatLogic({ isShared = false, initialMessages = undefined }: 
             false
           );
         }
-      } catch (error: any) {
-        if (error.name !== "AbortError") {
-          console.error("[fetchChatResponse] エラー発生:", error);
-          updateMessage(
-            messageIndex,
-            responseIndex,
-            [{ type: "text", text: `エラー: ${error.message}` }],
-            false,
-            false
-          );
+      } catch (e: any) {
+        console.error("API Error:", e);
+        let errorMessage = "An unexpected error occurred.";
+        if (e.name === "AbortError") {
+          errorMessage = "Generation aborted.";
+        } else if (e.response && e.response.data && e.response.data.error) {
+          errorMessage = e.response.data.error.message || "API request failed.";
+        } else if (e.message) {
+          errorMessage = e.message;
         }
+
+        updateMessage(messageIndex, responseIndex, (prev: any) => ({
+          ...prev,
+          text: `Error: ${errorMessage}`,
+          isGenerating: false,
+          isError: true,
+        }));
+        setError(errorMessage);
       } finally {
         console.log("[fetchChatResponse] 完了", {
           messageIndex,
@@ -714,5 +756,14 @@ export function useChatLogic({ isShared = false, initialMessages = undefined }: 
     handleSaveOnly,
     handleStopAllGeneration,
     containerRef,
+    isAutoScroll,
+    setIsAutoScroll,
+    AllModels,
+    initialLoadComplete,
+    error,
+    setError,
+    roomId,
+    cleanInputContent,
+    fetchChatResponse,
   };
 }

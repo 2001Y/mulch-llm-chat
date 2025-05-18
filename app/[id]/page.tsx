@@ -6,7 +6,7 @@ import { ChatLogicProvider } from "contexts/ChatLogicContext";
 export default function IndividualChatPage() {
   return (
     <ChatLogicProvider isShared={false}>
-      <ChatPage isShared={false} />
+      <ChatPage isSharedView={false} />
     </ChatLogicProvider>
   );
 }

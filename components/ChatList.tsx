@@ -23,38 +23,39 @@ export default function ChatList() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const { chatIds } = useChats();
   const [showGistModal, setShowGistModal] = useState<boolean>(false);
-  const [selectedChatForSharing, setSelectedChatForSharing] = useState<string | null>(null);
-
-  const loadChats = () => {
-    const chatItems: ChatItem[] = [];
-    chatIds.forEach((chatId) => {
-      const key = `chatMessages_${chatId}`;
-      const chatData = storage.get(key) || [];
-      if (chatData.length > 0) {
-        const firstMessage = chatData[0];
-
-        // タイムスタンプを後ろから順に探索
-        let timestamp = null;
-        for (let j = chatData.length - 1; j >= 0; j--) {
-          if (chatData[j].timestamp) {
-            timestamp = chatData[j].timestamp;
-            break;
-          }
-        }
-
-        chatItems.push({
-          id: chatId,
-          title: chatId,
-          firstMessage:
-            firstMessage.user[0]?.text?.slice(0, 20) || "No messages",
-          timestamp: timestamp || -1,
-        });
-      }
-    });
-    setChats(chatItems.sort((a, b) => b.timestamp - a.timestamp));
-  };
+  const [selectedChatForSharing, setSelectedChatForSharing] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
+    const loadChats = () => {
+      const chatItems: ChatItem[] = [];
+      chatIds.forEach((chatId) => {
+        const key = `chatMessages_${chatId}`;
+        const chatData = storage.get(key) || [];
+        if (chatData.length > 0) {
+          const firstMessage = chatData[0];
+
+          // タイムスタンプを後ろから順に探索
+          let timestamp = null;
+          for (let j = chatData.length - 1; j >= 0; j--) {
+            if (chatData[j].timestamp) {
+              timestamp = chatData[j].timestamp;
+              break;
+            }
+          }
+
+          chatItems.push({
+            id: chatId,
+            title: chatId,
+            firstMessage:
+              firstMessage.user[0]?.text?.slice(0, 20) || "No messages",
+            timestamp: timestamp || -1,
+          });
+        }
+      });
+      setChats(chatItems.sort((a, b) => b.timestamp - a.timestamp));
+    };
     loadChats();
   }, [chatIds]);
 
@@ -77,30 +78,30 @@ export default function ChatList() {
     e.preventDefault();
     navigateWithTransition(router, `/${chatId}`);
   };
-  
+
   const handleShare = async (chatId: string, event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    
+
     const gistToken = storage.getGistToken();
     if (!gistToken) {
       setSelectedChatForSharing(chatId);
       setShowGistModal(true);
       return;
     }
-    
+
     await shareChat(chatId);
   };
-  
+
   const shareChat = async (chatId: string) => {
     const key = `chatMessages_${chatId}`;
     const chatData = storage.get(key) || [];
-    
+
     if (chatData.length === 0) {
       alert("シェアするチャットデータがありません");
       return;
     }
-    
+
     try {
       const result = await saveToGist(chatId, chatData);
       if (result.success && result.url) {
@@ -113,10 +114,10 @@ export default function ChatList() {
       console.error("共有中にエラーが発生しました:", error);
       alert("共有中にエラーが発生しました");
     }
-    
+
     setActiveMenu(null);
   };
-  
+
   const handleGistConnectSuccess = () => {
     if (selectedChatForSharing) {
       shareChat(selectedChatForSharing);
@@ -174,8 +175,12 @@ export default function ChatList() {
               </button>
               {activeMenu === chat.id && (
                 <div className={styles.menuDropdown}>
-                  <button onClick={(e) => handleShare(chat.id, e)}>シェア</button>
-                  <button onClick={(e) => handleDelete(chat.id, e)}>削除</button>
+                  <button onClick={(e) => handleShare(chat.id, e)}>
+                    シェア
+                  </button>
+                  <button onClick={(e) => handleDelete(chat.id, e)}>
+                    削除
+                  </button>
                 </div>
               )}
             </div>

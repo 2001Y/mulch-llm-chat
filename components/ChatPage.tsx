@@ -16,12 +16,20 @@ interface ChatPageProps {
 }
 
 export default function ChatPage({ isSharedView = false }: ChatPageProps) {
-  const { isGenerating, handleSend } = useChatLogicContext();
-  const params = useParams();
+  const {
+    messages,
+    isGenerating,
+    handleSend,
+    initialLoadComplete,
+    error,
+    roomId,
+    chatInput,
+    setChatInput,
+    handleStopAllGeneration,
+    handleResetAndRegenerate,
+    handleSaveOnly,
+  } = useChatLogicContext();
 
-  const [chatInput, setChatInput] = useState<
-    { type: string; text?: string; image_url?: { url: string } }[]
-  >([{ type: "text", text: "" }]);
   const [hasActualChats, setHasActualChats] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -49,46 +57,82 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
       setHasActualChats(chatKeys.length > 0);
     };
 
-    checkActualChats();
-    window.addEventListener("storage", (e) => {
-      if (e.key?.startsWith("chatMessages_")) {
-        checkActualChats();
-      }
-    });
-    window.addEventListener("chatListUpdate", checkActualChats);
+    if (!roomId && !isSharedView) {
+      checkActualChats();
+      window.addEventListener("storage", (e) => {
+        if (e.key?.startsWith("chatMessages_")) {
+          checkActualChats();
+        }
+      });
+      window.addEventListener("chatListUpdate", checkActualChats);
 
-    return () => {
-      window.removeEventListener("storage", checkActualChats);
-      window.removeEventListener("chatListUpdate", checkActualChats);
-    };
-  }, []);
+      return () => {
+        window.removeEventListener("storage", checkActualChats);
+        window.removeEventListener("chatListUpdate", checkActualChats);
+      };
+    }
+  }, [roomId, isSharedView]);
 
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 768);
     };
-
     checkMobile();
     window.addEventListener("resize", checkMobile);
-
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   console.log(
-    "[DEBUG ChatPage] Rendering. params.id:",
-    params.id,
+    "[DEBUG ChatPage] Rendering. roomId:",
+    roomId,
     "isSharedView:",
     isSharedView,
-    "isMobile:",
-    isMobile,
-    "hasActualChats:",
-    hasActualChats
+    "initialLoadComplete:",
+    initialLoadComplete,
+    "error:",
+    error
   );
 
-  if (!params.id && !isSharedView) {
-    console.log(
-      "[DEBUG ChatPage] Rendering initial screen (no params.id AND not isSharedView)"
+  if (!initialLoadComplete && !error) {
+    console.log("[DEBUG ChatPage] Rendering Loading State");
+    return (
+      <>
+        <Header />
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>
+            {isSharedView
+              ? "共有チャットを読み込み中..."
+              : "チャットを読み込み中..."}
+          </p>
+        </div>
+        <SettingsModal />
+      </>
     );
+  }
+
+  if (error) {
+    console.log("[DEBUG ChatPage] Rendering Error State. Error:", error);
+    return (
+      <>
+        <Header />
+        <div className="error-container">
+          <p className="error-message">{error}</p>
+          {isSharedView && (
+            <p>
+              このチャットは削除されたか、アクセス権限がない可能性があります。
+            </p>
+          )}
+        </div>
+        <SettingsModal />
+      </>
+    );
+  }
+
+  const isInitialScreen = !roomId && !isSharedView;
+
+  if (isInitialScreen && initialLoadComplete) {
+    console.log("[DEBUG ChatPage] Rendering initial screen");
     return (
       <>
         <Header />
@@ -108,22 +152,48 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
           handleResetAndRegenerate={() => {}}
           handleSaveOnly={() => {}}
           isGenerating={isGenerating}
-          handleStopAllGeneration={() => {}}
-          isInitialScreen={!hasActualChats}
+          handleStopAllGeneration={handleStopAllGeneration}
+          isInitialScreen={true}
         />
         <SettingsModal />
       </>
     );
   }
 
-  console.log(
-    "[DEBUG ChatPage] Rendering chat screen. Preparing to render ChatResponses."
-  );
+  if ((roomId || isSharedView) && initialLoadComplete) {
+    console.log("[DEBUG ChatPage] Rendering chat screen.");
+    return (
+      <>
+        <Header />
+        <SettingsModal />
+        <ChatResponses readOnly={isSharedView} />
+        {!isSharedView && (
+          <InputSection
+            mainInput={true}
+            chatInput={chatInput}
+            setChatInput={setChatInput}
+            handleSend={handleSend}
+            isEditMode={false}
+            messageIndex={messages.length}
+            handleResetAndRegenerate={handleResetAndRegenerate}
+            handleSaveOnly={handleSaveOnly}
+            isGenerating={isGenerating}
+            handleStopAllGeneration={handleStopAllGeneration}
+            isInitialScreen={false}
+          />
+        )}
+      </>
+    );
+  }
+
+  console.warn("[DEBUG ChatPage] Rendering Fallback - unexpected state");
   return (
     <>
       <Header />
       <SettingsModal />
-      <ChatResponses readOnly={false} />
+      <div className="error-container">
+        <p>問題が発生しました。ページをリロードしてみてください。</p>
+      </div>
     </>
   );
 }

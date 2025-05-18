@@ -3,10 +3,6 @@
 
 .bento-grid {
   font-size: $bento-font-size;
-  @media (max-width: $mobile-breakpoint) {
-    font-size: $bento-mobile-font-size;
-  }
-
   background-color: $primary-color;
   padding: 1.5em 0;
   color: $text-primary;
@@ -23,6 +19,10 @@
   padding-bottom: 6em;
   opacity: 0;
   transition: opacity 0.3s ease;
+
+  @media (max-width: $mobile-breakpoint) {
+    font-size: $bento-mobile-font-size;
+  }
 
   &.visible {
     opacity: 1;

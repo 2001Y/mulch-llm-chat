@@ -2,20 +2,24 @@
 import React, { createContext, useContext } from "react";
 import { useChatLogic } from "hooks/useChatLogic";
 
-const ChatLogicContext = createContext<ReturnType<typeof useChatLogic> | null>(null);
+const ChatLogicContext = createContext<ReturnType<typeof useChatLogic> | null>(
+  null
+);
 
 interface ChatLogicProviderProps {
   children: React.ReactNode;
   isShared?: boolean;
   initialMessages?: any[];
+  initialError?: string | null;
 }
 
-export function ChatLogicProvider({ 
-  children, 
+export function ChatLogicProvider({
+  children,
   isShared = false,
-  initialMessages = undefined
+  initialMessages = undefined,
+  initialError = null,
 }: ChatLogicProviderProps) {
-  const chatLogic = useChatLogic({ isShared, initialMessages });
+  const chatLogic = useChatLogic({ isShared, initialMessages, initialError });
 
   return (
     <ChatLogicContext.Provider value={chatLogic}>
@@ -27,7 +31,9 @@ export function ChatLogicProvider({
 export function useChatLogicContext() {
   const context = useContext(ChatLogicContext);
   if (!context) {
-    throw new Error("useChatLogicContext must be used within a ChatLogicProvider");
+    throw new Error(
+      "useChatLogicContext must be used within a ChatLogicProvider"
+    );
   }
   return context;
 }
