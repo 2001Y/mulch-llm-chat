@@ -13,17 +13,23 @@ export async function GET(request: NextRequest) {
 
   const githubClientId = process.env.GITHUB_CLIENT_ID;
   const githubClientSecret = process.env.GITHUB_CLIENT_SECRET;
-  const redirectUri = process.env.GITHUB_CALLBACK_URL;
+  const host = request.headers.get("host");
+  const protocol =
+    request.headers.get("x-forwarded-proto") ||
+    (host?.startsWith("localhost") ? "http" : "https");
+  const baseUrl = `${protocol}://${host}`;
 
-  if (!githubClientId || !githubClientSecret || !redirectUri) {
+  if (!githubClientId || !githubClientSecret || !baseUrl || !host) {
     console.error(
-      "GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, or GITHUB_CALLBACK_URL is not set in environment variables."
+      "GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, or baseUrl could not be determined from request headers."
     );
     return NextResponse.json(
       { error: "Server configuration error" },
       { status: 500 }
     );
   }
+
+  const redirectUri = `${baseUrl}/api/auth/github/callback`;
 
   try {
     const tokenResponse = await fetch(
