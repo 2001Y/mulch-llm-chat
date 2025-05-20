@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import ModelSuggestions from "./ModelSuggestions";
 import useStorageState from "hooks/useLocalStorage";
 import { useChatLogicContext } from "contexts/ChatLogicContext";
+import type { ModelItem } from "hooks/useChatLogic";
 
 interface ModelInputModalProps {
   closeModal: () => void;
@@ -21,11 +22,6 @@ interface OpenRouterModel {
   name: string;
 }
 
-interface ModelItem {
-  name: string;
-  selected: boolean;
-}
-
 export default function ModelInputModal() {
   const { isModalOpen, handleCloseModal: closeModal } = useChatLogicContext();
 
@@ -35,7 +31,7 @@ export default function ModelInputModal() {
   }, [isModalOpen]);
 
   const [storedModels, setStoredModels] = useStorageState("models");
-  const models = storedModels || [];
+  const models: ModelItem[] = storedModels || [];
   const setModels = (newModels: ModelItem[]) => {
     setStoredModels(newModels);
   };
@@ -58,7 +54,12 @@ export default function ModelInputModal() {
 
   const newModelInputRef = useRef<HTMLInputElement>(null);
 
-  const [tools, setTools] = useStorageState("tools");
+  const [storedTools, setStoredTools] = useStorageState("tools");
+  const tools: Tool[] = storedTools || [];
+  const setTools = (newTools: Tool[]) => {
+    setStoredTools(newTools);
+  };
+
   const [toolFunctions, setToolFunctions] = useStorageState("toolFunctions");
 
   useEffect(() => {
@@ -88,10 +89,21 @@ export default function ModelInputModal() {
     setActiveSuggestionIndex(-1);
   };
 
+  const handleSubmit = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    handleAddModel();
+  };
+
   const handleAddModel = () => {
-    if (newModel && !models.some((m) => m.name === newModel)) {
-      setModels([...models, { name: newModel, selected: true }]);
+    const currentModels = models || [];
+    if (
+      newModel &&
+      !currentModels.some((m: ModelItem) => m.name === newModel)
+    ) {
+      setModels([...currentModels, { name: newModel, selected: true }]);
       setNewModel("");
+      setSuggestions([]);
+      setActiveSuggestionIndex(-1);
     }
   };
 
@@ -104,29 +116,33 @@ export default function ModelInputModal() {
         parameters: {},
       },
     };
-    setTools([...tools, newTool]);
+    setTools([...(tools || []), newTool]);
     setToolFunctions({
-      ...toolFunctions,
+      ...(toolFunctions || {}),
       new_function: () => console.log("新しい関数"),
     });
-    setEditingIndex(tools.length);
+    setEditingIndex((tools || []).length);
     setEditingToolDefinition(JSON.stringify(newTool, null, 2));
     setEditingToolFunction("() => console.log('新しい関数')");
   };
 
   const handleEditModel = (index: number) => {
     setEditingModelIndex(index);
-    setEditingModel(models[index].name);
+    if (models[index]) {
+      setEditingModel(models[index].name);
+    }
   };
 
   const handleSaveEditedModel = () => {
     if (editingModelIndex !== null && editingModel) {
       const updatedModels = [...models];
-      updatedModels[editingModelIndex] = {
-        name: editingModel,
-        selected: models[editingModelIndex].selected,
-      };
-      setModels(updatedModels);
+      if (updatedModels[editingModelIndex]) {
+        updatedModels[editingModelIndex] = {
+          name: editingModel,
+          selected: models[editingModelIndex].selected,
+        };
+        setModels(updatedModels);
+      }
       setEditingModelIndex(null);
       setEditingModel("");
     }
@@ -138,18 +154,21 @@ export default function ModelInputModal() {
   };
 
   const handleDeleteModel = (modelToDelete: ModelItem) => {
-    setModels(models.filter((model) => model.name !== modelToDelete.name));
+    setModels(
+      models.filter((model: ModelItem) => model.name !== modelToDelete.name)
+    );
   };
 
   const handleDeleteTool = (index: number) => {
-    const updatedTools = tools.filter((_, i) => i !== index);
+    const updatedTools = tools.filter((_: Tool, i: number) => i !== index);
     setTools(updatedTools);
+    const currentToolFunctions = toolFunctions || {};
     const deletedTool = tools[index];
-    const updatedToolFunctions = {
-      ...toolFunctions,
-    };
-    delete updatedToolFunctions[deletedTool.function.name];
-    setToolFunctions(updatedToolFunctions);
+    if (deletedTool?.function?.name) {
+      const updatedToolFunctions = { ...currentToolFunctions };
+      delete updatedToolFunctions[deletedTool.function.name];
+      setToolFunctions(updatedToolFunctions);
+    }
   };
 
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -159,17 +178,15 @@ export default function ModelInputModal() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    handleAddModel();
-  };
-
   const handleEditTool = (index: number) => {
     setEditingIndex(index);
-    const tool = tools[index];
-    setEditingToolDefinition(JSON.stringify(tool, null, 2));
-    const functionString = toolFunctions[tool.function.name] || "() => {}";
-    setEditingToolFunction(functionString);
+    const currentTool = tools[index];
+    if (currentTool) {
+      setEditingToolDefinition(JSON.stringify(currentTool, null, 2));
+      const funcString =
+        (toolFunctions || {})[currentTool.function.name] || "() => {}";
+      setEditingToolFunction(funcString);
+    }
   };
 
   const handleSaveEditedTool = () => {
@@ -209,7 +226,7 @@ export default function ModelInputModal() {
         setTools(updatedTools);
 
         const updatedToolFunctions = {
-          ...toolFunctions,
+          ...(toolFunctions || {}),
         };
         updatedToolFunctions[parsedTool.function.name] = functionImplementation;
         setToolFunctions(updatedToolFunctions);
@@ -307,7 +324,7 @@ export default function ModelInputModal() {
             <div className="modal-content">
               <h3>Model</h3>
               <ul className="model-list">
-                {models.map((model, index) => (
+                {models.map((model: ModelItem, index: number) => (
                   <li
                     key={model.name}
                     draggable
@@ -411,35 +428,34 @@ export default function ModelInputModal() {
                   </li>
                 ))}
               </ul>
-              <form onSubmit={handleSubmit} className="settings-input-area">
+              <div className="settings-input-area">
                 <input
                   ref={newModelInputRef}
                   type="text"
-                  value={newModel}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setNewModel(e.target.value)
-                  }
-                  onKeyDown={handleKeyDown}
-                  onFocus={() => setIsFocused(true)}
-                  onBlur={() => setIsFocused(false)}
-                  placeholder="New models added"
                   className="model-input"
+                  placeholder="モデル名を入力 (例: gpt-4)"
+                  value={newModel}
+                  onChange={(e) => setNewModel(e.target.value)}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setTimeout(() => setIsFocused(false), 100)}
+                  onKeyDown={handleKeyDown}
                 />
-                <button type="submit" className="add-button">
+                <button onClick={handleSubmit} className="add-button">
                   追加
                 </button>
-                {isFocused && (
+                {isFocused && suggestions.length > 0 && (
                   <ModelSuggestions
                     inputValue={newModel}
                     onSelectSuggestion={handleSelectSuggestion}
-                    inputRef={newModelInputRef}
+                    show={isFocused && suggestions.length > 0}
+                    cursorRect={null}
                     className="settings-modal-suggestions"
                   />
                 )}
-              </form>
+              </div>
               <h3>Function Calls</h3>
               <ul className="function-call-list">
-                {tools.map((tool, index) => (
+                {(tools || []).map((tool: Tool, index: number) => (
                   <li key={index}>
                     {editingIndex === index ? (
                       <div className="tool-edit">

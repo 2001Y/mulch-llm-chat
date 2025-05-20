@@ -1,15 +1,18 @@
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  MutableRefObject,
-} from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 
 interface ModelSuggestionsProps {
   inputValue: string;
   onSelectSuggestion: (suggestion: string) => void;
-  inputRef: MutableRefObject<HTMLInputElement | HTMLTextAreaElement | null>;
+  cursorRect?: {
+    top: number;
+    left: number;
+    height: number;
+    bottom: number;
+    right: number;
+  } | null;
   className?: string;
+  show: boolean;
+  parentRef?: React.RefObject<HTMLElement | null>;
 }
 
 interface OpenRouterModel {
@@ -20,33 +23,23 @@ interface OpenRouterModel {
 export default function ModelSuggestions({
   inputValue,
   onSelectSuggestion,
-  inputRef,
+  cursorRect,
   className,
+  show,
+  parentRef,
 }: ModelSuggestionsProps) {
   const [suggestions, setSuggestions] = useState<OpenRouterModel[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
-
-  const getCurrentModelQuery = useCallback(() => {
-    const input = inputRef.current;
-    if (!input) return "";
-
-    const cursorPosition = input.selectionStart || 0;
-    const textBeforeCursor = inputValue.slice(0, cursorPosition);
-    const textAfterCursor = inputValue.slice(cursorPosition);
-
-    console.log("Current cursor position:", cursorPosition);
-    console.log("Text before cursor:", textBeforeCursor);
-    console.log("Text after cursor:", textAfterCursor);
-
-    const currentModel = textBeforeCursor.replace(/^@/, "").trim();
-    console.log("Extracted model query:", currentModel);
-    return currentModel;
-  }, [inputValue, inputRef]);
+  const listRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
-    const currentQuery = getCurrentModelQuery();
-    fetchSuggestions(currentQuery);
-  }, [inputValue, getCurrentModelQuery]);
+    if (show && inputValue) {
+      fetchSuggestions(inputValue.replace(/^@/, "").trim());
+    } else if (!show) {
+      setSuggestions([]);
+      setActiveSuggestionIndex(-1);
+    }
+  }, [inputValue, show]);
 
   const fetchSuggestions = async (query: string) => {
     try {
@@ -106,8 +99,8 @@ export default function ModelSuggestions({
   );
 
   const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent | KeyboardEvent) => {
-      if (suggestions.length === 0) return;
+    (event: KeyboardEvent) => {
+      if (!show || suggestions.length === 0) return;
 
       if (event.key === "ArrowDown") {
         event.preventDefault();
@@ -119,7 +112,7 @@ export default function ModelSuggestions({
         setActiveSuggestionIndex((prev) =>
           prev > 0 ? prev - 1 : suggestions.length - 1
         );
-      } else if (event.key === "Enter") {
+      } else if (event.key === "Enter" || event.key === "Tab") {
         event.preventDefault();
         event.stopPropagation();
         if (
@@ -127,32 +120,29 @@ export default function ModelSuggestions({
           activeSuggestionIndex < suggestions.length
         ) {
           handleSuggestionSelect(suggestions[activeSuggestionIndex].id);
+        } else if (suggestions.length > 0 && event.key === "Enter") {
+          // Enterで一番上の候補を選択 (アクティブなものがなくても)
+          // handleSuggestionSelect(suggestions[0].id);
         }
       } else if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
         setSuggestions([]);
         setActiveSuggestionIndex(-1);
-        inputRef.current?.blur();
       }
     },
-    [suggestions, activeSuggestionIndex, handleSuggestionSelect, inputRef]
+    [show, suggestions, activeSuggestionIndex, handleSuggestionSelect]
   );
 
   useEffect(() => {
-    const currentInput = inputRef.current;
-    if (currentInput) {
-      currentInput.addEventListener("keydown", handleKeyDown as EventListener);
+    if (show) {
+      document.addEventListener("keydown", handleKeyDown);
       return () => {
-        currentInput.removeEventListener(
-          "keydown",
-          handleKeyDown as EventListener
-        );
+        document.removeEventListener("keydown", handleKeyDown);
       };
     }
-  }, [handleKeyDown, inputRef]);
+  }, [show, handleKeyDown]);
 
-  // アクティブな要素が変更されたときのスクロール処理
   useEffect(() => {
     if (activeSuggestionIndex >= 0) {
       const activeElement = document.querySelector(".suggestions-list .active");
@@ -163,8 +153,32 @@ export default function ModelSuggestions({
     }
   }, [activeSuggestionIndex]);
 
+  if (!show || suggestions.length === 0 || !cursorRect) {
+    return null;
+  }
+
+  const calculatePosition = () => {
+    if (!cursorRect || !parentRef?.current) {
+      return { top: "auto", left: "auto" };
+    }
+    const parentRect = parentRef.current.getBoundingClientRect();
+    // カーソルの下端を親要素の左上からの相対位置に変換
+    const top = cursorRect.bottom - parentRect.top;
+    // カーソルの左端を親要素の左上からの相対位置に変換
+    const left = cursorRect.left - parentRect.left;
+    return { top: `${top}px`, left: `${left}px` };
+  };
+
   return (
-    <ul className={`suggestions-list ${className || ""}`}>
+    <ul
+      ref={listRef}
+      className={`suggestions-list ${className || ""}`}
+      style={{
+        position: "absolute",
+        ...calculatePosition(),
+        zIndex: 10,
+      }}
+    >
       {suggestions.map((suggestion, index) => (
         <li
           key={suggestion.id}

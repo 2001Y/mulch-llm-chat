@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import defaultValues from "../config/localStorage.json";
+import type { Message, ModelItem } from "hooks/useChatLogic";
 
 // ストレージユーティリティ関数
 export const storage = {
@@ -59,7 +60,7 @@ export const storage = {
     const token = storage.get("accessToken");
     return token && token !== "" ? token : null;
   },
-  
+
   getGistToken: () => {
     if (typeof window === "undefined") return null;
     const token = storage.get("gistToken");
@@ -89,42 +90,27 @@ const generateStorageKey = (baseKey: string) => {
 export interface StorageState {
   accessToken: string;
   tools: any[];
-  models: Array<{ name: string; selected: boolean }>;
+  models: ModelItem[];
   toolFunctions: Record<string, (args: any) => any>;
   chats: string[];
-  [key: `chatMessages_${string}`]: any[];
+  [key: `chatMessages_${string}`]: Message[] | undefined;
 }
 
-export default function useStorageState<K extends keyof StorageState>(
-  key: K
-): [StorageState[K], (value: StorageState[K]) => void] {
-  const [storedValue, setStoredValue] = useState<StorageState[K]>(() => {
-    const defaultValue = (defaultValues as any)[key];
-    if (typeof window === "undefined") return defaultValue;
-
-    // login/noLoginの切り替えが必要な場合
-    if (key === "models") {
-      const hasToken = !!getAccessToken();
-      const storageKey = `${key}_${hasToken ? "login" : "noLogin"}`;
-      const storedData = storage.get(storageKey);
-
-      if (storedData) {
-        return storedData;
-      }
-
-      // デフォルト値から適切な配列を選択
-      const defaultModels = defaultValue[hasToken ? "login" : "noLogin"];
-      storage.set(storageKey, defaultModels);
-      return defaultModels;
+export default function useStorageState<V = any>(
+  key: string | undefined
+): [V | undefined, (value: V | undefined) => void] {
+  const [storedValue, setStoredValue] = useState<V | undefined>(() => {
+    if (typeof window === "undefined" || key === undefined) {
+      return (defaultValues as any)[key || ""] || undefined;
     }
-
-    // 通常のデータの場合
-    const storedData = storage.get(key as string);
-    return storedData !== undefined ? storedData : defaultValue;
+    const storedData = storage.get(key);
+    return storedData !== undefined
+      ? storedData
+      : (defaultValues as any)[key] || undefined;
   });
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || key === undefined) return;
 
     if (key === "models") {
       const hasToken = !!getAccessToken();
@@ -132,7 +118,6 @@ export default function useStorageState<K extends keyof StorageState>(
       const data = storage.get(storageKey);
       setStoredValue(data);
 
-      // アクセストークンの変更を監視
       const handleTokenChange = () => {
         const newHasToken = !!getAccessToken();
         const newStorageKey = `${key}_${newHasToken ? "login" : "noLogin"}`;
@@ -152,7 +137,6 @@ export default function useStorageState<K extends keyof StorageState>(
         window.removeEventListener("tokenChange", handleTokenChange);
       };
     } else {
-      // 通常のデータの場合
       const handleStorageChange = (e: StorageEvent) => {
         if (e.key === key) {
           const newValue = e.newValue ? JSON.parse(e.newValue) : undefined;
@@ -168,32 +152,16 @@ export default function useStorageState<K extends keyof StorageState>(
   }, [key]);
 
   const setValue = useCallback(
-    (value: StorageState[K]) => {
-      if (
-        value === undefined ||
-        value === null ||
-        value === "" ||
-        (Array.isArray(value) && value.length === 0) ||
-        (typeof value === "object" && Object.keys(value).length === 0)
-      ) {
-        if (key === "models") {
-          storage.remove(`${key}_login`);
-          storage.remove(`${key}_noLogin`);
-        } else {
-          storage.remove(key as string);
-        }
-        setStoredValue(undefined as any);
+    (value: V | undefined) => {
+      if (typeof window === "undefined" || key === undefined) return;
+
+      if (value === undefined) {
+        storage.remove(key as string);
+        setStoredValue(undefined);
         return;
       }
-
       setStoredValue(value);
-
-      if (key === "models") {
-        const storageKey = `${key}_${!!getAccessToken() ? "login" : "noLogin"}`;
-        storage.set(storageKey, value);
-      } else {
-        storage.set(key as string, value);
-      }
+      storage.set(key as string, value);
     },
     [key]
   );

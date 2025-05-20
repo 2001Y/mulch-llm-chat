@@ -6,11 +6,13 @@ import React, {
   useMemo,
 } from "react";
 import InputSection from "./InputSection";
-import { Marked } from "marked";
-import { markedHighlight } from "marked-highlight";
-import hljs from "highlight.js";
-import TurndownService from "turndown";
+// import { Marked } from "marked"; // Tiptap化により不要
+// import { markedHighlight } from "marked-highlight"; // Tiptap化により不要
+// import hljs from "highlight.js"; // Tiptap化により不要 (Tiptap内でコードブロックハイライトする場合、別途拡張が必要)
+// import TurndownService from "turndown"; // Tiptap化により不要
 import { useChatLogicContext } from "contexts/ChatLogicContext";
+import MarkdownTipTapEditor from "./MarkdownTipTapEditor"; // ★ インポート
+import { useVirtualizer } from "@tanstack/react-virtual"; // ★ インポート
 import {
   ChatCompletionMessageParam,
   ChatCompletionUserMessageParam,
@@ -21,20 +23,8 @@ import {
   ChatCompletionContentPart,
 } from "openai/resources/chat/completions";
 
-// Markedのインスタンスを作成し、拡張機能とオプションを設定
-const markedInstance = new Marked(
-  markedHighlight({
-    langPrefix: "hljs language-",
-    highlight(code, lang) {
-      const language = hljs.getLanguage(lang) ? lang : "plaintext";
-      return hljs.highlight(code, { language }).value;
-    },
-  })
-);
-markedInstance.setOptions({
-  gfm: true,
-  breaks: true,
-});
+// Markedのインスタンス化は不要になる
+// const markedInstance = new Marked(...);
 
 // 型定義を追加
 type MessageContent = {
@@ -93,46 +83,89 @@ const escapeCodeBlocks = (markdown: string): string => {
 };
 
 interface ResponsesProps {
-  readOnly?: boolean;
+  readOnly?: boolean; // このpropはTiptapエディタのeditableに渡すことを検討したが、今回は常に編集可とする
 }
 
 export default function Responses({ readOnly = false }: ResponsesProps) {
   const {
     messages,
     isGenerating,
-    isShared,
+    // isShared, // isSharedはeditable制御に使っていたが、常に編集可とするため不要
     containerRef,
-    chatInput,
-    setChatInput,
-    handleSend,
+    // chatInput, // このコンポーネントでは直接使わない
+    // setChatInput, // このコンポーネントでは直接使わない
+    handleSend, // InputSectionに渡す用
     updateMessage,
     handleResetAndRegenerate,
-    handleSaveOnly,
+    handleSaveOnly, // InputSectionに渡す用
     handleStopAllGeneration,
   } = useChatLogicContext();
 
-  const [localChatInput, setLocalChatInput] = useState<
-    { type: string; text?: string; image_url?: { url: string } }[]
-  >([{ type: "text", text: "" }]);
-
   const MemoizedInputSection = useMemo(() => React.memo(InputSection), []);
 
-  console.log("[DEBUG ChatResponses] Rendering. messages:", messages);
+  // 仮想スクロールのための設定
+  const parentRef = containerRef; // useChatLogicContextから渡されるコンテナのrefを流用
 
-  // 編集ハンドラー
-  const handleEdit = useCallback(
-    (
-      messageIndex: number,
-      responseIndex: number | null,
-      newContent: string
-    ) => {
-      const turndownService = new TurndownService();
-      const markdownContent = turndownService.turndown(newContent);
-      const newText = [{ type: "text", text: markdownContent }];
-      updateMessage(messageIndex, responseIndex, newText);
+  const estimateRowHeight = useCallback(
+    (index: number) => {
+      // TODO: messages[index] の内容に基づいて、より正確な高さを概算するロジックを実装
+      // 例えば、テキストの行数、画像の有無、コードブロックの有無などを考慮する。
+      // 最も簡単なのは、平均的な高さを返すことだが、アイテムの高さが大きく異なる場合は
+      // スクロールバーの挙動が不自然になることがある。
+      // TiptapエディタのコンテンツDOMの高さを直接取得するのはレンダリング後でないと難しいため、概算に留める。
+      const message = messages[index];
+      if (!message) return 150; // デフォルトの高さ
+
+      let estimatedHeight = 50; // 基本の高さ (paddingなど)
+      // ユーザーメッセージのTiptapエディタ部分
+      if (message.user) {
+        estimatedHeight += Math.max(50, message.user.split("\n").length * 20); // 行数 x 行の高さ (概算)
+      }
+      // LLM応答のTiptapエディタ部分 (複数の応答がある場合、最も高いものを考慮するか、平均を取るか)
+      message.llm.forEach((response) => {
+        if (response.text) {
+          estimatedHeight += Math.max(
+            50,
+            response.text.split("\n").length * 20
+          );
+          // 画像が含まれる場合の高さも考慮 (parseMarkdownToContentParts で画像URLを抽出し、その数やサイズで加算など)
+          // ここでは簡易的にテキスト行数のみで計算
+        }
+      });
+      return Math.max(100, estimatedHeight); // 最低でも100pxは確保する例
     },
-    [updateMessage]
+    [messages]
   );
+
+  const rowVirtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: estimateRowHeight, // ★ 修正: useCallbackでメモ化した関数を使用
+    overscan: 5,
+  });
+
+  // 新しいメッセージが追加されたときに最下部にスクロール
+  useEffect(() => {
+    if (messages.length > 0) {
+      // virtualizerが準備できてからスクロールを実行
+      // 初回レンダリング時やmessagesが空からの変更時に対応
+      setTimeout(() => {
+        // 少し遅延させて virtualizer の準備を待つ (より良い方法があれば検討)
+        rowVirtualizer.scrollToIndex(messages.length - 1, {
+          align: "end",
+          behavior: "auto",
+        }); // behavior: 'smooth' だと遅い場合あり
+      }, 0);
+    }
+  }, [messages.length, rowVirtualizer]); // rowVirtualizer も依存配列に追加
+
+  console.log(
+    "[DEBUG ChatResponses] Rendering. messages count:",
+    messages.length
+  );
+
+  // handleEdit は不要になる
+  // const handleEdit = useCallback(...);
 
   // レスポンス選択ハンドラー
   const handleSelectResponse = useCallback(
@@ -160,20 +193,27 @@ export default function Responses({ readOnly = false }: ResponsesProps) {
 
   return (
     <>
+      {/* 
+        親コンポーネント (ChatPage.tsx) で containerRef がアタッチされる要素は、
+        以下のようなスタイルを持つことが期待される:
+        .responses-container {
+          height: calc(100vh - HEADER_HEIGHT - INPUT_AREA_HEIGHT); // ビューポート内の可視領域の高さ
+          overflow-y: auto;
+          position: relative; // 仮想アイテムの絶対配置の基準とする場合
+        }
+      */}
       <div
-        className={`responses-container ${
-          messages.length === 0 ? "initial-screen" : ""
-        }`}
-        ref={containerRef}
-        translate="no"
+        style={{
+          height: `${rowVirtualizer.getTotalSize()}px`,
+          width: "100%",
+          position: "relative", // 仮想アイテムの絶対配置の基準
+        }}
       >
-        {messages.map((message, messageIndex) => {
-          console.log(
-            "[DEBUG ChatResponses] Mapping message:",
-            message,
-            "at index:",
-            messageIndex
-          );
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+          const message = messages[virtualRow.index];
+          if (!message) return null; // 安全のためのチェック
+
+          // selectedResponses と hasSelectedResponse は message.llm に基づくので、mapの中で計算
           const selectedResponses = message.llm
             .filter((r: any) => r.selected)
             .sort(
@@ -181,33 +221,44 @@ export default function Responses({ readOnly = false }: ResponsesProps) {
                 (a.selectedOrder || 0) - (b.selectedOrder || 0)
             );
           const hasSelectedResponse = selectedResponses.length > 0;
+
           return (
-            <div key={messageIndex} className="message-block">
-              {/* 常に編集可能なInputSectionを表示 */}
+            <div
+              key={virtualRow.key} // ★ virtualRow.key を使用
+              ref={rowVirtualizer.measureElement} // 要素の高さを動的に計測する場合
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+              className="message-block" // 既存のクラスを適用
+            >
               <MemoizedInputSection
-                chatInput={message.user}
-                setChatInput={(newInput) =>
-                  updateMessage(messageIndex, null, newInput)
-                }
+                chatInput={message.user} // userはstring (Markdown)
+                setChatInput={(newMarkdown) => {
+                  // updateMessageのcontentはanyだが、stringを期待している
+                  updateMessage(virtualRow.index, null, newMarkdown);
+                }}
                 handleSend={(event, isPrimaryOnly) =>
-                  handleSend(event, isPrimaryOnly)
+                  handleSend(event, isPrimaryOnly, message.user)
                 }
-                isEditMode={true}
-                messageIndex={messageIndex}
+                isEditMode={true} // 履歴は常に編集モードとしてTiptapを表示
+                messageIndex={virtualRow.index}
                 handleResetAndRegenerate={handleResetAndRegenerate}
                 handleSaveOnly={handleSaveOnly}
                 mainInput={false}
-                isInitialScreen={false}
+                isInitialScreen={false} // 仮想リスト内のアイテムなので常にfalse
                 handleStopAllGeneration={handleStopAllGeneration}
-                isGenerating={isGenerating}
+                isGenerating={isGenerating} // 全体のisGeneratingを渡す
               />
-
               <div className="scroll_area">
                 {message.llm.map((response, responseIndex) => {
-                  const isGenerating = response.isGenerating ?? false;
+                  const isLlmGenerating = response.isGenerating ?? false;
                   return (
                     <div
-                      key={response.model}
+                      key={`${virtualRow.key}-${response.model}-${responseIndex}`} // より一意なキー
                       className={`response ${response.role} ${
                         hasSelectedResponse && !response.selected
                           ? "unselected"
@@ -216,19 +267,20 @@ export default function Responses({ readOnly = false }: ResponsesProps) {
                     >
                       <div className="meta">
                         <small>{response.model}</small>
-                        {/* 常にコントロールを表示 */}
                         <div className="response-controls">
                           <button
                             className={
-                              isGenerating ? "stop-button" : "regenerate-button"
+                              isLlmGenerating
+                                ? "stop-button"
+                                : "regenerate-button"
                             }
                             onClick={() =>
-                              isGenerating
-                                ? handleStopAllGeneration()
-                                : handleResetAndRegenerate(messageIndex)
+                              isLlmGenerating
+                                ? handleStopAllGeneration() // 特定のLLM応答の停止も検討
+                                : handleResetAndRegenerate(virtualRow.index)
                             }
                           >
-                            {isGenerating ? (
+                            {isLlmGenerating ? (
                               <svg
                                 xmlns="http://www.w3.org/2000/svg"
                                 width="20"
@@ -267,7 +319,10 @@ export default function Responses({ readOnly = false }: ResponsesProps) {
                               response.selected ? "selected" : ""
                             }`}
                             onClick={() =>
-                              handleSelectResponse(messageIndex, responseIndex)
+                              handleSelectResponse(
+                                virtualRow.index,
+                                responseIndex
+                              )
                             }
                           >
                             {response.selected
@@ -280,19 +335,16 @@ export default function Responses({ readOnly = false }: ResponsesProps) {
                           </div>
                         </div>
                       </div>
-                      <div
-                        className="markdown-content"
-                        contentEditable={true}
-                        onBlur={(e) => {
-                          handleEdit(
-                            messageIndex,
+                      <MarkdownTipTapEditor
+                        value={response.text || ""}
+                        onChange={(markdown) => {
+                          updateMessage(
+                            virtualRow.index,
                             responseIndex,
-                            (e.target as HTMLDivElement).innerHTML
+                            markdown
                           );
                         }}
-                        dangerouslySetInnerHTML={{
-                          __html: markedInstance.parse(response.text || ""),
-                        }}
+                        editable={true}
                       />
                     </div>
                   );

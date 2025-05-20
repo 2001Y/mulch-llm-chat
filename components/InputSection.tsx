@@ -1,26 +1,31 @@
-import React, { useState, useEffect, useRef, ChangeEvent } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  ChangeEvent,
+  useMemo,
+} from "react";
 import { toast } from "sonner";
-import ModelSuggestions from "./ModelSuggestions";
-import useStorageState from "hooks/useLocalStorage";
+import { storage } from "hooks/useLocalStorage";
 import Image from "next/image";
 import { useParams } from "next/navigation";
+import MarkdownTipTapEditor, { EditorHandle } from "./MarkdownTipTapEditor";
+import { Editor } from "@tiptap/core";
+import { EditorProps as TiptapEditorProps, EditorView } from "@tiptap/pm/view";
+import type { Message, ModelItem } from "hooks/useChatLogic";
+import useStorageState from "hooks/useLocalStorage";
+import { useChatLogicContext } from "contexts/ChatLogicContext";
 
 interface Props {
   mainInput: boolean;
-  chatInput: { type: string; text?: string; image_url?: { url: string } }[];
-  setChatInput: React.Dispatch<
-    React.SetStateAction<
-      { type: string; text?: string; image_url?: { url: string } }[]
-    >
-  >;
+  chatInput: string;
+  setChatInput: React.Dispatch<React.SetStateAction<string>>;
   handleSend: (
-    event: React.MouseEvent<HTMLButtonElement>,
+    event:
+      | React.MouseEvent<HTMLButtonElement>
+      | React.KeyboardEvent<HTMLDivElement>,
     isPrimaryOnly: boolean,
-    currentInput?: {
-      type: string;
-      text?: string;
-      image_url?: { url: string };
-    }[]
+    currentInput?: string
   ) => void;
   isEditMode: boolean;
   messageIndex: number;
@@ -44,200 +49,142 @@ export default function InputSection({
   handleStopAllGeneration,
   isGenerating,
 }: Props) {
-  const [models, setModels] = useStorageState("models");
+  const [models, setModels] = useStorageState<ModelItem[] | undefined>(
+    "models"
+  );
+  const { AllModels, selectSingleModel } = useChatLogicContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
-  const [isComposing, setIsComposing] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [isEdited, setIsEdited] = useState(false);
   const params = useParams();
   const roomId = params?.id as string | undefined;
-  const [storedMessages] = useStorageState(
-    `chatMessages_${roomId || "default"}` as `chatMessages_${string}`
+  const [storedMessages] = useStorageState<Message[] | undefined>(
+    roomId ? `chatMessages_${roomId}` : undefined
   );
+  const tiptapEditorRef = useRef<EditorHandle>(null);
+
+  const aiModelSuggestionsForTiptap = useMemo(() => {
+    return (AllModels || []).map((model) => ({
+      id: model.fullId,
+      label: model.shortId || model.fullId,
+    }));
+  }, [AllModels]);
+
+  const handleTiptapChange = (markdown: string) => {
+    setChatInput(markdown);
+  };
 
   const handleModelSelect = (modelName: string) => {
-    const wasFocused = document.activeElement === inputRef.current;
-
+    const editor = tiptapEditorRef.current?.getEditorInstance();
+    const wasFocused = !!editor?.isFocused;
     setModels(
       (models ?? []).map((model) => ({
         name: model.name,
         selected: model.name === modelName ? !model.selected : model.selected,
       }))
     );
-
     if (wasFocused) {
-      setTimeout(() => inputRef.current?.focus(), 0);
+      setTimeout(() => editor?.commands.focus(), 0);
     }
   };
 
-  const originalMessage =
-    storedMessages &&
-    messageIndex >= 0 &&
-    messageIndex < (storedMessages?.length || 0)
-      ? storedMessages[messageIndex]?.user
-      : null;
+  const originalMessageMarkdown: string | null = useMemo(() => {
+    if (
+      storedMessages &&
+      messageIndex >= 0 &&
+      messageIndex < storedMessages.length
+    ) {
+      return storedMessages[messageIndex].user;
+    }
+    return null;
+  }, [storedMessages, messageIndex]);
 
   useEffect(() => {
-    if (mainInput) setChatInput([{ type: "text", text: "" }]);
-  }, [mainInput, setChatInput]);
-
-  useEffect(() => {
-    if (originalMessage)
-      setIsEdited(
-        JSON.stringify(chatInput) !== JSON.stringify(originalMessage)
-      );
-  }, [chatInput, originalMessage]);
-
-  useEffect(() => {
-    if (inputRef.current && mainInput) inputRef.current.focus();
+    if (mainInput && tiptapEditorRef.current) {
+      tiptapEditorRef.current.focus();
+    }
   }, [mainInput]);
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (document.body.dataset?.softwareKeyboard === "false") {
-      if (
-        event.key === "Enter" &&
-        !event.shiftKey &&
-        !isComposing &&
-        !isGenerating
-      ) {
+  useEffect(() => {
+    if (originalMessageMarkdown !== null) {
+      setIsEdited(chatInput !== originalMessageMarkdown);
+    } else {
+      setIsEdited(mainInput ? chatInput !== "" : false);
+    }
+  }, [chatInput, originalMessageMarkdown, mainInput]);
+
+  const editorPropsForTiptap: TiptapEditorProps = {
+    handleKeyDown: (view: EditorView, event: KeyboardEvent): boolean => {
+      if (event.isComposing) return false;
+      if (event.key === "Enter" && !event.shiftKey && !isGenerating) {
         event.preventDefault();
         if (!isInputEmpty()) {
-          isEditMode
-            ? handleResetAndRegenerate(messageIndex)
-            : handleSendAndResetInput(
-                event as unknown as React.MouseEvent<HTMLButtonElement>,
-                event.metaKey || event.ctrlKey
-              );
+          if (isEditMode) {
+            handleResetAndRegenerate(messageIndex);
+          } else {
+            handleSendAndResetInput(
+              event as any,
+              event.metaKey || event.ctrlKey
+            );
+          }
+          return true;
         }
-      } else if (
-        event.key === "Backspace" &&
-        (event.metaKey || event.ctrlKey)
-      ) {
+      }
+      if (event.key === "Backspace" && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
         handleStopAllGeneration();
+        return true;
       }
-    }
-  };
-
-  const checkSuggestionVisibility = (cursorPosition: number, text: string) => {
-    const textBeforeCursor = text.slice(0, cursorPosition);
-
-    const hasActiveSuggestion = /@[^@\s\u3000]*$/.test(textBeforeCursor);
-
-    setShowSuggestions(hasActiveSuggestion);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const text = e.target.value;
-    setChatInput((prev) => {
-      const newInput =
-        prev.length > 0 ? [...prev] : [{ type: "text", text: "" }];
-      newInput[0] = { ...newInput[0], text };
-      return newInput;
-    });
-
-    checkSuggestionVisibility(e.target.selectionStart || 0, text);
-  };
-
-  const handleSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
-    const target = e.target as HTMLTextAreaElement;
-    checkSuggestionVisibility(target.selectionStart || 0, target.value);
-  };
-
-  const selectSuggestion = (selectedModel: string) => {
-    if (inputRef.current) {
-      const cursorPosition = inputRef.current.selectionStart || 0;
-      const textBeforeCursor = inputRef.current.value.slice(0, cursorPosition);
-      const textAfterCursor = inputRef.current.value.slice(cursorPosition);
-
-      const newText =
-        textBeforeCursor.replace(
-          /@[^@\s\u3000]*$/,
-          `@${selectedModel.split("/")[1]} `
-        ) + textAfterCursor;
-
-      setChatInput([{ type: "text", text: newText }]);
-    }
+      return false;
+    },
+    attributes: {
+      // Tiptapエディタ自体に適用するHTML属性
+      // class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none', // 例: TailwindCSS用
+      // placeholder: isEditMode ? "Edit your message here..." : "Type your message here…", // プレースホルダーはTiptapのPlaceholder拡張機能で設定推奨
+    },
   };
 
   const handleSendAndResetInput = (
-    event: React.MouseEvent<HTMLButtonElement>,
+    event:
+      | React.MouseEvent<HTMLButtonElement>
+      | React.KeyboardEvent<HTMLDivElement>,
     isPrimaryOnly: boolean
   ) => {
-    const currentInput = [...chatInput];
-    setChatInput([{ type: "text", text: "" }]);
-    handleSend(event, isPrimaryOnly, currentInput);
+    const currentInputForSend = chatInput;
+    setChatInput("");
+    handleSend(event, isPrimaryOnly, currentInputForSend);
   };
 
   const handleImageSelect = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files?.length) {
-      try {
-        const newImages = await Promise.all(
-          Array.from(files).map(
-            (file) =>
-              new Promise<{ type: string; image_url: { url: string } }>(
-                (resolve, reject) => {
-                  const reader = new FileReader();
-                  reader.onloadend = () =>
-                    resolve({
-                      type: "image_url",
-                      image_url: { url: reader.result as string },
-                    });
-                  reader.onerror = reject;
-                  reader.readAsDataURL(file);
-                }
-              )
-          )
-        );
-        setChatInput((prev) => [...prev, ...newImages]);
-      } catch {
-        toast.error("画像の読み込み中にエラーが発生しました", {
-          description: "別の画像を選択してください",
-          duration: 3000,
-        });
+      const editor = tiptapEditorRef.current?.getEditorInstance();
+      if (!editor) {
+        toast.error("エディタが初期化されていません。");
+        return;
       }
-    } else {
-      toast.error("画像が選択されませんでした", {
-        description: "画像を選択してください",
-        duration: 3000,
-      });
+      for (const file of Array.from(files)) {
+        try {
+          const base64String = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          editor.chain().focus().setImage({ src: base64String }).run();
+        } catch (err) {
+          console.error("画像処理エラー:", err);
+          toast.error("画像の処理中にエラーが発生しました", {
+            description: "別の画像を選択するか、再度お試しください。",
+            duration: 3000,
+          });
+        }
+      }
     }
     if (event.target) event.target.value = "";
   };
 
-  const removeImage = (index: number) => {
-    setChatInput((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  useEffect(() => {
-    if (!CSS.supports("field-sizing: content")) {
-      const textarea = inputRef.current;
-      if (!textarea) return;
-
-      const adjustHeight = () => {
-        textarea.style.height = "1lh";
-        textarea.style.height = `${Math.max(
-          textarea.scrollHeight,
-          parseFloat(getComputedStyle(textarea).lineHeight)
-        )}px`;
-        const maxHeight = parseInt(window.getComputedStyle(textarea).maxHeight);
-        textarea.style.overflowY =
-          textarea.scrollHeight > maxHeight ? "auto" : "hidden";
-      };
-      textarea.addEventListener("input", adjustHeight);
-      window.addEventListener("resize", adjustHeight);
-      adjustHeight();
-      return () => {
-        textarea.removeEventListener("input", adjustHeight);
-        window.removeEventListener("resize", adjustHeight);
-      };
-    }
-  }, [chatInput]);
-
-  const isInputEmpty = () => !chatInput[0]?.text?.trim();
+  const isInputEmpty = () => !chatInput.trim();
 
   return (
     <section
@@ -247,7 +194,14 @@ export default function InputSection({
       ref={sectionRef}
     >
       <div className="input-container chat-input-area">
-        <div className="files-previews">
+        <div
+          className="add-files-container"
+          style={{
+            marginBottom: "0.5em",
+            display: "flex",
+            justifyContent: "flex-end",
+          }}
+        >
           <button
             onClick={() => fileInputRef.current?.click()}
             className="action-button add-files-button icon-button"
@@ -275,60 +229,17 @@ export default function InputSection({
             style={{ display: "none" }}
             multiple
           />
-          {chatInput
-            .slice(1)
-            .filter((item) => item.type === "image_url")
-            .map((image, idx) => (
-              <div key={idx} className="image-preview">
-                <Image
-                  src={image.image_url?.url || ""}
-                  alt={`選択された画像 ${idx + 1}`}
-                  width={200}
-                  height={200}
-                  style={{ objectFit: "contain" }}
-                />
-                <button onClick={() => removeImage(idx + 1)}>×</button>
-              </div>
-            ))}
         </div>
-        <textarea
-          ref={inputRef}
-          value={chatInput[0]?.text || ""}
-          onChange={handleInputChange}
-          onSelect={handleSelect}
-          onKeyDown={handleKeyDown}
-          onCompositionStart={() => setIsComposing(true)}
-          onCompositionEnd={(e) => {
-            setIsComposing(false);
-            handleInputChange({
-              target: e.target,
-            } as React.ChangeEvent<HTMLTextAreaElement>);
-          }}
-          className="chat-input"
-          placeholder={
-            isEditMode ? "Edit your message here..." : "Type your message here…"
-          }
-          data-fieldsizing="content"
+        <MarkdownTipTapEditor
+          ref={tiptapEditorRef}
+          value={chatInput}
+          onChange={handleTiptapChange}
+          editable={!isGenerating}
+          editorProps={editorPropsForTiptap}
+          className="chat-tiptap-editor"
+          aiModelSuggestions={aiModelSuggestionsForTiptap}
+          onSelectAiModel={selectSingleModel}
         />
-        {showSuggestions && (
-          <ModelSuggestions
-            inputValue={(() => {
-              const input = inputRef.current;
-              if (!input) return "";
-
-              const cursorPosition = input.selectionStart || 0;
-              const textBeforeCursor =
-                chatInput[0]?.text?.slice(0, cursorPosition) || "";
-
-              const match = textBeforeCursor.match(/@([^@\s\u3000]*)$/);
-
-              return match?.[1] || "";
-            })()}
-            onSelectSuggestion={selectSuggestion}
-            inputRef={inputRef}
-            className={`${mainInput ? "newInput" : "existingInput"}`}
-          />
-        )}
       </div>
 
       <div className="input-container model-select-area">

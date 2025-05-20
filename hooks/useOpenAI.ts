@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import OpenAI from "openai";
 
-export const useOpenAI = (accessToken: string) => {
+export const useOpenAI = (accessToken: string | undefined | null) => {
   const [openai, setOpenai] = useState<OpenAI | null>(null);
 
   useEffect(() => {
@@ -16,6 +16,8 @@ export const useOpenAI = (accessToken: string) => {
         // },
       });
       setOpenai(openaiInstance);
+    } else {
+      setOpenai(null);
     }
   }, [accessToken]);
 

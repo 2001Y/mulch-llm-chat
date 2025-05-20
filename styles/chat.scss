@@ -283,7 +283,6 @@ header {
   .input-container {
     display: flex;
     align-items: flex-end;
-    align-items: center;
     gap: 1em;
     padding: 0 $body-padding;
 
@@ -319,11 +318,7 @@ header {
 
     &.model-select-area {
       color: color.mix(#fff, #000, 70%);
-      // display: flex;
       gap: 0.5em;
-      // width: 100vw;
-      // margin: 0 calc(50% - 50vw);
-      // padding: 0 calc(50vw - 50%);
       width: 100%;
       max-width: 100%;
       overflow-x: auto;
@@ -411,13 +406,11 @@ header {
       margin: 0 $body-padding;
       position: relative;
       border: 1px solid rgba(255, 255, 255, 0.05);
+      align-items: stretch;
 
       .chat-input {
         width: 100%;
-        // margin: auto;
-        // padding: 1em 0;
         max-height: calc($maxHeight - 2em);
-        // min-height: 6em;
         line-height: 1.5;
         resize: none;
 
@@ -655,8 +648,6 @@ header {
     bottom: env(safe-area-inset-bottom);
     left: 50%;
     transform: translateX(-50%);
-    // padding: max(1em, 2vmax) 0;
-    // padding: max(1em, 4vmax) 0;
     pointer-events: none;
 
     @media (hover: none) {
@@ -664,10 +655,6 @@ header {
         bottom: 0;
       }
     }
-
-    // @media (min-width: 768px) {
-    //   left: calc(50% + 150.5px);
-    // }
 
     > * > * {
       pointer-events: auto;
@@ -806,7 +793,6 @@ header {
     &:last-of-type {
       display: flex;
       flex-direction: column;
-      // min-height: calc(100svh - $height_header*1.5);
 
       .scroll_area {
         min-height: calc(
@@ -1082,15 +1068,11 @@ header {
 }
 
 .modal-content {
-  // background: color.mix(#fff, #000, 15%);
   padding: 3vw 4vw;
   padding-bottom: max(env(safe-area-inset-bottom), 5vw);
   $border-radius: $border-radius * 1.5;
-  // border-radius: $border-radius $border-radius 0 0;
-  // max-width: 90%;
   max-height: 95vh;
   overflow-y: auto;
-  // width: 30rem;
   position: relative;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
 
@@ -1485,7 +1467,6 @@ header {
 }
 
 button {
-  // padding: 0.5em 1em;
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -1697,37 +1678,17 @@ textarea[data-fieldsizing="content"] {
 }
 
 .suggestions-list {
-  position: absolute;
-  bottom: 10em;
-  left: 1.5em;
   background: color.mix(#fff, #000, 10%);
   border-radius: $border-radius;
   box-shadow: $shadow;
   max-height: 10em;
-  height: fit-content;
   overflow-y: auto;
   z-index: 2;
   list-style: none;
   padding: 0.5em;
   margin: 0;
   width: calc(100% - 3em);
-
-  &.newInput,
-  &.existingInput {
-    z-index: 2;
-    left: 0;
-    width: 20em;
-
-    &.newInput {
-      top: -0.5em;
-      transform: translateY(-100%);
-    }
-
-    &.existingInput {
-      bottom: -0.5em;
-      transform: translateY(100%);
-    }
-  }
+  min-width: 200px;
 
   &:empty {
     display: none;
@@ -1740,59 +1701,8 @@ textarea[data-fieldsizing="content"] {
     &.active {
       background-color: color.mix(#fff, #000, 20%);
     }
-
-    input {
-      display: none;
-    }
-
-    label {
-      display: block;
-      width: 100%;
-      height: 100%;
-    }
   }
 }
-
-// .chatList {
-//   .newChatButton {
-//     display: flex;
-//     align-items: center;
-//     justify-content: space-between;
-//     width: 100%;
-//     padding: 1em;
-//     background: rgba(255, 255, 255, 0.1);
-//     border-radius: $border-radius;
-//     text-decoration: none;
-//     backdrop-filter: blur(10px);
-//     box-shadow: $shadow;
-//     margin-bottom: 1em;
-//     color: color.mix(#fff, #000, 70%);
-//     position: fixed;
-//     top: calc($height_header + 1em);
-//     left: 1em;
-//     right: 1em;
-//     z-index: 100;
-
-//     .shortcut {
-//       color: color.mix(#fff, #000, 70%);
-//       opacity: 0.5;
-//       font-size: 0.9em;
-//       padding: $button-padding-vertical $button-padding-horizontal;
-//       display: flex;
-//       align-items: center;
-//       white-space: nowrap;
-//     }
-
-//     &:hover {
-//       background: rgba(255, 255, 255, 0.15);
-//       color: #fff;
-
-//       .shortcut {
-//         color: #fff;
-//       }
-//     }
-//   }
-// }
 
 .chat-list-container {
   margin-top: $height_header;
@@ -1995,11 +1905,11 @@ textarea[data-fieldsizing="content"] {
   justify-content: center;
   align-items: center;
   z-index: 1000;
-  overflow: hidden; /* Prevent overlay from scrolling */
+  overflow: hidden;
 
   @media (max-width: 768px) {
     align-items: flex-start;
-    padding-top: 5vh; /* 5% space at the top */
+    padding-top: 5vh;
   }
 }
 
@@ -2014,16 +1924,16 @@ textarea[data-fieldsizing="content"] {
   box-shadow: $shadow;
   border: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
-  flex-direction: column; /* Stack children vertically */
-  padding: 0; /* Remove padding from container */
-  overflow: hidden; /* Hide overflow for container */
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
 
   @media (max-width: 768px) {
     width: 100%;
     max-width: 100%;
-    height: 95vh; /* Take up 95% of viewport height */
+    height: 95vh;
     max-height: 95vh;
-    border-radius: $border-radius $border-radius 0 0; /* Rounded corners only at top */
+    border-radius: $border-radius $border-radius 0 0;
   }
 
   .modal-header {
@@ -2038,13 +1948,13 @@ textarea[data-fieldsizing="content"] {
 
   .modal-content {
     padding: 0 1.5rem 1.5rem;
-    overflow-y: auto; /* Enable vertical scrolling */
-    overflow-x: hidden; /* Hide horizontal scrollbar */
+    overflow-y: auto;
+    overflow-x: hidden;
     flex: 1;
-    max-height: calc(90vh - 4rem); /* Adjust for header height */
+    max-height: calc(90vh - 4rem);
 
     @media (max-width: 768px) {
-      max-height: calc(95vh - 4rem); /* Adjust for header height on mobile */
+      max-height: calc(95vh - 4rem);
     }
   }
 
