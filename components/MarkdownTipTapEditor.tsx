@@ -6,6 +6,7 @@ import React, {
   forwardRef,
   useRef,
 } from "react";
+import { preinit } from "react-dom"; // ★ preinit をインポート
 import { useEditor, EditorContent, Editor, JSONContent } from "@tiptap/react";
 import { EditorProps } from "@tiptap/pm/view";
 import { Selection } from "@tiptap/pm/state";
@@ -72,6 +73,11 @@ export const MarkdownTipTapEditor = forwardRef<
     },
     ref
   ) => {
+    useEffect(() => {
+      // highlight.jsのテーマCSSをpreinitで読み込む
+      preinit("highlight.js/styles/a11y-dark.css", { as: "style" });
+    }, []); // 空の依存配列でマウント時に一度だけ実行
+
     const editor = useEditor({
       extensions: [
         StarterKit.configure({

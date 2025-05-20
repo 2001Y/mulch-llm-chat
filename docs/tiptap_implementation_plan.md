@@ -120,6 +120,7 @@
 - **React 19 機能の活用検討 (📝 未着手):**
   - React 19 のリリースと安定化に伴い、以下の機能の導入を検討し、プロジェクトのパフォーマンス、開発効率、UX を向上させる。
   - **React Compiler:**
+    - **ステータス:** 🚧 設定適用完了、効果測定とメモ化レビュー待ち
     - **目的:** 手動でのメモ化 (`useMemo`, `useCallback`, `React.memo`) を削減し、コンパイラによる自動最適化の恩恵を受ける。コードの可読性を向上させ、パフォーマンスボトルネックを潜在的に解消する。
     - **適用箇所と期待効果:**
       - `hooks/useChatLogic.ts`:
@@ -136,6 +137,7 @@
       - その他、`Header.tsx`, `SettingsModal.tsx`, `ChatList.tsx` など、状態や props に依存する多くのコンポーネント。
     - **導入方針:** React 19 および Next.js の対応バージョンアップ後、まずは主要なロジック (`useChatLogic`) とリスト表示 (`ChatResponses`) から段階的にコンパイラを適用。既存の `React.memo` や `useCallback` は慎重に削除し、パフォーマンステスト (React DevTools Profiler, Lighthouse など) を通じて効果を検証・比較する。
   - **Actions と `useFormStatus`:**
+    - **ステータス:** 🚧 `InputSection.tsx` に基本導入完了、調整とエラーハンドリング残あり
     - **目的:** フォーム送信と関連する非同期処理の宣言的な記述、UI の Pending 状態管理の簡素化、アクセシビリティ向上。
     - **適用箇所と期待効果:**
       - `components/InputSection.tsx` (`mainInput={true}` のメッセージ送信フォーム):
@@ -148,6 +150,7 @@
         - 結果として、設定変更時の UX が向上し、コードの見通しも良くなる。
     - **導入方針:** まず `InputSection.tsx` のメインメッセージ送信フォームから導入。続いて `SettingsModal.tsx` の各設定フォームへ展開。既存の `isGenerating` state との連携・整理も行う。
   - **`useOptimistic` フック:**
+    - **ステータス:** ✅ 実装済み
     - **目的:** ネットワークリクエストの完了を待たずに UI を即座に更新し、体感的な応答速度を向上させる。
     - **適用箇所と期待効果:**
       - `hooks/useChatLogic.ts` (`handleSend`内):
@@ -160,6 +163,7 @@
       - エラー発生時のロールバック処理について、現状 `addOptimisticMessage` で `isError: true` を設定しエラーメッセージを表示しているが、より複雑なロールバック（例: 楽観的に追加したメッセージの完全削除）が必要か検討。**現状はエラー表示で十分と判断。**
       - LLM 応答完了時（ストリーム終了時）に `isGenerating: false` を `addOptimisticMessage` で確実に反映する。(✅ 実装済み)
   - **Asset Loading API (Suspense for Resources):**
+    - **ステータス:** 🚧 `highlight.js` CSS の読み込みに `preinit` を適用完了、効果確認待ち
     - **目的:** CSS、フォント、外部スクリプトなどの外部リソース読み込みを React が管理し、Suspense と連携することで、最適なタイミングでの読み込みと表示制御を実現し、初期表示速度 (LCP) や体感速度を改善する。
     - **適用箇所と期待効果:**
       - `app/layout.tsx`:
@@ -169,6 +173,7 @@
         - Suspense for CSS を活用し、CSS 読み込み中のフォールバック UI（例: スケルトン表示）を提供することも検討。
     - **導入方針:** Next.js が React 19 の Asset Loading API にどのように対応するか公式ドキュメントを確認し、推奨される方法で適用。まずはグローバルアセットから開始し、次にコンポーネント固有のアセットへと展開。
   - **Server Actions (Next.js App Router との連携強化):**
+    - **ステータス:** 🚧 `fetchModels` を Server Action 化完了、動作確認待ち
     - **目的:** クライアントサイドで行っている API リクエストやビジネスロジックの一部をサーバーサイドに移行し、クライアントの負荷軽減、セキュリティ向上、コードの関心事分離を促進する。
     - **適用箇所と期待効果:**
       - `hooks/useChatLogic.ts` の `fetchModels` 関数:

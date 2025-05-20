@@ -19,6 +19,7 @@ import type {
   ChatCompletionAssistantMessageParam,
   ChatCompletionMessageParam,
 } from "openai/resources/chat/completions";
+import { fetchOpenRouterModels } from "@/app/actions"; // ★ Server Actionをインポート
 
 // Markedのインスタンスを作成し、拡張機能とオプションを設定
 const markedInstance = new Marked(
@@ -532,24 +533,15 @@ export function useChatLogic({
   }, []);
 
   const handleSend = useCallback(
-    async (
-      event:
-        | React.FormEvent<HTMLFormElement>
-        | React.MouseEvent<HTMLButtonElement>
-        | React.KeyboardEvent<HTMLDivElement>,
-      isPrimaryOnly = false,
-      savedInput?: string
-    ) => {
-      event.preventDefault();
-      if (isGenerating) return;
+    async (isPrimaryOnly = false, savedInput?: string) => {
       const inputToUse = savedInput || chatInput;
       if (!inputToUse.trim()) return;
+
       const modelsToUse: string[] = determineModelsToUse(
         inputToUse,
         isPrimaryOnly
       );
 
-      // ユーザーメッセージとLLMプレースホルダーを楽観的UIに追加
       addOptimisticMessage({
         type: "addUserMessageAndPlaceholders",
         userMessage: inputToUse,
@@ -558,16 +550,13 @@ export function useChatLogic({
         })),
       });
 
-      // サーバーへの実際の送信処理 (fetchChatResponse呼び出し)
-      // この時、messageIndex は楽観的更新前の messages.length を使う必要があるため注意
       const currentMessagesLengthBeforeOptimisticUpdate = messages.length;
 
       if (!roomId) {
         const newChatId = generateId(6);
         const newStorageKey = `chatMessages_${newChatId}`;
-        storage.set(newStorageKey, [
-          messages[currentMessagesLengthBeforeOptimisticUpdate],
-        ]);
+        const newMessageForStorage = createMessage(inputToUse, modelsToUse);
+        storage.set(newStorageKey, [newMessageForStorage]);
         router.push(`/${newChatId}`);
         window.dispatchEvent(new Event("hideBentoGrid"));
         window.dispatchEvent(new Event("chatListUpdate"));
@@ -587,27 +576,21 @@ export function useChatLogic({
           );
         });
       }
-      setChatInput("");
       setIsAutoScroll(true);
     },
     [
-      addOptimisticMessage,
       chatInput,
-      isGenerating,
-      roomId,
       determineModelsToUse,
-      createMessage,
+      addOptimisticMessage,
+      messages.length,
+      roomId,
       router,
-      setStoredMessages,
       fetchChatResponse,
       models,
-      setChatInput,
       setIsAutoScroll,
       setAbortControllers,
       setIsGenerating,
-      messages,
-      setMessages,
-      isShared,
+      createMessage,
     ]
   );
 
@@ -810,21 +793,19 @@ export function useChatLogic({
   ]);
 
   useEffect(() => {
-    const fetchModels = async () => {
+    const loadModels = async () => {
       try {
-        const response = await fetch("https://openrouter.ai/api/v1/models");
-        const data = await response.json();
-        const modelIds = data.data.map((model: any) => ({
-          fullId: model.id,
-          shortId: model.id.split("/").pop(),
-        }));
+        setError(null); // 試行前にエラーをクリア
+        const modelIds = await fetchOpenRouterModels(); // ★ Server Actionを呼び出し
         setAllModels(modelIds);
-      } catch (error) {
-        console.error("モデルリストの取得に失敗しました:", error);
+      } catch (err: any) {
+        console.error("モデルリストの取得に失敗しました (Server Action):", err);
+        setError("Failed to load AI models. Please try again later."); // ★ ユーザー向けエラーメッセージ設定
+        setAllModels([]); // エラー時は空にする
       }
     };
-    fetchModels();
-  }, []);
+    loadModels();
+  }, []); // 依存配列は空のまま（マウント時に一度だけ実行）
 
   useEffect(() => {
     if (!initialLoadComplete) return;

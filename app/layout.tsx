@@ -6,7 +6,6 @@ import { Toaster } from "sonner";
 import ClientOnly from "components/ClientOnly";
 import Sidebar from "components/Sidebar";
 import "@/styles/layout.scss";
-import "highlight.js/styles/a11y-dark.css";
 import { Glegoo, JetBrains_Mono } from "next/font/google";
 
 const glegoo = Glegoo({

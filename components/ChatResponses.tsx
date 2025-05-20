@@ -192,7 +192,13 @@ export default function Responses({ readOnly = false }: ResponsesProps) {
   );
 
   return (
-    <>
+    <div // この div がルート要素
+      style={{
+        height: `${rowVirtualizer.getTotalSize()}px`,
+        width: "100%",
+        position: "relative", // 仮想アイテムの絶対配置の基準
+      }}
+    >
       {/* 
         親コンポーネント (ChatPage.tsx) で containerRef がアタッチされる要素は、
         以下のようなスタイルを持つことが期待される:
@@ -202,158 +208,104 @@ export default function Responses({ readOnly = false }: ResponsesProps) {
           position: relative; // 仮想アイテムの絶対配置の基準とする場合
         }
       */}
-      <div
-        style={{
-          height: `${rowVirtualizer.getTotalSize()}px`,
-          width: "100%",
-          position: "relative", // 仮想アイテムの絶対配置の基準
-        }}
-      >
-        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-          const message = messages[virtualRow.index];
-          if (!message) return null; // 安全のためのチェック
+      {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+        const message = messages[virtualRow.index];
+        if (!message) return null; // 安全のためのチェック
 
-          // selectedResponses と hasSelectedResponse は message.llm に基づくので、mapの中で計算
-          const selectedResponses = message.llm
-            .filter((r: any) => r.selected)
-            .sort(
-              (a: any, b: any) =>
-                (a.selectedOrder || 0) - (b.selectedOrder || 0)
-            );
-          const hasSelectedResponse = selectedResponses.length > 0;
+        // selectedResponses と hasSelectedResponse は message.llm に基づくので、mapの中で計算
+        const selectedResponses = message.llm
+          .filter((r: any) => r.selected)
+          .sort(
+            (a: any, b: any) => (a.selectedOrder || 0) - (b.selectedOrder || 0)
+          );
+        const hasSelectedResponse = selectedResponses.length > 0;
 
-          return (
-            <div
-              key={virtualRow.key} // ★ virtualRow.key を使用
-              ref={rowVirtualizer.measureElement} // 要素の高さを動的に計測する場合
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                transform: `translateY(${virtualRow.start}px)`,
+        return (
+          <div
+            key={virtualRow.key} // ★ virtualRow.key を使用
+            ref={rowVirtualizer.measureElement} // 要素の高さを動的に計測する場合
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              transform: `translateY(${virtualRow.start}px)`,
+            }}
+            className="message-block" // 既存のクラスを適用
+          >
+            <MemoizedInputSection
+              mainInput={false} // 履歴編集なのでメイン入力ではない
+              chatInput={message.user} // userはstring (Markdown)
+              setChatInput={(newMarkdown) => {
+                // updateMessageのcontentはanyだが、stringを期待している
+                updateMessage(virtualRow.index, null, newMarkdown);
               }}
-              className="message-block" // 既存のクラスを適用
-            >
-              <MemoizedInputSection
-                chatInput={message.user} // userはstring (Markdown)
-                setChatInput={(newMarkdown) => {
-                  // updateMessageのcontentはanyだが、stringを期待している
-                  updateMessage(virtualRow.index, null, newMarkdown);
-                }}
-                handleSend={(event, isPrimaryOnly) =>
-                  handleSend(event, isPrimaryOnly, message.user)
-                }
-                isEditMode={true} // 履歴は常に編集モードとしてTiptapを表示
-                messageIndex={virtualRow.index}
-                handleResetAndRegenerate={handleResetAndRegenerate}
-                handleSaveOnly={handleSaveOnly}
-                mainInput={false}
-                isInitialScreen={false} // 仮想リスト内のアイテムなので常にfalse
-                handleStopAllGeneration={handleStopAllGeneration}
-                isGenerating={isGenerating} // 全体のisGeneratingを渡す
-              />
-              <div className="scroll_area">
-                {message.llm.map((response, responseIndex) => {
-                  const isLlmGenerating = response.isGenerating ?? false;
-                  return (
-                    <div
-                      key={`${virtualRow.key}-${response.model}-${responseIndex}`} // より一意なキー
-                      className={`response ${response.role} ${
-                        hasSelectedResponse && !response.selected
-                          ? "unselected"
-                          : ""
-                      }`}
-                    >
-                      <div className="meta">
-                        <small>{response.model}</small>
-                        <div className="response-controls">
-                          <button
-                            className={
-                              isLlmGenerating
-                                ? "stop-button"
-                                : "regenerate-button"
-                            }
-                            onClick={() =>
-                              isLlmGenerating
-                                ? handleStopAllGeneration() // 特定のLLM応答の停止も検討
-                                : handleResetAndRegenerate(virtualRow.index)
-                            }
-                          >
-                            {isLlmGenerating ? (
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="20"
-                                height="20"
-                                viewBox="0 0 24 24"
-                                fill="currentColor"
-                                stroke="none"
-                              >
-                                <rect
-                                  x="4"
-                                  y="4"
-                                  width="16"
-                                  height="16"
-                                  rx="2"
-                                  ry="2"
-                                />
-                              </svg>
-                            ) : (
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="24"
-                                height="24"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
-                              </svg>
-                            )}
-                          </button>
-                          <div
-                            className={`response-select ${
-                              response.selected ? "selected" : ""
-                            }`}
-                            onClick={() =>
-                              handleSelectResponse(
-                                virtualRow.index,
-                                responseIndex
-                              )
-                            }
-                          >
-                            {response.selected
-                              ? selectedResponses.length > 1
-                                ? selectedResponses.findIndex(
-                                    (r) => r === response
-                                  ) + 1
-                                : "✓"
-                              : ""}
-                          </div>
-                        </div>
-                      </div>
+              isEditMode={true} // 履歴は常に編集モードとしてTiptapを表示
+              messageIndex={virtualRow.index} // 正しいメッセージインデックスを渡す
+              handleResetAndRegenerate={handleResetAndRegenerate}
+              handleSaveOnly={handleSaveOnly}
+              isInitialScreen={false} // 仮想リスト内のアイテムなので常にfalse
+              handleStopAllGeneration={handleStopAllGeneration}
+              isGenerating={isGenerating} // 全体のisGeneratingを渡す
+            />
+            <div className="scroll_area">
+              {message.llm.map((response, responseIndex) => {
+                const isLlmGenerating = response.isGenerating ?? false;
+                return (
+                  <div
+                    key={`${virtualRow.index}-${responseIndex}`}
+                    className={`response-item ${
+                      response.selected ? "selected" : ""
+                    } ${isLlmGenerating ? "generating" : ""}`}
+                  >
+                    <div className="response-content">
                       <MarkdownTipTapEditor
-                        value={response.text || ""}
-                        onChange={(markdown) => {
+                        value={response.text} // Tiptapへ渡すのはMarkdown文字列
+                        onChange={(newMarkdown) => {
                           updateMessage(
                             virtualRow.index,
                             responseIndex,
-                            markdown
+                            newMarkdown
                           );
                         }}
-                        editable={true}
+                        editable={true} // 常に編集可能とする
+                        editorProps={{
+                          attributes: {
+                            class:
+                              "prose prose-sm sm:prose lg:prose-lg xl:prose-xl focus:outline-none",
+                          },
+                        }}
                       />
                     </div>
-                  );
-                })}
-              </div>
+                    {!isLlmGenerating && (
+                      <div className="response-actions">
+                        <button
+                          onClick={() =>
+                            handleSelectResponse(
+                              virtualRow.index,
+                              responseIndex
+                            )
+                          }
+                          className="action-button select-button"
+                          aria-label={response.selected ? "Deselect" : "Select"}
+                        >
+                          {response.selected ? "☑️" : "☐"}
+                        </button>
+                        {/* 以下のアクションボタンはInputSection内に移動・統合検討 */}
+                      </div>
+                    )}
+                    {isLlmGenerating && (
+                      <div className="generating-indicator">
+                        🌀 Generating...
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
-      </div>
-    </>
+          </div>
+        );
+      })}
+    </div> // ここが追加された閉じタグ
   );
 }

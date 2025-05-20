@@ -146,14 +146,13 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
           mainInput={true}
           chatInput={chatInput}
           setChatInput={setChatInput}
-          handleSend={handleSend}
           isEditMode={false}
           messageIndex={0}
           handleResetAndRegenerate={() => {}}
           handleSaveOnly={() => {}}
-          isGenerating={isGenerating}
-          handleStopAllGeneration={handleStopAllGeneration}
           isInitialScreen={true}
+          handleStopAllGeneration={handleStopAllGeneration}
+          isGenerating={isGenerating}
         />
         <SettingsModal />
       </>
@@ -171,14 +170,13 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
           mainInput={true}
           chatInput={chatInput}
           setChatInput={setChatInput}
-          handleSend={handleSend}
           isEditMode={false}
           messageIndex={messages.length}
           handleResetAndRegenerate={handleResetAndRegenerate}
           handleSaveOnly={handleSaveOnly}
-          isGenerating={isGenerating}
-          handleStopAllGeneration={handleStopAllGeneration}
           isInitialScreen={false}
+          handleStopAllGeneration={handleStopAllGeneration}
+          isGenerating={isGenerating}
         />
       </>
     );
