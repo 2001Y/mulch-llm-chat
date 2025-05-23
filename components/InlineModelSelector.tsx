@@ -33,6 +33,29 @@ export default function InlineModelSelector({
   // 選択されているモデルの数を表示
   const selectedCount = models.filter((m) => m.selected).length;
 
+  // モデルの選択/選択解除
+  const toggleModel = useCallback(
+    (targetModel: ModelItem) => {
+      const updatedModels = models.map((model) =>
+        model.id === targetModel.id
+          ? { ...model, selected: !model.selected }
+          : model
+      );
+
+      // 新しいモデルの場合は追加（nameをidと同じハイフン形式に設定）
+      if (!models.find((m) => m.id === targetModel.id)) {
+        updatedModels.push({
+          id: targetModel.id,
+          name: targetModel.id, // 表示名もIDと同じハイフン形式にする
+          selected: true,
+        });
+      }
+
+      onUpdateModels(updatedModels);
+    },
+    [models, onUpdateModels]
+  );
+
   // キーボード操作
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -68,30 +91,7 @@ export default function InlineModelSelector({
           break;
       }
     },
-    [filteredModels, selectedIndex, isInputFocused]
-  );
-
-  // モデルの選択/選択解除
-  const toggleModel = useCallback(
-    (targetModel: ModelItem) => {
-      const updatedModels = models.map((model) =>
-        model.id === targetModel.id
-          ? { ...model, selected: !model.selected }
-          : model
-      );
-
-      // 新しいモデルの場合は追加（nameをidと同じハイフン形式に設定）
-      if (!models.find((m) => m.id === targetModel.id)) {
-        updatedModels.push({
-          id: targetModel.id,
-          name: targetModel.id, // 表示名もIDと同じハイフン形式にする
-          selected: true,
-        });
-      }
-
-      onUpdateModels(updatedModels);
-    },
-    [models, onUpdateModels]
+    [filteredModels, selectedIndex, isInputFocused, toggleModel]
   );
 
   // 既存モデルの選択解除

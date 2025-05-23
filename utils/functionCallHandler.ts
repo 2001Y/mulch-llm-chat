@@ -98,7 +98,7 @@ export class FunctionCallHandler {
     updateMessage: (
       messageIndex: number,
       responseIndex: number,
-      content: MessageContent[]
+      content: MessageContent
     ) => void,
     messageIndex: number,
     responseIndex: number
@@ -109,9 +109,7 @@ export class FunctionCallHandler {
       console.log("[Parsed Function Arguments]", args);
 
       // 関数実行中は一時的なメッセージを表示
-      const tempResult: MessageContent[] = [
-        { type: "text", text: `${tempContent}\n\n[${this.name}を実行中...]` },
-      ];
+      const tempResult = `${tempContent}\n\n[${this.name}を実行中...]`;
       updateMessage(messageIndex, responseIndex, tempResult);
 
       if (toolFunctions[this.name]) {
@@ -124,14 +122,9 @@ export class FunctionCallHandler {
         });
 
         // 関数実行結果を含めた最終的なメッセージを表示
-        const finalResult: MessageContent[] = [
-          { type: "text", text: tempContent },
-          {
-            type: "function_result",
-            text: JSON.stringify(functionResult, null, 2),
-            function: this.name,
-          },
-        ];
+        const finalResult = `${tempContent}\n\n**関数実行結果 (${
+          this.name
+        }):**\n\`\`\`json\n${JSON.stringify(functionResult, null, 2)}\n\`\`\``;
         updateMessage(messageIndex, responseIndex, finalResult);
         this.functionCallExecuted = true;
         this.pendingFunctionCall = false;
@@ -139,13 +132,7 @@ export class FunctionCallHandler {
         this.openBraces = 0;
       } else {
         console.error("[Function Not Found]", { name: this.name });
-        const errorResult: MessageContent[] = [
-          { type: "text", text: tempContent },
-          {
-            type: "error",
-            text: `関数 "${this.name}" は定義されていません。`,
-          },
-        ];
+        const errorResult = `${tempContent}\n\n**エラー:** 関数 "${this.name}" は定義されていません。`;
         updateMessage(messageIndex, responseIndex, errorResult);
       }
     } catch (error: any) {
@@ -154,13 +141,7 @@ export class FunctionCallHandler {
         arguments: this.arguments,
         error,
       });
-      const errorResult: MessageContent[] = [
-        { type: "text", text: tempContent },
-        {
-          type: "error",
-          text: `関数実行中にエラーが発生しました: ${error.message}`,
-        },
-      ];
+      const errorResult = `${tempContent}\n\n**エラー:** 関数実行中にエラーが発生しました: ${error.message}`;
       updateMessage(messageIndex, responseIndex, errorResult);
     }
   }

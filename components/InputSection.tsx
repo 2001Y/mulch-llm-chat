@@ -458,27 +458,14 @@ export default function InputSection({
         ref={sectionRef}
       >
         <input type="hidden" name="chatInput" value={chatInput} />
-
-        {/* インラインモデル選択UI */}
-        <InlineModelSelector
-          models={models || []}
-          allModels={AllModels || []}
-          onUpdateModels={updateModels}
-          className="chat-model-selector"
-        />
-
-        <MarkdownTipTapEditor
-          ref={tiptapEditorRef}
-          value={chatInput}
-          onChange={handleTiptapChange}
-          editable={!isGenerating}
-          editorProps={editorPropsForTiptap}
-          className="input-container chat-input-area chat-tiptap-editor"
-          aiModelSuggestions={aiModelSuggestionsForTiptap}
-          onSelectAiModel={selectSingleModel}
-        />
-
-        <div className="input-container input-actions">
+        <div
+          className="add-files-container"
+          style={{
+            marginBottom: "0.5em",
+            display: "flex",
+            justifyContent: "flex-end",
+          }}
+        >
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -507,7 +494,28 @@ export default function InputSection({
             style={{ display: "none" }}
             multiple
           />
+        </div>
 
+        {/* インラインモデル選択UI */}
+        <InlineModelSelector
+          models={models || []}
+          allModels={AllModels || []}
+          onUpdateModels={updateModels}
+          className="chat-model-selector"
+        />
+
+        <MarkdownTipTapEditor
+          ref={tiptapEditorRef}
+          value={chatInput}
+          onChange={handleTiptapChange}
+          editable={!isGenerating}
+          editorProps={editorPropsForTiptap}
+          className="input-container chat-input-area chat-tiptap-editor"
+          aiModelSuggestions={aiModelSuggestionsForTiptap}
+          onSelectAiModel={selectSingleModel}
+        />
+
+        <div className="input-container input-actions">
           {isGenerating ? (
             <button
               type="button"
@@ -530,18 +538,23 @@ export default function InputSection({
             </button>
           ) : (
             <>
-              <SubmitButton
-                isPrimaryOnly={true}
-                models={models}
-                isInputEmpty={isInputEmpty}
-                isModelsLoaded={showModelSelectionAndButtonName}
-              />
+              {/* 編集時も新規時も同じ送信ボタンを表示 */}
               <SubmitButton
                 isPrimaryOnly={false}
                 models={models}
                 isInputEmpty={isInputEmpty}
                 isModelsLoaded={showModelSelectionAndButtonName}
               />
+              <SubmitButton
+                isPrimaryOnly={true}
+                models={models}
+                isInputEmpty={isInputEmpty}
+                isModelsLoaded={showModelSelectionAndButtonName}
+              />
+              <span className="line-break shortcut-area">
+                段落替え<span className="shortcut">⏎</span> / 改行
+                <span className="shortcut">⇧⏎</span>
+              </span>
             </>
           )}
         </div>

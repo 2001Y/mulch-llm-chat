@@ -131,7 +131,7 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
           chatInput={chatInput}
           setChatInput={setChatInput}
           isEditMode={false}
-          messageIndex={0}
+          messageId=""
           handleResetAndRegenerate={async (
             messageId: string,
             newContent: string
@@ -169,7 +169,7 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
           chatInput={chatInput}
           setChatInput={setChatInput}
           isEditMode={false}
-          messageIndex={0}
+          messageId=""
           handleResetAndRegenerate={handleResetAndRegenerate}
           handleSaveOnly={handleSaveOnly}
           isInitialScreen={false}
