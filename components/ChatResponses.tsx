@@ -6,60 +6,11 @@ import React, {
   useMemo,
 } from "react";
 import InputSection from "./InputSection";
-// import { Marked } from "marked"; // Tiptap化により不要
-// import { markedHighlight } from "marked-highlight"; // Tiptap化により不要
 // import hljs from "highlight.js"; // Tiptap化により不要 (Tiptap内でコードブロックハイライトする場合、別途拡張が必要)
-// import TurndownService from "turndown"; // Tiptap化により不要
 import { useChatLogicContext } from "contexts/ChatLogicContext";
 import MarkdownTipTapEditor from "./MarkdownTipTapEditor"; // ★ インポート
-import { useVirtualizer } from "@tanstack/react-virtual"; // ★ インポート
-import {
-  ChatCompletionMessageParam,
-  ChatCompletionUserMessageParam,
-  ChatCompletionAssistantMessageParam,
-  ChatCompletionSystemMessageParam,
-  ChatCompletionToolMessageParam,
-  ChatCompletionFunctionMessageParam,
-  ChatCompletionContentPart,
-} from "openai/resources/chat/completions";
-
-// Markedのインスタンス化は不要になる
-// const markedInstance = new Marked(...);
-
-// 型定義を追加
-type MessageContent = {
-  type: string;
-  text?: string;
-  image_url?: { url: string };
-};
-
-type ChatMessage = {
-  role: "user" | "assistant" | "system" | "tool" | "function";
-  content?: string | MessageContent[] | null | undefined;
-  name?: string;
-  tool_call_id?: string;
-};
-
-interface Message {
-  user: MessageContent[];
-  llm: Array<{
-    role: string;
-    model: string;
-    text: string;
-    selected: boolean;
-    isGenerating?: boolean;
-    selectedOrder?: number;
-  }>;
-  timestamp?: number;
-  edited?: boolean;
-}
-
-interface ModelItem {
-  name: string;
-  selected: boolean;
-}
-
-type ModelsState = ModelItem[];
+// import { useVirtualizer } from "@tanstack/react-virtual"; // ★ 仮想スクロールを一時的に無効化
+import type { AppMessage } from "types/chat"; // ★ インポート修正
 
 // HTMLタグをエスケープする関数
 const escapeHtml = (unsafe: string): string => {
@@ -71,241 +22,283 @@ const escapeHtml = (unsafe: string): string => {
     .replace(/'/g, "&#039;");
 };
 
-// コードブロック内のHTMLタグをエスケープする関数
-const escapeCodeBlocks = (markdown: string): string => {
-  // コードブロックに一致する正規表現
-  const codeBlockRegex = /```[\s\S]*?```/g;
-
-  return markdown.replace(codeBlockRegex, (match) => {
-    // コードブロックの内容をエスケープ
-    return match.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  });
-};
-
-interface ResponsesProps {
-  readOnly?: boolean; // このpropはTiptapエディタのeditableに渡すことを検討したが、今回は常に編集可とする
+// グループ化されたメッセージの型定義
+interface GroupedMessage {
+  userMessage: AppMessage & { role: "user" };
+  assistantMessages: (AppMessage & { role: "assistant" })[];
 }
 
-export default function Responses({ readOnly = false }: ResponsesProps) {
+export default function Responses({
+  readOnly = false,
+}: {
+  readOnly?: boolean;
+}) {
   const {
     messages,
     isGenerating,
-    // isShared, // isSharedはeditable制御に使っていたが、常に編集可とするため不要
-    containerRef,
-    // chatInput, // このコンポーネントでは直接使わない
-    // setChatInput, // このコンポーネントでは直接使わない
-    handleSend, // InputSectionに渡す用
-    updateMessage,
-    handleResetAndRegenerate,
-    handleSaveOnly, // InputSectionに渡す用
+    // containerRef, // グループ化により、個別のコンテナ管理が複雑になるため一旦コメントアウト
+    handleSend, // ユーザーメッセージ編集後の再送信に使う可能性あり
+    updateAssistantMessageContent,
+    handleResetAndRegenerate, // ユーザーメッセージからの再生成
+    handleSaveOnly,
     handleStopAllGeneration,
+    regenerateAssistantResponse, // ★取得
+    updateAssistantMessageSelection, // ★取得
   } = useChatLogicContext();
 
   const MemoizedInputSection = useMemo(() => React.memo(InputSection), []);
 
-  // 仮想スクロールのための設定
-  const parentRef = containerRef; // useChatLogicContextから渡されるコンテナのrefを流用
+  // メッセージをユーザーメッセージ単位でグルーピング
+  const groupedMessages = useMemo(() => {
+    const groups: GroupedMessage[] = [];
+    let currentUserMessage: (AppMessage & { role: "user" }) | null = null;
+    let currentAssistantMessages: (AppMessage & { role: "assistant" })[] = [];
 
-  const estimateRowHeight = useCallback(
-    (index: number) => {
-      // TODO: messages[index] の内容に基づいて、より正確な高さを概算するロジックを実装
-      // 例えば、テキストの行数、画像の有無、コードブロックの有無などを考慮する。
-      // 最も簡単なのは、平均的な高さを返すことだが、アイテムの高さが大きく異なる場合は
-      // スクロールバーの挙動が不自然になることがある。
-      // TiptapエディタのコンテンツDOMの高さを直接取得するのはレンダリング後でないと難しいため、概算に留める。
-      const message = messages[index];
-      if (!message) return 150; // デフォルトの高さ
-
-      let estimatedHeight = 50; // 基本の高さ (paddingなど)
-      // ユーザーメッセージのTiptapエディタ部分
-      if (message.user) {
-        estimatedHeight += Math.max(50, message.user.split("\n").length * 20); // 行数 x 行の高さ (概算)
-      }
-      // LLM応答のTiptapエディタ部分 (複数の応答がある場合、最も高いものを考慮するか、平均を取るか)
-      message.llm.forEach((response) => {
-        if (response.text) {
-          estimatedHeight += Math.max(
-            50,
-            response.text.split("\n").length * 20
-          );
-          // 画像が含まれる場合の高さも考慮 (parseMarkdownToContentParts で画像URLを抽出し、その数やサイズで加算など)
-          // ここでは簡易的にテキスト行数のみで計算
+    messages.forEach((msg) => {
+      if (!msg) return; // nullメッセージをスキップ
+      if (msg.role === "user") {
+        if (currentUserMessage) {
+          groups.push({
+            userMessage: currentUserMessage,
+            assistantMessages: currentAssistantMessages,
+          });
         }
+        currentUserMessage = msg as AppMessage & { role: "user" };
+        currentAssistantMessages = [];
+      } else if (msg.role === "assistant" && currentUserMessage) {
+        currentAssistantMessages.push(
+          msg as AppMessage & { role: "assistant" }
+        );
+      }
+    });
+    if (currentUserMessage) {
+      groups.push({
+        userMessage: currentUserMessage,
+        assistantMessages: currentAssistantMessages,
       });
-      return Math.max(100, estimatedHeight); // 最低でも100pxは確保する例
-    },
-    [messages]
-  );
-
-  const rowVirtualizer = useVirtualizer({
-    count: messages.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: estimateRowHeight, // ★ 修正: useCallbackでメモ化した関数を使用
-    overscan: 5,
-  });
-
-  // 新しいメッセージが追加されたときに最下部にスクロール
-  useEffect(() => {
-    if (messages.length > 0) {
-      // virtualizerが準備できてからスクロールを実行
-      // 初回レンダリング時やmessagesが空からの変更時に対応
-      setTimeout(() => {
-        // 少し遅延させて virtualizer の準備を待つ (より良い方法があれば検討)
-        rowVirtualizer.scrollToIndex(messages.length - 1, {
-          align: "end",
-          behavior: "auto",
-        }); // behavior: 'smooth' だと遅い場合あり
-      }, 0);
     }
-  }, [messages.length, rowVirtualizer]); // rowVirtualizer も依存配列に追加
+    return groups;
+  }, [messages]);
+
+  // 選択順序とアイコンを取得するヘルパー関数
+  const getSelectionIcon = (
+    responseId: string,
+    assistantMessages: (AppMessage & { role: "assistant" })[]
+  ) => {
+    const selectedMessages = assistantMessages
+      .filter((msg) => msg.ui?.isSelected)
+      .sort(
+        (a, b) => (a.ui?.selectionOrder || 0) - (b.ui?.selectionOrder || 0)
+      );
+
+    const selectedIndex = selectedMessages.findIndex(
+      (msg) => msg.id === responseId
+    );
+
+    if (selectedIndex === -1) return "□"; // 未選択は四角
+
+    // 選択が1つだけの場合はチェックマーク、2つ以上の場合は数字
+    if (selectedMessages.length === 1) return "✓";
+    return (selectedIndex + 1).toString();
+  };
+
+  // レスポンスの表示状態を判定するヘルパー関数
+  const getResponseDisplayState = (
+    response: AppMessage & { role: "assistant" },
+    assistantMessages: (AppMessage & { role: "assistant" })[]
+  ) => {
+    const isSelected = response.ui?.isSelected ?? false;
+    const hasAnySelected = assistantMessages.some((msg) => msg.ui?.isSelected);
+
+    if (!hasAnySelected) return "normal";
+    if (isSelected) return "selected";
+    return "unselected";
+  };
 
   console.log(
-    "[DEBUG ChatResponses] Rendering. messages count:",
-    messages.length
+    "[DEBUG ChatResponses] Rendering. Grouped messages count:",
+    groupedMessages.length
   );
-
-  // handleEdit は不要になる
-  // const handleEdit = useCallback(...);
-
-  // レスポンス選択ハンドラー
-  const handleSelectResponse = useCallback(
-    (messageIndex: number, responseIndex: number) => {
-      updateMessage(messageIndex, responseIndex, undefined, true);
-    },
-    [updateMessage]
-  );
-
-  // ストリーム中止ハンドラー
-  const handleStop = useCallback(
-    (messageIndex: number, responseIndex: number) => {
-      // このコンポーネントでは利用しない（コンテキストで処理）
-    },
-    []
-  );
-
-  // 再生成ハンドラー
-  const handleRegenerate = useCallback(
-    (messageIndex: number, responseIndex: number, model: string) => {
-      // ここでは再生成は行わない - useChatLogicのメソッドを使うべき
-    },
-    []
-  );
+  if (groupedMessages.length > 0) {
+    groupedMessages.forEach((group, idx) => {
+      console.log(
+        `Group ${idx}: UserMsgID=${group.userMessage.id}, AssistantMsgCount=${group.assistantMessages.length}`
+      );
+    });
+  }
 
   return (
-    <div // この div がルート要素
-      style={{
-        height: `${rowVirtualizer.getTotalSize()}px`,
-        width: "100%",
-        position: "relative", // 仮想アイテムの絶対配置の基準
-      }}
-    >
-      {/* 
-        親コンポーネント (ChatPage.tsx) で containerRef がアタッチされる要素は、
-        以下のようなスタイルを持つことが期待される:
-        .responses-container {
-          height: calc(100vh - HEADER_HEIGHT - INPUT_AREA_HEIGHT); // ビューポート内の可視領域の高さ
-          overflow-y: auto;
-          position: relative; // 仮想アイテムの絶対配置の基準とする場合
-        }
-      */}
-      {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-        const message = messages[virtualRow.index];
-        if (!message) return null; // 安全のためのチェック
-
-        // selectedResponses と hasSelectedResponse は message.llm に基づくので、mapの中で計算
-        const selectedResponses = message.llm
-          .filter((r: any) => r.selected)
-          .sort(
-            (a: any, b: any) => (a.selectedOrder || 0) - (b.selectedOrder || 0)
-          );
-        const hasSelectedResponse = selectedResponses.length > 0;
+    <>
+      {groupedMessages.map((group, groupIndex) => {
+        const userMsg = group.userMessage;
+        const assistantMsgs = group.assistantMessages;
 
         return (
-          <div
-            key={virtualRow.key} // ★ virtualRow.key を使用
-            ref={rowVirtualizer.measureElement} // 要素の高さを動的に計測する場合
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              transform: `translateY(${virtualRow.start}px)`,
-            }}
-            className="message-block" // 既存のクラスを適用
-          >
+          <div key={userMsg.id} className="message-block">
+            {/* ユーザーメッセージ表示 */}
             <MemoizedInputSection
-              mainInput={false} // 履歴編集なのでメイン入力ではない
-              chatInput={message.user} // userはstring (Markdown)
+              mainInput={false}
+              chatInput={userMsg.content as string} // ユーザーメッセージはstringと仮定
               setChatInput={(newMarkdown) => {
-                // updateMessageのcontentはanyだが、stringを期待している
-                updateMessage(virtualRow.index, null, newMarkdown);
+                // ユーザーメッセージ編集時は handleSaveOnly や handleResetAndRegenerate を使う
+                // ここで直接 handleSaveOnly を呼ぶか、または useChatLogic 側の updateUserInput を整備
+                console.log(
+                  "User message edited in ChatResponses, new markdown:",
+                  newMarkdown,
+                  "for ID:",
+                  userMsg.id
+                );
+                // handleSaveOnly(userMsg.id, newMarkdown); // 保存のみの場合
+                // 編集後に再生成する場合は handleResetAndRegenerate を呼ぶUIが必要
               }}
-              isEditMode={true} // 履歴は常に編集モードとしてTiptapを表示
-              messageIndex={virtualRow.index} // 正しいメッセージインデックスを渡す
+              isEditMode={true} // 常に編集モードだが、表示専用のスタイルはInputSection内で制御
+              messageId={userMsg.id} // messageId を InputSection に渡す
               handleResetAndRegenerate={handleResetAndRegenerate}
               handleSaveOnly={handleSaveOnly}
-              isInitialScreen={false} // 仮想リスト内のアイテムなので常にfalse
+              isInitialScreen={false}
               handleStopAllGeneration={handleStopAllGeneration}
-              isGenerating={isGenerating} // 全体のisGeneratingを渡す
+              isGenerating={isGenerating || (userMsg.ui?.isGenerating ?? false)}
             />
-            <div className="scroll_area">
-              {message.llm.map((response, responseIndex) => {
-                const isLlmGenerating = response.isGenerating ?? false;
-                return (
-                  <div
-                    key={`${virtualRow.index}-${responseIndex}`}
-                    className={`response-item ${
-                      response.selected ? "selected" : ""
-                    } ${isLlmGenerating ? "generating" : ""}`}
-                  >
-                    <div className="response-content">
-                      <MarkdownTipTapEditor
-                        value={response.text} // Tiptapへ渡すのはMarkdown文字列
-                        onChange={(newMarkdown) => {
-                          updateMessage(
-                            virtualRow.index,
-                            responseIndex,
-                            newMarkdown
-                          );
-                        }}
-                        editable={true} // 常に編集可能とする
-                        editorProps={{
-                          attributes: {
-                            class:
-                              "prose prose-sm sm:prose lg:prose-lg xl:prose-xl focus:outline-none",
-                          },
-                        }}
-                      />
+
+            {/* アシスタントメッセージ群表示 - 既存のscroll_area構造を使用 */}
+            {assistantMsgs.length > 0 && (
+              <div className="scroll_area">
+                {assistantMsgs.map((response, responseIndex) => {
+                  const isLlmGenerating = response.ui?.isGenerating ?? false;
+                  const isSelected = response.ui?.isSelected ?? false;
+                  const displayState = getResponseDisplayState(
+                    response,
+                    assistantMsgs
+                  );
+                  const selectionIcon = getSelectionIcon(
+                    response.id,
+                    assistantMsgs
+                  );
+
+                  return (
+                    <div
+                      key={response.id}
+                      className={`response ${displayState} ${
+                        isLlmGenerating ? "generating" : ""
+                      }`}
+                    >
+                      <div className="meta">
+                        <span>{response.ui?.modelId || "Assistant"}</span>
+                        <div className="response-controls">
+                          {!isLlmGenerating && !readOnly && (
+                            <button
+                              onClick={() => {
+                                if (regenerateAssistantResponse) {
+                                  regenerateAssistantResponse(response.id);
+                                }
+                              }}
+                              className="regenerate-button"
+                              aria-label="Regenerate response"
+                              title="レスポンスを再生成"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M15.325 4.302a.75.75 0 010 1.06l-1.06 1.06a6.5 6.5 0 11-8.392 9.286.75.75 0 11-1.06-1.06A8 8 0 1015.325 4.302zm-.954 8.467a.75.75 0 01-1.06 0L10 9.439l-3.31 3.33a.75.75 0 11-1.06-1.06l3.84-3.838a.75.75 0 011.06 0l3.84 3.838a.75.75 0 010 1.06z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            </button>
+                          )}
+                          {!isLlmGenerating && (
+                            <button
+                              onClick={() => {
+                                if (updateAssistantMessageSelection) {
+                                  updateAssistantMessageSelection(
+                                    response.id,
+                                    !isSelected
+                                  );
+                                }
+                              }}
+                              className={`response-select ${
+                                isSelected ? "selected" : ""
+                              }`}
+                              aria-label={isSelected ? "Deselect" : "Select"}
+                              title={isSelected ? "選択を解除" : "選択"}
+                            >
+                              <span className="checkbox-icon">
+                                {selectionIcon}
+                              </span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="response-content">
+                        <MarkdownTipTapEditor
+                          value={(response.content as string) || ""}
+                          onChange={(newMarkdown) => {
+                            if (response.id) {
+                              updateAssistantMessageContent(
+                                response.id,
+                                newMarkdown
+                              );
+                            }
+                          }}
+                          editable={!isLlmGenerating && !readOnly}
+                          editorProps={{
+                            attributes: {
+                              class: "prose prose-sm focus:outline-none",
+                            },
+                          }}
+                          className={`ai-response-tiptap ${
+                            readOnly ? "is-readonly" : ""
+                          }`}
+                        />
+                      </div>
+                      {isLlmGenerating && (
+                        <div className="generating-indicator">
+                          <svg
+                            className="spinner"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            ></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            ></path>
+                          </svg>
+                          生成中...
+                        </div>
+                      )}
                     </div>
-                    {!isLlmGenerating && (
-                      <div className="response-actions">
-                        <button
-                          onClick={() =>
-                            handleSelectResponse(
-                              virtualRow.index,
-                              responseIndex
-                            )
-                          }
-                          className="action-button select-button"
-                          aria-label={response.selected ? "Deselect" : "Select"}
-                        >
-                          {response.selected ? "☑️" : "☐"}
-                        </button>
-                        {/* 以下のアクションボタンはInputSection内に移動・統合検討 */}
-                      </div>
-                    )}
-                    {isLlmGenerating && (
-                      <div className="generating-indicator">
-                        🌀 Generating...
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })}
-    </div> // ここが追加された閉じタグ
+    </>
   );
 }
+
+// 型定義 Message の user を string に修正（Markdown文字列を直接格納するため）
+// 元の型: user: MessageContent[];
+// これは useChatLogic.ts の Message 型定義とも整合性を取る必要がある。
+// useChatLogic.ts では user は string になっているため、ここも合わせる。
+
+// ResponsesProps のコメントアウトを修正
+// interface ResponsesProps {
+//   readOnly?: boolean;
+// }

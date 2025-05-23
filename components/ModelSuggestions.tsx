@@ -33,12 +33,12 @@ export default function ModelSuggestions({
   const listRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
-    if (show && inputValue) {
-      fetchSuggestions(inputValue.replace(/^@/, "").trim());
-    } else if (!show) {
+    if (!show || !inputValue.trim()) {
       setSuggestions([]);
       setActiveSuggestionIndex(-1);
+      return;
     }
+    fetchSuggestions(inputValue.replace(/^@/, "").trim());
   }, [inputValue, show]);
 
   const fetchSuggestions = async (query: string) => {
@@ -153,20 +153,20 @@ export default function ModelSuggestions({
     }
   }, [activeSuggestionIndex]);
 
-  if (!show || suggestions.length === 0 || !cursorRect) {
+  if (!show || !parentRef?.current) {
     return null;
   }
 
   const calculatePosition = () => {
-    if (!cursorRect || !parentRef?.current) {
-      return { top: "auto", left: "auto" };
+    if (!parentRef?.current) {
+      return { top: "auto", left: "auto", width: "auto" };
     }
     const parentRect = parentRef.current.getBoundingClientRect();
-    // カーソルの下端を親要素の左上からの相対位置に変換
-    const top = cursorRect.bottom - parentRect.top;
-    // カーソルの左端を親要素の左上からの相対位置に変換
-    const left = cursorRect.left - parentRect.left;
-    return { top: `${top}px`, left: `${left}px` };
+    const top = parentRef.current.offsetHeight;
+    const left = 0;
+    const width = parentRef.current.offsetWidth;
+
+    return { top: `${top}px`, left: `${left}px`, width: `${width}px` };
   };
 
   return (

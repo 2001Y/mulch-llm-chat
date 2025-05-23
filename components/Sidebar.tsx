@@ -13,8 +13,8 @@ export default function Sidebar() {
         (key) =>
           key.startsWith("chatMessages_") &&
           key !== "chatMessages_default" &&
-          (storage.get(key) || []).some((msg: any) =>
-            msg.user?.some((u: any) => u.text?.trim())
+          (storage.get(key) || []).some(
+            (msg: any) => typeof msg.user === "string" && msg.user.trim() !== ""
           )
       );
       setHasChats(chatKeys.length > 0);

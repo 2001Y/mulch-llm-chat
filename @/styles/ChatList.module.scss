@@ -1,0 +1,40 @@
+.skeletonItem {
+  background-color: rgba(255, 255, 255, 0.05);
+  cursor: default;
+  pointer-events: none;
+
+  .skeletonContent {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    width: 100%;
+  }
+
+  .skeletonTextShort,
+  .skeletonTextLong {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    height: 0.8em;
+    animation: pulse 1.5s infinite ease-in-out;
+  }
+
+  .skeletonTextShort {
+    width: 60%;
+  }
+
+  .skeletonTextLong {
+    width: 90%;
+  }
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}

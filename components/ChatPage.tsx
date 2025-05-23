@@ -43,8 +43,9 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
             const item = localStorage.getItem(key);
             if (item && item !== "undefined") {
               try {
-                return (JSON.parse(item) || []).some((msg: any) =>
-                  msg.user?.some((u: any) => u.text?.trim())
+                return (JSON.parse(item) || []).some(
+                  (msg: any) =>
+                    typeof msg.user === "string" && msg.user.trim() !== ""
                 );
               } catch (e) {
                 console.error(`Failed to parse localStorage item ${key}:`, e);
@@ -93,45 +94,28 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
     error
   );
 
-  if (!initialLoadComplete && !error) {
-    console.log("[DEBUG ChatPage] Rendering Loading State");
-    return (
-      <>
-        <Header />
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>
-            {isSharedView
-              ? "共有チャットを読み込み中..."
-              : "チャットを読み込み中..."}
-          </p>
-        </div>
-        <SettingsModal />
-      </>
+  // メッセージの詳細ログを追加
+  if (messages && messages.length > 0) {
+    console.log("[DEBUG ChatPage] Current messages count:", messages.length);
+    console.log(
+      "[DEBUG ChatPage] Messages content:",
+      JSON.stringify(messages, null, 2)
     );
+  } else {
+    console.log("[DEBUG ChatPage] No messages available to display");
   }
 
-  if (error) {
-    console.log("[DEBUG ChatPage] Rendering Error State. Error:", error);
-    return (
-      <>
-        <Header />
-        <div className="error-container">
-          <p className="error-message">{error}</p>
-          {isSharedView && (
-            <p>
-              このチャットは削除されたか、アクセス権限がない可能性があります。
-            </p>
-          )}
-        </div>
-        <SettingsModal />
-      </>
-    );
-  }
+  // メッセージがある場合はチャット画面を表示するよう修正
+  const isInitialScreen =
+    !roomId && !isSharedView && (!messages || messages.length === 0);
+  console.log(
+    "[DEBUG ChatPage] isInitialScreen:",
+    isInitialScreen,
+    "messages.length:",
+    messages?.length || 0
+  );
 
-  const isInitialScreen = !roomId && !isSharedView;
-
-  if (isInitialScreen && initialLoadComplete) {
+  if (isInitialScreen) {
     console.log("[DEBUG ChatPage] Rendering initial screen");
     return (
       <>
@@ -148,8 +132,17 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
           setChatInput={setChatInput}
           isEditMode={false}
           messageIndex={0}
-          handleResetAndRegenerate={() => {}}
-          handleSaveOnly={() => {}}
+          handleResetAndRegenerate={async (
+            messageId: string,
+            newContent: string
+          ) => {
+            console.warn(
+              "handleResetAndRegenerate called on initial screen input."
+            );
+          }}
+          handleSaveOnly={(messageId: string, newContent: string) => {
+            console.warn("handleSaveOnly called on initial screen input.");
+          }}
           isInitialScreen={true}
           handleStopAllGeneration={handleStopAllGeneration}
           isGenerating={isGenerating}
@@ -159,25 +152,31 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
     );
   }
 
-  if ((roomId || isSharedView) && initialLoadComplete) {
-    console.log("[DEBUG ChatPage] Rendering chat screen.");
+  // roomIdがあるか、メッセージがある場合はチャット画面を表示するよう修正
+  if (roomId || isSharedView || (messages && messages.length > 0)) {
+    console.log(
+      "[DEBUG ChatPage] Rendering chat screen. Messages count:",
+      messages.length
+    );
     return (
       <>
         <Header />
-        <SettingsModal />
-        <ChatResponses readOnly={isSharedView} />
+        <div className="responses-container" id="responses-container">
+          <ChatResponses readOnly={isSharedView} />
+        </div>
         <InputSection
           mainInput={true}
           chatInput={chatInput}
           setChatInput={setChatInput}
           isEditMode={false}
-          messageIndex={messages.length}
+          messageIndex={0}
           handleResetAndRegenerate={handleResetAndRegenerate}
           handleSaveOnly={handleSaveOnly}
           isInitialScreen={false}
           handleStopAllGeneration={handleStopAllGeneration}
           isGenerating={isGenerating}
         />
+        <SettingsModal />
       </>
     );
   }

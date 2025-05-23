@@ -52,10 +52,33 @@ export async function GET(request: NextRequest) {
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.json();
       console.error("Failed to fetch access token from GitHub:", errorData);
-      return NextResponse.json(
-        { error: "Failed to obtain access token", details: errorData },
-        { status: tokenResponse.status }
-      );
+      // エラー時も親ウィンドウに通知
+      const htmlResponse = `
+        <html>
+          <head><title>OAuth Error</title></head>
+          <body>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({
+                  type: 'github_oauth_error',
+                  error: 'Failed to obtain access token',
+                  details: '${JSON.stringify(
+                    errorData.error_description ||
+                      errorData.error ||
+                      "Unknown GitHub error"
+                  )}'
+                }, '*');
+              }
+              window.close();
+            </script>
+            <p>Error: Failed to obtain access token. This window should close automatically.</p>
+          </body>
+        </html>
+      `;
+      return new NextResponse(htmlResponse, {
+        status: tokenResponse.status, // GitHubからのステータスをそのまま使う
+        headers: { "Content-Type": "text/html" },
+      });
     }
 
     const tokenData = await tokenResponse.json();

@@ -103,65 +103,94 @@ export default function useStorageState<V = any>(
     if (typeof window === "undefined" || key === undefined) {
       return (defaultValues as any)[key || ""] || undefined;
     }
-    const storedData = storage.get(key);
-    return storedData !== undefined
-      ? storedData
-      : (defaultValues as any)[key] || undefined;
+
+    let initialValue: V | undefined;
+    if (key === "models") {
+      const hasToken = !!getAccessToken();
+      const storageKey = `${key}_${hasToken ? "login" : "noLogin"}`;
+      initialValue = storage.get(storageKey) as V | undefined;
+      if (initialValue === undefined) {
+        // 動的キーで取得できなかった場合、localStorage.jsonのトップレベル"models"から取得試行
+        const defaultModelsObject = (defaultValues as any)[key];
+        if (defaultModelsObject && typeof defaultModelsObject === "object") {
+          initialValue = (
+            hasToken ? defaultModelsObject.login : defaultModelsObject.noLogin
+          ) as V | undefined;
+        }
+      }
+    } else {
+      initialValue = storage.get(key) as V | undefined;
+    }
+
+    return initialValue !== undefined
+      ? initialValue
+      : (defaultValues as any)[key] || undefined; // 通常のキーでのデフォルト値フォールバック
   });
 
   useEffect(() => {
     if (typeof window === "undefined" || key === undefined) return;
 
+    // models の場合はアクセストークンの変更を監視して再読み込み
     if (key === "models") {
-      const hasToken = !!getAccessToken();
-      const storageKey = `${key}_${hasToken ? "login" : "noLogin"}`;
-      const data = storage.get(storageKey);
-      setStoredValue(data);
-
       const handleTokenChange = () => {
-        const newHasToken = !!getAccessToken();
-        const newStorageKey = `${key}_${newHasToken ? "login" : "noLogin"}`;
-        const newData = storage.get(newStorageKey);
+        const hasToken = !!getAccessToken();
+        const storageKey = `${key}_${hasToken ? "login" : "noLogin"}`;
+        let newData = storage.get(storageKey) as V | undefined;
+        if (newData === undefined) {
+          const defaultModelsObject = (defaultValues as any)[key];
+          if (defaultModelsObject && typeof defaultModelsObject === "object") {
+            newData = (
+              hasToken ? defaultModelsObject.login : defaultModelsObject.noLogin
+            ) as V | undefined;
+          }
+        }
         setStoredValue(newData);
       };
 
-      window.addEventListener("storage", (e) => {
-        if (e.key === "accessToken") {
-          handleTokenChange();
-        }
-      });
-      window.addEventListener("tokenChange", handleTokenChange);
+      // storageイベントは他のタブでの変更を検知するが、accessTokenの変更は別イベントで検知
+      // window.addEventListener("storage", (e) => { ... });
+      window.addEventListener("tokenChange", handleTokenChange); // accessToken変更時に再読み込み
+      // 初期ロード時にも一度実行 (useStateの初期化後、トークン状態が確定してから)
+      handleTokenChange();
 
       return () => {
-        window.removeEventListener("storage", handleTokenChange);
         window.removeEventListener("tokenChange", handleTokenChange);
       };
     } else {
+      // その他のキーは通常のstorageイベントを監視
       const handleStorageChange = (e: StorageEvent) => {
         if (e.key === key) {
           const newValue = e.newValue ? JSON.parse(e.newValue) : undefined;
-          setStoredValue(newValue);
+          setStoredValue(newValue as V | undefined);
         }
       };
-
       window.addEventListener("storage", handleStorageChange);
       return () => {
         window.removeEventListener("storage", handleStorageChange);
       };
     }
-  }, [key]);
+  }, [key]); // 依存配列は key のみで良い (handleTokenChangeは内部で最新のtokenを取得するため)
 
   const setValue = useCallback(
     (value: V | undefined) => {
       if (typeof window === "undefined" || key === undefined) return;
 
+      let storageKeyToSet = key;
+      if (key === "models") {
+        const hasToken = !!getAccessToken();
+        storageKeyToSet = `${key}_${hasToken ? "login" : "noLogin"}`;
+      }
+
       if (value === undefined) {
-        storage.remove(key as string);
+        storage.remove(storageKeyToSet as string);
         setStoredValue(undefined);
         return;
       }
-      setStoredValue(value);
-      storage.set(key as string, value);
+      setStoredValue(value); // コンポーネントのstateを更新
+      storage.set(storageKeyToSet as string, value); // ローカルストレージを更新
+
+      // modelsが更新されたら、useChatLogic側で再読み込みを促すイベントを発行しても良いかもしれない
+      // if (key === "models") window.dispatchEvent(new Event("modelsUpdated"));
     },
     [key]
   );

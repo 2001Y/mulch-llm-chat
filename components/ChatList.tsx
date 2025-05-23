@@ -28,6 +28,7 @@ export default function ChatList() {
   const [selectedChatForSharing, setSelectedChatForSharing] = useState<
     string | null
   >(null);
+  const [isLoadingChats, setIsLoadingChats] = useState(true);
 
   const clearUrlQuery = useCallback(() => {
     const newUrl = pathname;
@@ -71,6 +72,7 @@ export default function ChatList() {
 
   useEffect(() => {
     const loadChats = () => {
+      setIsLoadingChats(true);
       const chatItems: ChatItem[] = [];
       chatIds.forEach((chatId) => {
         const key = `chatMessages_${chatId}`;
@@ -97,6 +99,7 @@ export default function ChatList() {
         }
       });
       setChats(chatItems.sort((a, b) => b.timestamp - a.timestamp));
+      setIsLoadingChats(false);
     };
     loadChats();
   }, [chatIds]);
@@ -150,21 +153,63 @@ export default function ChatList() {
         alert(`チャットを共有しました: ${result.url}`);
         navigator.clipboard.writeText(result.url).catch(console.error);
       } else {
-        alert(`エラー: ${result.message || "不明なエラー"}`);
+        if (result.reauthRequired) {
+          setSelectedChatForSharing(chatId);
+          setShowGistModal(true);
+          console.warn(
+            "GitHub認証が必要です。モーダルを表示します。",
+            result.message
+          );
+        } else {
+          alert(`共有エラー: ${result.message || "不明なエラー"}`);
+        }
       }
     } catch (error) {
-      console.error("共有中にエラーが発生しました:", error);
-      alert("共有中にエラーが発生しました");
+      console.error("共有中に予期せぬエラーが発生しました:", error);
+      alert("共有中に予期せぬエラーが発生しました");
     }
-
     setActiveMenu(null);
   };
 
   const handleGistConnectSuccess = () => {
+    setShowGistModal(false);
     if (selectedChatForSharing) {
+      console.log(
+        "OAuth成功後、再度共有処理を実行します。",
+        selectedChatForSharing
+      );
       shareChat(selectedChatForSharing);
     }
   };
+
+  if (isLoadingChats && chatIds.length > 0) {
+    return (
+      <div className={styles.chatList}>
+        <Link
+          href="/"
+          className={styles.newChatButton}
+          onClick={(e) => {
+            e.preventDefault();
+            navigateWithTransition(router, "/");
+          }}
+        >
+          Start New Chat
+          <span className={styles.shortcut}>⌘N</span>
+        </Link>
+        {Array.from({ length: Math.min(chatIds.length, 5) }).map((_, index) => (
+          <div
+            key={`skeleton-${index}`}
+            className={`${styles.chatItem} ${styles.skeletonItem}`}
+          >
+            <div className={styles.skeletonContent}>
+              <div className={styles.skeletonTextShort}></div>
+              <div className={styles.skeletonTextLong}></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <>

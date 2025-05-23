@@ -9,13 +9,19 @@ export default function useAccessToken() {
   useEffect(() => {
     if (accessToken !== previousAccessToken) {
       setPreviousAccessToken(accessToken);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("tokenChange", { detail: { accessToken } })
+        );
+        console.log("[useAccessToken] Dispatched tokenChange event.");
+      }
     }
   }, [accessToken, previousAccessToken]);
 
   const isDevelopment = process.env.NODE_ENV === "development";
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
+    if (typeof window === "undefined") {
       return; // Skip on server-side rendering
     }
 
@@ -53,7 +59,7 @@ export default function useAccessToken() {
     }
 
     const isVercelPreview = window.location.hostname.includes("vercel.app");
-    
+
     if (ssnb || isDevelopment || isVercelPreview) {
       const newAccessToken = process.env.NEXT_PUBLIC_SSNB;
       if (typeof newAccessToken === "string") {

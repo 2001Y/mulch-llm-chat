@@ -1,12 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-// import { storage } from "../hooks/useLocalStorage"; // storageはここでは不要になる
 
 interface GistConnectionModalProps {
   closeModal: () => void;
-  // onSuccess はGitHub OAuthフローが完了し、トークンが親コンポーネントで
-  // localStorageに保存された後に呼び出される想定に変更
   onSuccess: () => void;
 }
 
@@ -45,14 +42,6 @@ export default function GistConnectionModal({
       setIsLoading(false);
       return;
     }
-
-    // モーダルを先に閉じる (ユーザー体験向上のため)
-    // closeModal(); // OAuth開始時にモーダルを閉じるか、完了後に閉じるかは検討。
-    // 一旦、完了後に閉じる前提で進める。
-
-    // window.postMessage をリッスンする処理は ChatList.tsx (または呼び出し元) に移動
-    // ここでは、ウィンドウが閉じたことを検知してローディングを解除する程度に留めるか、
-    // ChatList側で成功/失敗を検知してisLoadingを制御する
   };
 
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {

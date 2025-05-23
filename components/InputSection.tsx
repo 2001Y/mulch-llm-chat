@@ -7,24 +7,26 @@ import React, {
 } from "react";
 import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
-import { storage } from "hooks/useLocalStorage";
-import Image from "next/image";
 import { useParams } from "next/navigation";
 import MarkdownTipTapEditor, { EditorHandle } from "./MarkdownTipTapEditor";
-import { Editor } from "@tiptap/core";
 import { EditorProps as TiptapEditorProps, EditorView } from "@tiptap/pm/view";
-import type { Message, ModelItem } from "hooks/useChatLogic";
+import type { AppMessage } from "types/chat";
+import type { ModelItem } from "hooks/useChatLogic";
 import useStorageState from "hooks/useLocalStorage";
 import { useChatLogicContext } from "contexts/ChatLogicContext";
+import InlineModelSelector from "./InlineModelSelector";
 
 interface Props {
   mainInput: boolean;
   chatInput: string;
   setChatInput: React.Dispatch<React.SetStateAction<string>>;
   isEditMode: boolean;
-  messageIndex: number;
-  handleResetAndRegenerate: (messageIndex: number) => void;
-  handleSaveOnly: (messageIndex: number) => void;
+  messageId: string;
+  handleResetAndRegenerate: (
+    messageId: string,
+    newContent: string
+  ) => Promise<void>;
+  handleSaveOnly: (messageId: string, newContent: string) => void;
   isInitialScreen: boolean;
   handleStopAllGeneration: () => void;
   isGenerating: boolean;
@@ -34,10 +36,12 @@ const SubmitButton = ({
   isPrimaryOnly,
   models,
   isInputEmpty,
+  isModelsLoaded,
 }: {
   isPrimaryOnly: boolean;
   models: ModelItem[] | undefined;
   isInputEmpty: () => boolean;
+  isModelsLoaded: boolean;
 }) => {
   const { pending } = useFormStatus();
 
@@ -75,13 +79,17 @@ const SubmitButton = ({
             <>
               Send to{" "}
               <code>
-                {(Array.isArray(models) &&
-                  models
-                    ?.find((model) => model.selected)
-                    ?.name.split("/")[1]) ||
-                  "model"}
+                {(() => {
+                  if (!isModelsLoaded || !Array.isArray(models)) return "model";
+                  const selectedModel = models.find((model) => model.selected);
+                  if (!selectedModel || typeof selectedModel.name !== "string")
+                    return "model";
+                  return selectedModel.name.includes("/")
+                    ? selectedModel.name.split("/")[1]
+                    : selectedModel.name;
+                })()}
               </code>
-              <span className="shortcut">⌘⏎</span>
+              <span className="shortcut">⌘⇧⏎</span>
             </>
           )}
         </span>
@@ -118,7 +126,7 @@ const SubmitButton = ({
         )}
         <span>
           {pending ? "Sending..." : "Send"}
-          {!pending && <span className="shortcut">⏎</span>}
+          {!pending && <span className="shortcut">⌘⏎</span>}
         </span>
       </button>
     );
@@ -130,36 +138,42 @@ export default function InputSection({
   chatInput,
   setChatInput,
   isEditMode,
-  messageIndex,
+  messageId,
   handleResetAndRegenerate,
   handleSaveOnly,
   isInitialScreen,
   handleStopAllGeneration,
   isGenerating,
 }: Props) {
-  const [models, setModels] = useStorageState<ModelItem[] | undefined>(
-    "models"
-  );
   const {
     AllModels,
     selectSingleModel,
     handleSend: originalHandleSend,
     isGenerating: contextIsGenerating,
+    setSelectedModelIds,
+    updateModels,
+    models,
   } = useChatLogicContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const [isEdited, setIsEdited] = useState(false);
   const params = useParams();
   const roomId = params?.id as string | undefined;
-  const [storedMessages] = useStorageState<Message[] | undefined>(
+  const [storedMessages] = useStorageState<AppMessage[] | undefined>(
     roomId ? `chatMessages_${roomId}` : undefined
   );
   const tiptapEditorRef = useRef<EditorHandle>(null);
+  const [showModelSelectionAndButtonName, setShowModelSelectionAndButtonName] =
+    useState(false);
+
+  useEffect(() => {
+    setShowModelSelectionAndButtonName(true);
+  }, []);
 
   const aiModelSuggestionsForTiptap = useMemo(() => {
     return (AllModels || []).map((model) => ({
-      id: model.fullId,
-      label: model.shortId || model.fullId,
+      id: model.id,
+      label: model.name || model.id,
     }));
   }, [AllModels]);
 
@@ -167,30 +181,19 @@ export default function InputSection({
     setChatInput(markdown);
   };
 
-  const handleModelSelect = (modelName: string) => {
-    const editor = tiptapEditorRef.current?.getEditorInstance();
-    const wasFocused = !!editor?.isFocused;
-    setModels(
-      (models ?? []).map((model) => ({
-        name: model.name,
-        selected: model.name === modelName ? !model.selected : model.selected,
-      }))
-    );
-    if (wasFocused) {
-      setTimeout(() => editor?.commands.focus(), 0);
-    }
-  };
-
   const originalMessageMarkdown: string | null = useMemo(() => {
-    if (
-      storedMessages &&
-      messageIndex >= 0 &&
-      messageIndex < storedMessages.length
-    ) {
-      return storedMessages[messageIndex].user;
+    if (storedMessages && messageId) {
+      const message = storedMessages.find((msg) => msg.id === messageId);
+      if (
+        message &&
+        message.role === "user" &&
+        typeof message.content === "string"
+      ) {
+        return message.content;
+      }
     }
     return null;
-  }, [storedMessages, messageIndex]);
+  }, [storedMessages, messageId]);
 
   useEffect(() => {
     if (mainInput && tiptapEditorRef.current) {
@@ -209,14 +212,115 @@ export default function InputSection({
   const editorPropsForTiptap: TiptapEditorProps = {
     handleKeyDown: (view: EditorView, event: KeyboardEvent): boolean => {
       if (event.isComposing) return false;
-      if (event.key === "Enter" && !event.shiftKey && !isGenerating) {
+
+      // Ctrl+Shift+Enter (Cmd+Shift+Enter): プライマリモデル単一送信
+      if (
+        event.key === "Enter" &&
+        (event.metaKey || event.ctrlKey) &&
+        event.shiftKey &&
+        !isGenerating
+      ) {
         event.preventDefault();
-        const form = view.dom.closest("form");
-        if (form) {
-          form.requestSubmit();
+
+        // 編集モードの場合は編集内容を新規メッセージとして送信
+        if (isEditMode && isEdited) {
+          // 編集内容をそのまま新規メッセージとして送信
+          const form = view.dom.closest("form");
+          if (form) {
+            // プライマリモデル送信用のhidden inputを追加
+            const submitTypeInput = document.createElement("input");
+            submitTypeInput.type = "hidden";
+            submitTypeInput.name = "submitType";
+            submitTypeInput.value = "primary";
+            form.appendChild(submitTypeInput);
+            form.requestSubmit();
+            form.removeChild(submitTypeInput);
+          }
+          return true;
+        }
+
+        // 新規メッセージの場合はプライマリモデル送信
+        if (!isEditMode) {
+          const form = view.dom.closest("form");
+          if (form) {
+            // プライマリモデル送信用のhidden inputを追加
+            const submitTypeInput = document.createElement("input");
+            submitTypeInput.type = "hidden";
+            submitTypeInput.name = "submitType";
+            submitTypeInput.value = "primary";
+            form.appendChild(submitTypeInput);
+            form.requestSubmit();
+            form.removeChild(submitTypeInput);
+          }
         }
         return true;
       }
+
+      // Ctrl+Enter (Cmd+Enter): 複数モデル送信
+      if (
+        event.key === "Enter" &&
+        (event.metaKey || event.ctrlKey) &&
+        !event.shiftKey &&
+        !isGenerating
+      ) {
+        event.preventDefault();
+
+        // 編集モードの場合は編集内容を新規メッセージとして送信
+        if (isEditMode && isEdited) {
+          // 編集内容をそのまま新規メッセージとして送信
+          const form = view.dom.closest("form");
+          if (form) {
+            // 複数モデル送信用のhidden inputを追加
+            const submitTypeInput = document.createElement("input");
+            submitTypeInput.type = "hidden";
+            submitTypeInput.name = "submitType";
+            submitTypeInput.value = "normal";
+            form.appendChild(submitTypeInput);
+            form.requestSubmit();
+            form.removeChild(submitTypeInput);
+          }
+          return true;
+        }
+
+        // 新規メッセージの場合は複数モデル送信
+        if (!isEditMode) {
+          const form = view.dom.closest("form");
+          if (form) {
+            // 複数モデル送信用のhidden inputを追加
+            const submitTypeInput = document.createElement("input");
+            submitTypeInput.type = "hidden";
+            submitTypeInput.name = "submitType";
+            submitTypeInput.value = "normal";
+            form.appendChild(submitTypeInput);
+            form.requestSubmit();
+            form.removeChild(submitTypeInput);
+          }
+        }
+        return true;
+      }
+
+      // Enter: 段落替え（デフォルトのTiptap動作を許可）
+      if (
+        event.key === "Enter" &&
+        !event.shiftKey &&
+        !event.metaKey &&
+        !event.ctrlKey
+      ) {
+        // デフォルトのTiptap段落替え動作を許可
+        return false;
+      }
+
+      // Shift+Enter: 改行（デフォルトのTiptap動作を許可）
+      if (
+        event.key === "Enter" &&
+        event.shiftKey &&
+        !event.metaKey &&
+        !event.ctrlKey
+      ) {
+        // デフォルトのTiptap改行動作を許可
+        return false;
+      }
+
       if (event.key === "Backspace" && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
         handleStopAllGeneration();
@@ -271,17 +375,78 @@ export default function InputSection({
 
     if (!submittedChatInput || !submittedChatInput.trim()) return;
 
-    const isPrimaryOnly = submitType === "primary";
+    // プライマリ送信の場合、元のモデル選択状態をバックアップ
+    let originalModelState: ModelItem[] | undefined;
 
     try {
-      await originalHandleSend(isPrimaryOnly, submittedChatInput);
+      console.log(
+        "[InputSection] submitAction - submittedChatInput:",
+        submittedChatInput,
+        "submitType:",
+        submitType
+      );
+
+      // 編集モードの場合は、submitTypeに応じて適切な処理を選択
+      if (isEditMode && messageId) {
+        console.log(
+          "[InputSection] Edit mode detected, submitType:",
+          submitType
+        );
+
+        // プライマリモデル送信の場合、選択されたモデルのうち最初のものを単一選択
+        if (submitType === "primary" && models && models.length > 0) {
+          const selectedModel = models.find((m) => m.selected);
+          if (selectedModel) {
+            console.log(
+              "[InputSection] Setting single model for primary send:",
+              selectedModel.id
+            );
+            // 元の状態をバックアップ
+            originalModelState = [...models];
+            // 一時的にプライマリモデルのみを選択
+            selectSingleModel(selectedModel.id);
+          }
+        }
+
+        // 古いメッセージを削除してから新規送信
+        if (handleResetAndRegenerate) {
+          await handleResetAndRegenerate(messageId, submittedChatInput);
+        }
+      }
+
+      // 新規メッセージの場合
+      if (!isEditMode) {
+        // プライマリモデル送信の場合
+        if (submitType === "primary" && models && models.length > 0) {
+          const selectedModel = models.find((m) => m.selected);
+          if (selectedModel) {
+            console.log(
+              "[InputSection] Setting single model for primary send:",
+              selectedModel.id
+            );
+            // 元の状態をバックアップ
+            originalModelState = [...models];
+            // 一時的にプライマリモデルのみを選択
+            selectSingleModel(selectedModel.id);
+          }
+        }
+
+        // 通常の送信処理
+        await originalHandleSend(submittedChatInput);
+      }
     } catch (error: any) {
       console.error("Error during submitAction:", error);
       toast.error(
         "Failed to send message: " + (error?.message || "Unknown error")
       );
+    } finally {
+      // プライマリ送信後、元のモデル選択状態を復元
+      if (originalModelState && submitType === "primary") {
+        console.log("[InputSection] Restoring original model selection state");
+        updateModels(originalModelState);
+      }
+      setChatInput("");
     }
-    setChatInput("");
   };
 
   return (
@@ -293,75 +458,56 @@ export default function InputSection({
         ref={sectionRef}
       >
         <input type="hidden" name="chatInput" value={chatInput} />
-        <div className="input-container chat-input-area">
-          <div
-            className="add-files-container"
-            style={{
-              marginBottom: "0.5em",
-              display: "flex",
-              justifyContent: "flex-end",
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="action-button add-files-button icon-button"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-              </svg>
-              <span>Add files</span>
-            </button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleImageSelect}
-              accept="image/png,image/jpeg,image/webp"
-              style={{ display: "none" }}
-              multiple
-            />
-          </div>
-          <MarkdownTipTapEditor
-            ref={tiptapEditorRef}
-            value={chatInput}
-            onChange={handleTiptapChange}
-            editable={!isGenerating}
-            editorProps={editorPropsForTiptap}
-            className="chat-tiptap-editor"
-            aiModelSuggestions={aiModelSuggestionsForTiptap}
-            onSelectAiModel={selectSingleModel}
-          />
-        </div>
 
-        <div className="input-container model-select-area">
-          {Array.isArray(models) &&
-            models?.map((model, idx) => (
-              <div className="model-radio" key={model.name}>
-                <input
-                  type="checkbox"
-                  id={`model-${idx}`}
-                  value={model.name}
-                  checked={model.selected}
-                  onChange={() => handleModelSelect(model.name)}
-                />
-                <label htmlFor={`model-${idx}`}>
-                  {model.name.split("/")[1]}
-                </label>
-              </div>
-            ))}
-        </div>
+        {/* インラインモデル選択UI */}
+        <InlineModelSelector
+          models={models || []}
+          allModels={AllModels || []}
+          onUpdateModels={updateModels}
+          className="chat-model-selector"
+        />
+
+        <MarkdownTipTapEditor
+          ref={tiptapEditorRef}
+          value={chatInput}
+          onChange={handleTiptapChange}
+          editable={!isGenerating}
+          editorProps={editorPropsForTiptap}
+          className="input-container chat-input-area chat-tiptap-editor"
+          aiModelSuggestions={aiModelSuggestionsForTiptap}
+          onSelectAiModel={selectSingleModel}
+        />
 
         <div className="input-container input-actions">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="action-button add-files-button icon-button"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+            </svg>
+            <span>Add files</span>
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImageSelect}
+            accept="image/png,image/jpeg,image/webp"
+            style={{ display: "none" }}
+            multiple
+          />
+
           {isGenerating ? (
             <button
               type="button"
@@ -384,72 +530,18 @@ export default function InputSection({
             </button>
           ) : (
             <>
-              {isEditMode && isEdited ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => handleResetAndRegenerate(messageIndex)}
-                    className="action-button reset-regenerate-button icon-button"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
-                    </svg>
-                    <span>
-                      ReGenerate<span className="shortcut">⏎</span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSaveOnly(messageIndex)}
-                    className="action-button save-only-button icon-button"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                      <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                      <polyline points="7 3 7 8 15 8"></polyline>
-                    </svg>
-                    <span>Save Only</span>
-                  </button>
-                </>
-              ) : (
-                !isEditMode && (
-                  <>
-                    <SubmitButton
-                      isPrimaryOnly={false}
-                      models={models}
-                      isInputEmpty={isInputEmpty}
-                    />
-                    <SubmitButton
-                      isPrimaryOnly={true}
-                      models={models}
-                      isInputEmpty={isInputEmpty}
-                    />
-                  </>
-                )
-              )}
-              <span className="line-break shortcut-area">
-                Line break<span className="shortcut">⇧⏎</span>
-              </span>
+              <SubmitButton
+                isPrimaryOnly={true}
+                models={models}
+                isInputEmpty={isInputEmpty}
+                isModelsLoaded={showModelSelectionAndButtonName}
+              />
+              <SubmitButton
+                isPrimaryOnly={false}
+                models={models}
+                isInputEmpty={isInputEmpty}
+                isModelsLoaded={showModelSelectionAndButtonName}
+              />
             </>
           )}
         </div>

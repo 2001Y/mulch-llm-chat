@@ -23,18 +23,32 @@ interface OpenRouterModel {
 }
 
 export default function ModelInputModal() {
-  const { isModalOpen, handleCloseModal: closeModal } = useChatLogicContext();
+  // ChatLogicContextから必要な全てのプロパティを一度で取得
+  const {
+    isModalOpen,
+    handleCloseModal: closeModal,
+    models,
+    AllModels,
+    updateModels,
+    resetCurrentChat,
+  } = useChatLogicContext();
+
+  // API Keys State
+  const [openRouterApiKey, setOpenRouterApiKey] =
+    useStorageState<string>("openrouter_api_key");
+  const [tempOpenRouterApiKey, setTempOpenRouterApiKey] = useState<string>("");
 
   // デバッグ用ログの追加
   useEffect(() => {
     console.log("[DEBUG] SettingsModal - isModalOpen:", isModalOpen);
   }, [isModalOpen]);
 
-  const [storedModels, setStoredModels] = useStorageState("models");
-  const models: ModelItem[] = storedModels || [];
-  const setModels = (newModels: ModelItem[]) => {
-    setStoredModels(newModels);
-  };
+  // Load API key into temp state when modal opens
+  useEffect(() => {
+    if (isModalOpen) {
+      setTempOpenRouterApiKey(openRouterApiKey || "");
+    }
+  }, [isModalOpen, openRouterApiKey]);
 
   const [newModel, setNewModel] = useState<string>("");
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -44,9 +58,6 @@ export default function ModelInputModal() {
   const [editingModel, setEditingModel] = useState<string>("");
   const [editingToolDefinition, setEditingToolDefinition] = useState("");
   const [editingToolFunction, setEditingToolFunction] = useState("");
-  const [suggestions, setSuggestions] = useState<OpenRouterModel[]>([]);
-  const [activeSuggestionIndex, setActiveSuggestionIndex] =
-    useState<number>(-1);
   const [isFocused, setIsFocused] = useState(false);
 
   const dragItem = useRef<number | null>(null);
@@ -62,31 +73,11 @@ export default function ModelInputModal() {
 
   const [toolFunctions, setToolFunctions] = useStorageState("toolFunctions");
 
-  useEffect(() => {
-    if (newModel.length > 0) {
-      fetchSuggestions(newModel);
-    } else {
-      setSuggestions([]);
-    }
-  }, [newModel]);
-
-  const fetchSuggestions = async (query: string) => {
-    try {
-      const response = await fetch("https://openrouter.ai/api/v1/models");
-      const data = await response.json();
-      const filteredModels = data.data.filter((model: OpenRouterModel) =>
-        model.id.toLowerCase().includes(query.toLowerCase())
-      );
-      setSuggestions(filteredModels);
-    } catch (error) {
-      console.error("モデルの取得に失敗しました:", error);
-    }
-  };
-
   const handleSelectSuggestion = (modelId: string) => {
     setNewModel(modelId);
-    setSuggestions([]);
-    setActiveSuggestionIndex(-1);
+    if (newModelInputRef.current) {
+      newModelInputRef.current.focus();
+    }
   };
 
   const handleSubmit = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -100,10 +91,12 @@ export default function ModelInputModal() {
       newModel &&
       !currentModels.some((m: ModelItem) => m.name === newModel)
     ) {
-      setModels([...currentModels, { name: newModel, selected: true }]);
+      updateModels([
+        ...currentModels,
+        { id: newModel, name: newModel, selected: true },
+      ]);
       setNewModel("");
-      setSuggestions([]);
-      setActiveSuggestionIndex(-1);
+      setIsFocused(false);
     }
   };
 
@@ -138,10 +131,11 @@ export default function ModelInputModal() {
       const updatedModels = [...models];
       if (updatedModels[editingModelIndex]) {
         updatedModels[editingModelIndex] = {
+          id: editingModel,
           name: editingModel,
           selected: models[editingModelIndex].selected,
         };
-        setModels(updatedModels);
+        updateModels(updatedModels);
       }
       setEditingModelIndex(null);
       setEditingModel("");
@@ -154,7 +148,7 @@ export default function ModelInputModal() {
   };
 
   const handleDeleteModel = (modelToDelete: ModelItem) => {
-    setModels(
+    updateModels(
       models.filter((model: ModelItem) => model.name !== modelToDelete.name)
     );
   };
@@ -293,7 +287,7 @@ export default function ModelInputModal() {
       copyListItems.splice(dragOverItem.current, 0, draggedItemContent);
       dragItem.current = null;
       dragOverItem.current = null;
-      setModels(copyListItems);
+      updateModels(copyListItems);
     }
   };
 
@@ -301,6 +295,56 @@ export default function ModelInputModal() {
     if (event.key === "Enter") {
       event.preventDefault();
       handleAddModel();
+    }
+  };
+
+  const handleSaveApiKeys = () => {
+    console.log("[SettingsModal] Saving OpenRouter API Key...");
+    console.log("[SettingsModal] Key exists:", !!tempOpenRouterApiKey);
+    if (tempOpenRouterApiKey) {
+      // セキュリティのためマスク表示
+      const maskedKey = `${tempOpenRouterApiKey.substring(
+        0,
+        4
+      )}...${tempOpenRouterApiKey.substring(tempOpenRouterApiKey.length - 4)}`;
+      console.log(`[SettingsModal] Using masked key: ${maskedKey}`);
+    }
+
+    setOpenRouterApiKey(tempOpenRouterApiKey);
+
+    // 保存完了を表示
+    const saveSuccessMessage = document.createElement("div");
+    saveSuccessMessage.innerText = "APIキーを保存しました";
+    saveSuccessMessage.className = "save-success-message";
+    saveSuccessMessage.style.position = "absolute";
+    saveSuccessMessage.style.bottom = "10px";
+    saveSuccessMessage.style.left = "50%";
+    saveSuccessMessage.style.transform = "translateX(-50%)";
+    saveSuccessMessage.style.backgroundColor = "rgba(0, 255, 0, 0.2)";
+    saveSuccessMessage.style.color = "#00ff00";
+    saveSuccessMessage.style.padding = "8px 16px";
+    saveSuccessMessage.style.borderRadius = "4px";
+    saveSuccessMessage.style.zIndex = "9999";
+
+    document.body.appendChild(saveSuccessMessage);
+
+    // 3秒後に表示を消す
+    setTimeout(() => {
+      document.body.removeChild(saveSuccessMessage);
+    }, 3000);
+
+    console.log("[SettingsModal] OpenRouter API Key saved successfully.");
+  };
+
+  const handleResetChat = () => {
+    if (
+      window.confirm(
+        "現在のチャット履歴を本当にリセットしますか？この操作は元に戻せません。"
+      )
+    ) {
+      resetCurrentChat();
+      console.log("Chat has been reset by user.");
+      closeModal(); // リセット後にモーダルを閉じる
     }
   };
 
@@ -322,6 +366,70 @@ export default function ModelInputModal() {
               </span>
             </div>
             <div className="modal-content">
+              {/* API Keys Section */}
+              <h3>API Keys</h3>
+              <div className="api-keys-section settings-input-area">
+                <label htmlFor="openrouter-api-key">OpenRouter API Key:</label>
+                <input
+                  type="password" // APIキーなのでpasswordタイプを推奨
+                  id="openrouter-api-key"
+                  className="model-input" // 既存のスタイルを流用
+                  placeholder="sk-or-xxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  value={tempOpenRouterApiKey}
+                  onChange={(e) => setTempOpenRouterApiKey(e.target.value)}
+                />
+                <button onClick={handleSaveApiKeys} className="add-button">
+                  {" "}
+                  {/* スタイルはadd-buttonを流用 */}
+                  Save API Key
+                </button>
+              </div>
+
+              {/* Danger Zone - Chat Reset */}
+              <h3>Danger Zone</h3>
+              <div className="danger-zone-section settings-input-area">
+                <p
+                  style={{
+                    flexBasis: "100%",
+                    color: "rgba(255,255,255,0.7)",
+                    fontSize: "0.9em",
+                    marginBottom: "0.5em",
+                  }}
+                >
+                  現在のチャットスレッドの全メッセージ履歴をクリアします。この操作は取り消せません。
+                </p>
+                <button
+                  onClick={handleResetChat}
+                  className="delete-button"
+                  style={{
+                    backgroundColor: "rgba(255, 59, 48, 0.2)",
+                    color: "#ff3b30",
+                    borderColor: "rgba(255, 59, 48, 0.4)",
+                  }}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{
+                      width: "1.2em",
+                      height: "1.2em",
+                      marginRight: "0.5em",
+                    }}
+                  >
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                  </svg>
+                  現在のチャットをリセット
+                </button>
+              </div>
+
               <h3>Model</h3>
               <ul className="model-list">
                 {models.map((model: ModelItem, index: number) => (
@@ -437,21 +545,19 @@ export default function ModelInputModal() {
                   value={newModel}
                   onChange={(e) => setNewModel(e.target.value)}
                   onFocus={() => setIsFocused(true)}
-                  onBlur={() => setTimeout(() => setIsFocused(false), 100)}
+                  onBlur={() => setTimeout(() => setIsFocused(false), 200)}
                   onKeyDown={handleKeyDown}
                 />
                 <button onClick={handleSubmit} className="add-button">
                   追加
                 </button>
-                {isFocused && suggestions.length > 0 && (
-                  <ModelSuggestions
-                    inputValue={newModel}
-                    onSelectSuggestion={handleSelectSuggestion}
-                    show={isFocused && suggestions.length > 0}
-                    cursorRect={null}
-                    className="settings-modal-suggestions"
-                  />
-                )}
+                <ModelSuggestions
+                  inputValue={newModel}
+                  onSelectSuggestion={handleSelectSuggestion}
+                  show={isFocused && newModel.trim().length > 0}
+                  parentRef={newModelInputRef}
+                  className="settings-modal-suggestions"
+                />
               </div>
               <h3>Function Calls</h3>
               <ul className="function-call-list">

@@ -6,10 +6,8 @@ import React, {
   forwardRef,
   useRef,
 } from "react";
-import { preinit } from "react-dom"; // ★ preinit をインポート
 import { useEditor, EditorContent, Editor, JSONContent } from "@tiptap/react";
 import { EditorProps } from "@tiptap/pm/view";
-import { Selection } from "@tiptap/pm/state";
 import StarterKit from "@tiptap/starter-kit";
 import { Markdown } from "tiptap-markdown"; //コミュニティ製のMarkdown拡張
 import Image from "@tiptap/extension-image";
@@ -24,6 +22,7 @@ import tippy, {
   Props as TippyProps,
 } from "tippy.js"; // ★ tippy.js をインポート
 import MentionList, { MentionListProps } from "./MentionList"; // ★ MentionListProps もインポート
+import "highlight.js/styles/a11y-dark.css"; // ★ CSSを直接インポートに戻す
 
 interface ModelMentionItemForSuggestion {
   id: string; // モデルのフルID (例: openai/gpt-4o)
@@ -73,11 +72,6 @@ export const MarkdownTipTapEditor = forwardRef<
     },
     ref
   ) => {
-    useEffect(() => {
-      // highlight.jsのテーマCSSをpreinitで読み込む
-      preinit("highlight.js/styles/a11y-dark.css", { as: "style" });
-    }, []); // 空の依存配列でマウント時に一度だけ実行
-
     const editor = useEditor({
       extensions: [
         StarterKit.configure({
@@ -254,11 +248,27 @@ export const MarkdownTipTapEditor = forwardRef<
       content: value,
       editable,
       editorProps,
-      onUpdate: ({ editor: currentEditor }: { editor: Editor }) => {
-        const markdown = currentEditor.storage.markdown.getMarkdown();
-        onChange(markdown);
-      },
       onSelectionUpdate,
+      onUpdate: ({ editor }) => {
+        const currentMarkdown = editor.storage.markdown.getMarkdown();
+        console.log(
+          "[MarkdownTipTapEditor] onUpdate triggered. Current markdown:",
+          currentMarkdown,
+          "Current value prop from parent:",
+          value
+        );
+        if (value !== currentMarkdown) {
+          console.log(
+            "[MarkdownTipTapEditor] onChange called because value and currentMarkdown differ."
+          );
+          onChange(currentMarkdown);
+        } else {
+          console.log(
+            "[MarkdownTipTapEditor] onChange skipped because value and currentMarkdown are the same."
+          );
+        }
+      },
+      immediatelyRender: false, // ★ SSR Hydration Mismatch対策
     });
 
     useEffect(() => {
@@ -289,11 +299,7 @@ export const MarkdownTipTapEditor = forwardRef<
       return null;
     }
 
-    return (
-      <div className={`tiptap-editor-wrapper ${className || ""}`}>
-        <EditorContent editor={editor} />
-      </div>
-    );
+    return <EditorContent editor={editor} className={className} />;
   }
 );
 

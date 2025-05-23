@@ -1,40 +1,206 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Mulch LLM Chat
 
-## Getting Started
+`mulch-llm-chat` は、Next.js 15 (App Router) と React 19 をベースに構築された、LLM モデルに縛られない先進的な AI チャットクライアントです。OpenRouter を介して多様な大規模言語モデル(LLM)との対話を可能にし、GitHub Gist との連携による柔軟なデータ管理を提供します。
 
-First, run the development server:
+## **3 NOs:** 利用者のための、柔軟で安心な運用設計。
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **No Subscription:** 月額固定費なし、使った分だけの API 利用料。
+- **No Installation:** PWA 対応、ブラウザですぐに全機能利用可能。
+- **No Cloud Storage:** 会話データはブラウザローカル保存で高プライバシー。
+
+## Mulch LLM Chat の主な特徴
+
+- **Many LLMs, One Prompt:** 多数の AI モデルへ同時アクセス、多様な視点を一度に。
+  - 本アプリケーションは、多様な大規模言語モデル(LLM)へのアクセス手段を提供します。ライトユーザーは OpenRouter アカウントと連携することで、GPT、Claude、Gemini、CommandR+、Llama、Qwen など、OpenRouter がサポートする多数のモデルへ簡単に同時アクセスし、応答を生成させることが可能です。
+  - さらに、Vercel AI SDK の柔軟性を活かし、特定のモデル（例：OpenAI の GPT シリーズなど）については、ユーザー自身の個別の API キーを設定して利用することも可能です。これにより、OpenRouter 経由のアクセスと、直接的な API キー利用の双方のメリットを享受できます。
+  - 各モデルの個性や得意分野を比較検討し、多様な視点やアイデアを一度に引き出すことで、最適な結果を追求できます。
+- **Select & Filter Responses:** 最適な AI 応答を選択し、会話を整理。
+  - 複数の AI から同時に生成された多様なレスポンスに対し、ユーザーは各レスポンスに付随するチェックボックスを用いて「採用する」ものを明示的に選択できます。
+  - 選択されなかったレスポンスは、視覚的に目立たない状態（例: CSS による透明度の低減）で保持され、後からの参照や再評価も可能です。
+  - これにより、現在の会話の主流からは効果的にフィルタリングアウトされ、ユーザーは選択した情報に集中し、クリーンで追跡しやすいチャットログを形成できます。
+- **Full Edit Control with Tiptap:** 全てのメッセージを自由に編集・整形。
+  - ユーザー自身の過去のプロンプトだけでなく、AI からの応答（採用/非採用問わず、チャット履歴内の全てのメッセージ）も、Markdown 対応の高機能リッチテキストエディタ（Tiptap）を用いて自由に編集可能です。
+  - 情報の追記、修正、部分的な削除、フォーマット調整などを通じて、AI との共同作業で最終的なアウトプットをユーザー自身の手で洗練させることができます。
+  - **対応 Markdown 形式:** 太字、斜体、取り消し線、インラインコード、コードブロック（主要言語のシンタックスハイライト付）、ブロック引用、順序付き/なしリスト、タスクリスト（チェックボックス）、ハードブレーク、水平線、リンク編集。
+  - **Tiptap 拡張機能によるリッチコンテンツ:** 画像挿入・表示（`@tiptap/extension-image`、Base64 対応）、テーブル作成・編集（`@tiptap/extension-table`）、メンション（`@tiptap/extension-mention`、モデル選択等に活用）。
+- **Tools (Function Calling):** 高度な対話型 AI アプリケーションを実現する拡張機能。
+  - LLM の能力を拡張し、外部システムとの連携やプログラム的な対話制御を可能にするためのインターフェースです。従来の Function Calling の概念を包含しつつ、より広範なツール利用をサポートします。
+  - 外部 API エンドポイントの呼び出し、ローカル関数の実行、データベースクエリの発行など、定義されたツールセットに基づいて LLM が能動的に情報を取得・操作し、その結果を対話に統合します。これにより、単なるテキスト応答を超えた、実世界のタスク実行や複雑な情報処理が実現可能になります。
+  - 現在、基本的なツール実行をサポートしており、将来的には リモート MCP の実装を計画しています。
+- **Sync with GitHub Gist:** チャット履歴を Gist で安全に共有・バックアップ。
+  - **チャット履歴の共有と同期:** GitHub Gist を利用して、チャット履歴を安全に共有・同期できます。デバイス間のシームレスなアクセスや、他者とのコラボレーションが可能です。(同期機能は近日公開予定)
+  - **安全なバックアップ:** Gist を介して会話データのバックアップをユーザー自身が管理できます。
+
+## 圧倒的にクリーンな設計
+
+- **優れたモードレス UI と UX:**
+  - **シームレスな編集体験:** Tiptap エディタをチャットインターフェースに深く統合。ユーザープロンプト入力、AI レスポンスのインライン編集、過去ログの修正といった主要操作が、画面遷移やモーダルウィンドウに思考を中断されることなく、直感的かつ効率的に行えます。
+  - **Markdown 中心の操作:** Markdown ショートカットのサポートにより、キーボード主体の高速なテキストフォーマットが可能です。（将来的な拡張：スラッシュコマンドメニュー、フローティング/バブル編集ツールバー）
+- **データベース不要アーキテクチャ:**
+  - **プライバシー優先のローカル保存:** チャットデータは、原則として全てユーザーのブラウザのローカルストレージに保存されます。これにより、サーバーサイドのデータベース管理コストを削減し、ユーザーデータのプライバシーを最大限に保護します。
+  - **ユーザー主導の Gist 同期:** データの永続化、バックアップ、共有が必要な場合のみ、ユーザーが明示的に GitHub Gist との連携を選択できます。データ所有権は常にユーザーにあります。
+- **軽量かつハイパフォーマンス:**
+  - **最新技術スタック:** Next.js 15 (App Router) と React 19 (React Compiler による自動最適化、Server Components/Actions の活用検討) を採用し、最新のウェブ標準に準拠した高速かつ効率的な動作を実現します。
+  - **仮想レンダリング:** `@tanstack/react-virtual` を導入し、チャットメッセージリストのレンダリングを最適化。大量のメッセージ履歴が存在する場合でも、DOM 要素数を最小限に抑え、スクロール性能やアプリケーション全体の応答性を高く維持します。
+
+## デザインと UI の思想
+
+- **没入感を高めるダークインターフェース:**
+
+  - 黒を基調とした配色（`$bg_body: #000`）と、コントラストを考慮したテキスト・アクセントカラー（例: `$accent-color`）は、視覚的な疲労を軽減し、長時間の利用でもコンテンツへの集中を維持させます。
+  - 半透明の背景（例: `rgba(color.mix(#fff, #000, 10%), 0.8)`）や `backdrop-filter: blur()` の効果的な使用は、UI 要素に奥行きと洗練された階層感を与え、モダンなルックアンドフィールを追求しています。
+
+- **機能美とミニマリズムの追求:**
+
+  - 過度な装飾を排し、機能性を重視したクリーンなデザインを採用。UI 要素は直感的に理解できるアイコンや、状態に応じた視覚的フィードバック（ホバーエフェクト、アクティブ状態の強調など）によって補完されます。
+  - `box-shadow` や `border` の繊細な使い分けにより、要素間の区別やインタラクティブな部分をさりげなく示唆します。
+
+- **効率的な情報アクセスと AI レスポンスの比較検討:**
+
+  - **マルチ LLM レスポンスの横並び表示:** チャット応答エリア (`.responses-container > .message-block > .scroll_area`) は、`display: flex; overflow-x: auto;` と各レスポンスカード (`.response`) の `min-width` 指定により、複数の LLM からの出力を横スクロールで一覧・比較できる設計思想が明確です。これにより、ユーザーは各モデルの特性を把握し、最適な回答を効率的に選択・統合することを支援します。（注: 現状の表示でこれが実現できていない場合、HTML 構造や他のスタイルとの競合、または JavaScript による動的制御の調整が必要ですが、CSS の意図は横比較レイアウトです。）
+  - **レスポンス選択と視覚的フィルタリング UI:** 上記の横並び表示と連動し、各 AI レスポンスカード (`.response`) には選択用のチェックボックス (`.response-select`)が備わっています。ユーザーがこのチェックボックスで「採用する」レスポンスを選択すると、以下の UI・UX が提供されます。
+    - **明確な選択状態:** 選択されたレスポンスは視覚的にハイライトされ（例: `.response-select.selected` のスタイル適用）、会話の主要な流れとして明確に識別されます。
+    - **非採用レスポンスのトーンダウン:** 選択されなかったレスポンスカードには `.unselected` クラスが付与され、CSS (`opacity: 0.3`) によって意図的に視認性が低減されます。これにより、ユーザーは採用した情報に自然と集中できます。
+    - **情報の保持と再評価の柔軟性:** 非採用レスポンスは完全に削除されるのではなく、あくまで視覚的にフィルタリングされるだけなので、後から内容を参照したり、異なる観点から再評価して再度「採用」したりする柔軟性が保持されます。
+    - **ノイズの低減とログの可読性向上:** このインタラクティブなフィルタリング機構により、ユーザーは多様な AI からの提案を効率的に吟味しつつ、最終的には選択された質の高い情報のみが際立つ、整理されたチャットログを構築できます。これにより、思考のノイズが大幅に削減され、本質的な情報への集中と追跡が容易になります。
+  - 入力エリア (`.input-section`) は、初期表示、フォーカス時、編集中など、コンテキストに応じて表示される情報やアクションボタンが動的に変化し、ユーザーをスムーズに導きます。
+
+- **滑らかなインタラクションと視覚的フィードバック:**
+
+  - CSS 変数 (`$height_header`, `$body-padding`等) の活用による一貫したレイアウトと、`transition`プロパティを多用した滑らかな状態変化が特徴です。
+  - モバイル環境における View Transitions API (`::view-transition-old(page)`等) の活用は、ネイティブアプリケーションのような洗練されたページ遷移体験を目指しています。
+
+- **レスポンシブデザインとモバイルファーストの考慮:**
+  - メディアクエリ (`@media (max-width: 768px)`) を用いたレイアウトの最適化により、デスクトップからモバイルまで幅広いデバイスで快適な操作性を提供します。
+  - モバイルでのチャットリスト表示とチャット画面の切り替えを考慮したレイアウト変更（`.sidebar` と `.main-content` の表示制御）が実装されています。
+
+## 技術スタック
+
+- **フレームワーク:** Next.js 15 (App Router)
+- **UI ライブラリ:** React 19
+  - React Compiler: 有効化 (next.config.mjs)
+- **言語:** TypeScript
+- **スタイリング:** SASS/SCSS
+- **リッチテキスト編集 (Tiptap):**
+  - `@tiptap/react`, `@tiptap/starter-kit`
+  - `@tiptap/extension-image` (画像対応)
+  - `@tiptap/extension-table`, `@tiptap/extension-table-row`, `@tiptap/extension-table-header`, `@tiptap/extension-table-cell` (テーブル対応)
+  - `@tiptap/extension-mention` (メンション機能基盤)
+  - `highlight.js` (コードブロックのシンタックスハイライト)
+  - `tiptap-markdown` (Markdown 変換)
+- **状態管理:**
+  - React Context API
+  - カスタムフック (`useChatLogic`, `useAccessToken` など)
+  - `use-storage-state` (ローカルストレージ永続化)
+- **AI・LLM 連携:**
+  - Vercel AI SDK: `@ai-sdk/openai`, `ai`
+  - OpenRouter API `@openrouter/ai-sdk-provider`
+- **UI コンポーネント・ユーティリティ:**
+  - `@tanstack/react-virtual` (リスト仮想化)
+  - `sonner` (通知表示)
+  - `classnames` (条件付きクラス名)
+  - `nanoid` (ユニーク ID 生成)
+  - `marked`, `marked-highlight`, `turndown` (Markdown 処理関連)
+- **バックエンド (Next.js API Routes):**
+  - `/api/chat`: LLM とのストリーミングチャット処理。
+  - `/api/auth/github/*`: GitHub OAuth 認証フロー (Gist 連携用)。
+  - `/api/auth/route.ts`: (現状問題あり) OpenRouter API キー検証エンドポイント。
+- **パッケージマネージャー:** `bun`
+- **デプロイ推奨環境:** Vercel
+
+## 環境変数
+
+プロジェクトを実行するには、ルートディレクトリに `.env.local` ファイルを作成し、以下の環境変数を設定してください。
+
+```env
+# OpenRouter APIキー (チャット機能に必須)
+# OpenRouterダッシュボード (https://openrouter.ai/keys) から取得
+OPENROUTER_API_KEY=sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# GitHub OAuth アプリケーションの設定 (Gist共有機能に必須)
+# GitHub Developer Settings (https://github.com/settings/developers) でOAuth Appを作成
+# Authorization callback URL: [あなたのアプリケーションのURL]/api/auth/github/callback
+# 例: http://localhost:3000/api/auth/github/callback (ローカル開発時)
+GITHUB_CLIENT_ID=your_github_oauth_app_client_id
+GITHUB_CLIENT_SECRET=your_github_oauth_app_client_secret
+
+# アプリケーションのベースURL (各種API連携、OAuthリダイレクトなどに利用)
+# ローカル開発時は http://localhost:3000
+# Vercelデプロイ時は自動設定される VERCEL_URL を優先的に使用する設計も検討可
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
+
+# アプリケーションのサイト名 (OpenRouter APIへのX-Titleヘッダーなどに利用)
+YOUR_SITE_NAME="Mulch LLM Chat"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**注意:**
+コード内で `process.env.YOUR_SITE_URL` の参照が残っている可能性があります。環境変数は `NEXT_PUBLIC_BASE_URL` に統一することを強く推奨します。必要に応じて `.env.local` で両方定義するか、コード内の参照を修正してください。
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+## セットアップと実行
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+1.  **リポジトリのクローン:**
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+    ```bash
+    git clone https://github.com/your-username/mulch-llm-chat.git
+    cd mulch-llm-chat
+    ```
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+2.  **依存関係のインストール:**
+    `bun` を使用します。未インストールの場合は、[公式ドキュメント](https://bun.sh/docs/installation)に従ってインストールしてください。
 
-## Learn More
+    ```bash
+    bun install
+    ```
 
-To learn more about Next.js, take a look at the following resources:
+3.  **環境変数の設定:**
+    上記「環境変数」セクションを参照し、`.env.local` ファイルを作成・設定してください。
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4.  **開発サーバーの起動:**
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+    ```bash
+    bun dev
+    ```
 
-## Deploy on Vercel
+    ブラウザで [http://localhost:3000](http://localhost:3000) を開くとアプリケーションが表示されます。
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+5.  **ビルドと実運用:**
+    ```bash
+    bun run build
+    bun run start
+    ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+## 注意点・既知の問題
+
+- **OpenRouter API キー認証エンドポイントの不備 (`app/api/auth/route.ts`):**
+  現状、このエンドポイントは OpenRouter の `/api/v1/auth/keys` に対して `code` を送信する実装になっていますが、その `code` がハードコードされた固定値 (`sk-or-v1-20bc9...`) になっています。
+  - **問題点:**
+    1.  OpenRouter の正規の API キー取得フローでは、この `code` はユーザーが OpenRouter サイトでの認証後に一時的に発行され、クライアント経由で渡されるべきものです。ハードコードは不正な利用です。
+    2.  そもそも、このエンドポイントの目的が不明瞭です。クライアントサイドで直接 OpenRouter API キーをユーザーに入力させる方式（現状のメインフロー）と矛盾しているように見えます。
+    3.  このハードコードされたキーらしきものは、既に失効しているか、テスト用の一時的なものである可能性が高いですが、万が一有効なプライベートキーである場合、重大なセキュリティリスクです。
+  - **推奨対応:** このエンドポイントの必要性を再検討し、不要であれば削除する。もし特定の認証フロー（例：OAuth 経由での OpenRouter 連携など）を意図しているのであれば、OpenRouter のドキュメントに基づき、セキュリティを考慮した正しい実装に修正する必要があります。現状の実装は**利用しないでください**。
+
+## 今後の改善点 (提案)
+
+- **認証ロジックの抜本的見直し:**
+  - `app/api/auth/route.ts` のハードコード問題を即時修正、またはエンドポイント自体を削除。
+  - OpenRouter API キーはユーザーが設定画面から入力・保存する現在の方式を主とし、その際のキー検証やエラーハンドリングを強化。
+- **Tiptap エディタ機能拡張:**
+  - **メンション機能の本格導入:** `@mention` で AI モデルを簡単に参照・入力支援。
+  - **画像編集機能:** 画像のドラッグ&ドロップ挿入、リサイズ、キャプション付与、アライメント調整。
+  - **テーブル操作 UI 改善:** 行・列の追加削除、セル結合、ヘッダー設定などの GUI 操作。
+  - **インタラクティブ要素:** チェックリスト（タスクリスト）の操作性向上。
+  - **スラッシュコマンド:** `/`入力でコマンドパレットを表示し、書式設定や特殊要素（画像、テーブル、区切り線など）の挿入を効率化。
+  - **フローティング/バブル編集ツールバー:** テキスト選択時や特定要素の編集中に、コンテキストに応じた編集オプションを提示。
+  - **リンク編集 UI:** URL 入力だけでなく、アンカーテキスト編集や `target="_blank"` 設定などの UI を提供。
+- **React 19 機能の積極的活用:**
+  - **React Server Actions:** フォーム送信やデータミューテーション（設定保存、Gist 操作など）をよりシンプルかつ堅牢に実装。
+  - **`useOptimistic`フック:** サーバーへのリクエストを伴う操作（メッセージ送信、設定変更など）の UI 応答性を向上させるため、楽観的更新を導入。
+  - **Asset Loading API:** 画像やフォントなどのアセット読み込みを最適化し、初期表示速度や体感パフォーマンスを改善。
+  - React Compiler の安定性と効果を継続的に評価し、最大限活用。
+- **UI/UX 全般の改善:**
+  - キーボードショートカットの拡充（メッセージ送信、編集開始、設定画面表示など）。
+  - エラーメッセージや通知の分かりやすさ向上、デザイン統一。
+  - 設定画面の項目整理と説明文の充実。
+- **環境変数管理の整理:** `YOUR_SITE_URL` と `NEXT_PUBLIC_BASE_URL` の参照箇所をコードベース全体で調査し、`NEXT_PUBLIC_BASE_URL` に統一。
+- **コード品質向上:**
+  - 複雑なロジックのリファクタリングと可読性向上。
