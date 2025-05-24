@@ -5,6 +5,7 @@ interface InlineModelSelectorProps {
   models: ModelItem[];
   allModels: ModelItem[];
   onUpdateModels: (newModels: ModelItem[]) => void;
+  onOpenModelModal?: () => void;
   className?: string;
 }
 
@@ -12,13 +13,25 @@ export default function InlineModelSelector({
   models,
   allModels,
   onUpdateModels,
+  onOpenModelModal,
   className = "",
 }: InlineModelSelectorProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLUListElement>(null);
+
+  // モバイル判定
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // 検索結果をフィルタリング
   const filteredModels = allModels.filter((model) => {
@@ -94,7 +107,7 @@ export default function InlineModelSelector({
     [filteredModels, selectedIndex, isInputFocused, toggleModel]
   );
 
-  // 既存モデルの選択解除
+  // 既存モデルの選択解除（PC版のみ）
   const removeModel = useCallback(
     (modelId: string) => {
       const updatedModels = models.map((model) =>
@@ -125,8 +138,43 @@ export default function InlineModelSelector({
     }
   }, [selectedIndex]);
 
+  // SP版：選択済みモデルのみ表示 + 「^モデルを編集」ボタン
+  if (isMobile) {
+    return (
+      <div className={`inline-model-selector mobile ${className}`}>
+        <div className="selected-models-display">
+          <ul className="selected-models-list mobile">
+            {models
+              .filter((model) => model.selected)
+              .map((model) => (
+                <li key={model.id} className="selected-model-item mobile">
+                  <span className="model-name">
+                    {model.name.includes("/")
+                      ? model.name.split("/")[1]
+                      : model.name}
+                  </span>
+                </li>
+              ))}
+          </ul>
+
+          {/* ^モデルを編集ボタン */}
+          <button
+            type="button"
+            className="edit-models-button"
+            onClick={onOpenModelModal}
+            title="モデルを編集"
+          >
+            <span className="button-icon">^</span>
+            <span className="button-text">モデルを編集</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // PC版：従来通りの検索・編集機能付き
   return (
-    <div className={`inline-model-selector ${className}`}>
+    <div className={`inline-model-selector desktop ${className}`}>
       {/* 現在選択されているモデルのリスト */}
       <ul className="selected-models-list">
         {models

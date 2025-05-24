@@ -2353,3 +2353,87 @@ textarea[data-fieldsizing="content"] {
     }
   }
 }
+
+// InlineModelSelector モバイル版スタイル
+.inline-model-selector.mobile {
+  margin: 0 $body-padding;
+  margin-bottom: 0.5em;
+  position: relative;
+
+  .selected-models-display {
+    position: relative;
+
+    .selected-models-list.mobile {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5em;
+      list-style: none;
+      padding: 0.75em 1em 3em; // 下部にボタン用のスペースを確保
+      background: rgba(color.mix(#fff, #000, 8%), 0.8);
+      backdrop-filter: blur(10px);
+      border-radius: $border-radius;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      box-shadow: $shadow;
+      min-height: 4rem;
+
+      .selected-model-item.mobile {
+        display: flex;
+        align-items: center;
+        padding: 0.4em 0.8em;
+        background: rgba(color.mix(#fff, $accent-color, 15%), 0.6);
+        border: 1px solid rgba($accent-color, 0.2);
+        border-radius: calc($border-radius - 2px);
+        color: #fff;
+        font-size: 0.85em;
+        font-weight: 500;
+
+        .model-name {
+          color: inherit;
+        }
+      }
+    }
+
+    // 「^モデルを編集」ボタン
+    .edit-models-button {
+      position: absolute;
+      bottom: 0.5em;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 0.4em;
+      padding: 0.4em 0.8em;
+      background: rgba(color.mix(#fff, $accent-color, 20%), 0.9);
+      border: 1px solid rgba($accent-color, 0.3);
+      border-radius: calc($border-radius - 2px);
+      color: #fff;
+      font-size: 0.8em;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      z-index: 10;
+
+      .button-icon {
+        font-size: 1.1em;
+        line-height: 1;
+        transform: rotate(180deg); // ^を下向きの矢印に
+      }
+
+      .button-text {
+        white-space: nowrap;
+      }
+
+      &:hover {
+        background: rgba(color.mix(#fff, $accent-color, 25%), 1);
+        border-color: rgba($accent-color, 0.4);
+        transform: translateX(-50%) translateY(-1px);
+        box-shadow: 0 2px 8px rgba($accent-color, 0.2);
+      }
+
+      &:active {
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+  }
+}

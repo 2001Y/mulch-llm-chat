@@ -15,6 +15,7 @@ import type { ModelItem } from "hooks/useChatLogic";
 import useStorageState from "hooks/useLocalStorage";
 import { useChatLogicContext } from "contexts/ChatLogicContext";
 import InlineModelSelector from "./InlineModelSelector";
+import ModelModal from "./ModelModal";
 
 interface Props {
   mainInput: boolean;
@@ -157,18 +158,21 @@ export default function InputSection({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const [isEdited, setIsEdited] = useState(false);
+  const [isModelModalOpen, setIsModelModalOpen] = useState(false);
   const params = useParams();
   const roomId = params?.id as string | undefined;
   const [storedMessages] = useStorageState<AppMessage[] | undefined>(
     roomId ? `chatMessages_${roomId}` : undefined
   );
   const tiptapEditorRef = useRef<EditorHandle>(null);
-  const [showModelSelectionAndButtonName, setShowModelSelectionAndButtonName] =
-    useState(false);
 
-  useEffect(() => {
-    setShowModelSelectionAndButtonName(true);
-  }, []);
+  const showModelSelectionAndButtonName = useMemo(() => {
+    return models && models.length > 0;
+  }, [models]);
+
+  const isInputEmpty = () => {
+    return !chatInput || chatInput.trim().length === 0;
+  };
 
   const aiModelSuggestionsForTiptap = useMemo(() => {
     return (AllModels || []).map((model) => ({
@@ -364,8 +368,6 @@ export default function InputSection({
     if (event.target) event.target.value = "";
   };
 
-  const isInputEmpty = () => !chatInput.trim();
-
   const submitAction = async (formData: FormData) => {
     const submittedChatInput = formData.get("chatInput") as string;
     const submitType = formData.get("submitType") as
@@ -501,7 +503,14 @@ export default function InputSection({
           models={models || []}
           allModels={AllModels || []}
           onUpdateModels={updateModels}
+          onOpenModelModal={() => setIsModelModalOpen(true)}
           className="chat-model-selector"
+        />
+
+        {/* ModelModal */}
+        <ModelModal
+          isOpen={isModelModalOpen}
+          onClose={() => setIsModelModalOpen(false)}
         />
 
         <MarkdownTipTapEditor
