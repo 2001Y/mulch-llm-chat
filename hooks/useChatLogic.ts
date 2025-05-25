@@ -1417,7 +1417,7 @@ export function useChatLogic({
   // ローカルストレージへの保存useEffect (saveMessagesToHistory を使う)
   useEffect(() => {
     if (isProcessingRef.current) return;
-    if (!isShared && roomId && initialLoadComplete) {
+    if (!isShared && initialLoadComplete) {
       if (messages.length > 0) {
         saveMessagesToHistory(messages);
       } else if (messagesBackupRef.current.length > 0) {
