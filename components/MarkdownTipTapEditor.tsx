@@ -38,6 +38,7 @@ interface MarkdownTipTapEditorProps {
   className?: string;
   aiModelSuggestions?: ModelMentionItemForSuggestion[]; // 親からAIモデル候補リストを受け取る
   onSelectAiModel?: (modelId: string) => void; // ★ AIモデル選択コールバック
+  children?: React.ReactNode; // ★ アクションボタンなどを受け取るためのchildren
 }
 
 // 親コンポーネントが参照できるハンドル型を定義
@@ -69,6 +70,7 @@ export const MarkdownTipTapEditor = forwardRef<
       className,
       aiModelSuggestions = [], // デフォルトは空配列
       onSelectAiModel, // ★ propsから受け取る
+      children, // ★ アクションボタンなどを受け取るためのchildren
     },
     ref
   ) => {
@@ -299,7 +301,12 @@ export const MarkdownTipTapEditor = forwardRef<
       return null;
     }
 
-    return <EditorContent editor={editor} className={className} />;
+    return (
+      <div className={className}>
+        <EditorContent editor={editor} />
+        {children && <div className="editor-actions">{children}</div>}
+      </div>
+    );
   }
 );
 

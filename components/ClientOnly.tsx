@@ -33,7 +33,7 @@ export default function ClientOnly() {
           !(event.target as HTMLElement).closest(".responses-container") &&
           !(event.target as HTMLElement).closest(".chat-input-area") &&
           !(event.target as HTMLElement).closest(".modal-content") &&
-          !(event.target as HTMLElement).closest(".model-input-modal"))
+          !(event.target as HTMLElement).closest(".modal-backdrop"))
       ) {
         event.preventDefault();
       }

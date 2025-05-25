@@ -14,8 +14,6 @@ import type { AppMessage } from "types/chat";
 import type { ModelItem } from "hooks/useChatLogic";
 import useStorageState from "hooks/useLocalStorage";
 import { useChatLogicContext } from "contexts/ChatLogicContext";
-import InlineModelSelector from "./InlineModelSelector";
-import ModelModal from "./ModelModal";
 
 interface Props {
   mainInput: boolean;
@@ -158,7 +156,6 @@ export default function InputSection({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const [isEdited, setIsEdited] = useState(false);
-  const [isModelModalOpen, setIsModelModalOpen] = useState(false);
   const params = useParams();
   const roomId = params?.id as string | undefined;
   const [storedMessages] = useStorageState<AppMessage[] | undefined>(
@@ -460,58 +457,6 @@ export default function InputSection({
         ref={sectionRef}
       >
         <input type="hidden" name="chatInput" value={chatInput} />
-        <div
-          className="add-files-container"
-          style={{
-            marginBottom: "0.5em",
-            display: "flex",
-            justifyContent: "flex-end",
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="action-button add-files-button icon-button"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-            </svg>
-            <span>Add files</span>
-          </button>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleImageSelect}
-            accept="image/png,image/jpeg,image/webp"
-            style={{ display: "none" }}
-            multiple
-          />
-        </div>
-
-        {/* インラインモデル選択UI */}
-        <InlineModelSelector
-          models={models || []}
-          allModels={AllModels || []}
-          onUpdateModels={updateModels}
-          onOpenModelModal={() => setIsModelModalOpen(true)}
-          className="chat-model-selector"
-        />
-
-        {/* ModelModal */}
-        <ModelModal
-          isOpen={isModelModalOpen}
-          onClose={() => setIsModelModalOpen(false)}
-        />
 
         <MarkdownTipTapEditor
           ref={tiptapEditorRef}
@@ -522,51 +467,75 @@ export default function InputSection({
           className="input-container chat-input-area chat-tiptap-editor"
           aiModelSuggestions={aiModelSuggestionsForTiptap}
           onSelectAiModel={selectSingleModel}
-        />
-
-        <div className="input-container input-actions">
-          {isGenerating ? (
+        >
+          <div className="input-actions">
             <button
               type="button"
-              onClick={handleStopAllGeneration}
-              className="action-button stop-button icon-button"
+              onClick={() => fileInputRef.current?.click()}
+              className="action-button add-files-button icon-button"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"
                 height="24"
                 viewBox="0 0 24 24"
-                fill="currentColor"
-                stroke="none"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
               </svg>
-              <span>
-                Stop<span className="shortcut">⌘⌫</span>
-              </span>
+              <span>Add files</span>
             </button>
-          ) : (
-            <>
-              {/* 編集時も新規時も同じ送信ボタンを表示 */}
-              <SubmitButton
-                isPrimaryOnly={false}
-                models={models}
-                isInputEmpty={isInputEmpty}
-                isModelsLoaded={showModelSelectionAndButtonName}
-              />
-              <SubmitButton
-                isPrimaryOnly={true}
-                models={models}
-                isInputEmpty={isInputEmpty}
-                isModelsLoaded={showModelSelectionAndButtonName}
-              />
-              <span className="line-break shortcut-area">
-                段落替え<span className="shortcut">⏎</span> / 改行
-                <span className="shortcut">⇧⏎</span>
-              </span>
-            </>
-          )}
-        </div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImageSelect}
+              accept="image/png,image/jpeg,image/webp"
+              style={{ display: "none" }}
+              multiple
+            />
+
+            {isGenerating ? (
+              <button
+                type="button"
+                onClick={handleStopAllGeneration}
+                className="action-button stop-button icon-button"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  stroke="none"
+                >
+                  <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+                </svg>
+                <span>
+                  Stop<span className="shortcut">⌘⌫</span>
+                </span>
+              </button>
+            ) : (
+              <>
+                <SubmitButton
+                  isPrimaryOnly={true}
+                  models={models}
+                  isInputEmpty={isInputEmpty}
+                  isModelsLoaded={showModelSelectionAndButtonName}
+                />
+                <SubmitButton
+                  isPrimaryOnly={false}
+                  models={models}
+                  isInputEmpty={isInputEmpty}
+                  isModelsLoaded={showModelSelectionAndButtonName}
+                />
+              </>
+            )}
+          </div>
+        </MarkdownTipTapEditor>
       </section>
     </form>
   );

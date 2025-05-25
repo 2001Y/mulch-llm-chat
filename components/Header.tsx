@@ -50,9 +50,9 @@ function AuthButton() {
       {handleOpenModal && (
         <button
           onClick={() => {
-            console.log("[DEBUG] Settings icon clicked");
-            if (handleOpenModal) handleOpenModal();
-            console.log("[DEBUG] After handleOpenModal called");
+            if (handleOpenModal) {
+              handleOpenModal();
+            }
           }}
           className="setting-button"
           style={{

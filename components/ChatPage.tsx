@@ -3,10 +3,11 @@
 import React, { useState, useEffect } from "react";
 import "@/styles/chat.scss";
 import { useParams } from "next/navigation";
-import Header from "./Header";
+import MainHeader from "./MainHeader";
 import ChatResponses from "./ChatResponses";
 import InputSection from "./InputSection";
 import SettingsModal from "./SettingsModal";
+import ModelModal from "./ModelModal";
 import BentoFeatures from "./BentoFeatures";
 import ChatList from "./ChatList";
 import { useChatLogicContext } from "contexts/ChatLogicContext";
@@ -28,6 +29,8 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
     handleStopAllGeneration,
     handleResetAndRegenerate,
     handleSaveOnly,
+    isModelModalOpen,
+    handleCloseModelModal,
   } = useChatLogicContext();
 
   const [hasActualChats, setHasActualChats] = useState(false);
@@ -115,11 +118,17 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
     messages?.length || 0
   );
 
+  const handleShare = () => {
+    // 共有機能の実装
+    console.log("Share functionality will be implemented here");
+    // TODO: 共有機能を実装
+  };
+
   if (isInitialScreen) {
     console.log("[DEBUG ChatPage] Rendering initial screen");
     return (
       <>
-        <Header />
+        <MainHeader onShare={handleShare} />
         {(!isMobile || (isMobile && !hasActualChats)) && <BentoFeatures />}
         {hasActualChats && (
           <div className="chat-list-container">
@@ -148,6 +157,7 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
           isGenerating={isGenerating}
         />
         <SettingsModal />
+        <ModelModal isOpen={isModelModalOpen} onClose={handleCloseModelModal} />
       </>
     );
   }
@@ -160,7 +170,7 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
     );
     return (
       <>
-        <Header />
+        <MainHeader onShare={handleShare} />
         <div className="responses-container" id="responses-container">
           <ChatResponses readOnly={isSharedView} />
         </div>
@@ -177,6 +187,7 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
           isGenerating={isGenerating}
         />
         <SettingsModal />
+        <ModelModal isOpen={isModelModalOpen} onClose={handleCloseModelModal} />
       </>
     );
   }
@@ -184,8 +195,9 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
   console.warn("[DEBUG ChatPage] Rendering Fallback - unexpected state");
   return (
     <>
-      <Header />
+      <MainHeader onShare={handleShare} />
       <SettingsModal />
+      <ModelModal isOpen={isModelModalOpen} onClose={handleCloseModelModal} />
       <div className="error-container">
         <p>問題が発生しました。ページをリロードしてみてください。</p>
       </div>

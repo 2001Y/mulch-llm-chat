@@ -78,28 +78,37 @@ export default function ChatList() {
         const key = `chatMessages_${chatId}`;
         const chatData = storage.get(key) || [];
         if (chatData.length > 0) {
-          const firstMessage = chatData[0];
+          // ConversationTurn形式のデータから最初のメッセージを取得
+          const firstTurn = chatData[0];
 
-          // タイムスタンプを後ろから順に探索
+          // タイムスタンプを後ろから順に探索（ConversationTurn形式に対応）
           let timestamp = null;
           for (let j = chatData.length - 1; j >= 0; j--) {
-            if (chatData[j].timestamp) {
-              timestamp = chatData[j].timestamp;
+            const turn = chatData[j];
+            if (turn && turn.userMessage && turn.userMessage.timestamp) {
+              timestamp = turn.userMessage.timestamp;
               break;
             }
           }
 
+          // 最初のユーザーメッセージを取得
+          const firstMessage =
+            firstTurn && firstTurn.userMessage && firstTurn.userMessage.content
+              ? firstTurn.userMessage.content.slice(0, 50) +
+                (firstTurn.userMessage.content.length > 50 ? "..." : "")
+              : "No messages";
+
           chatItems.push({
             id: chatId,
             title: chatId,
-            firstMessage:
-              firstMessage.user[0]?.text?.slice(0, 20) || "No messages",
+            firstMessage: firstMessage,
             timestamp: timestamp || -1,
           });
         }
       });
       setChats(chatItems.sort((a, b) => b.timestamp - a.timestamp));
       setIsLoadingChats(false);
+      console.log("[ChatList] Loaded chats:", chatItems);
     };
     loadChats();
   }, [chatIds]);

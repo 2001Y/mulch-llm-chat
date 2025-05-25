@@ -95,6 +95,7 @@ export function useChatLogic({
   const [apiKeyError, setApiKeyError] = useState<string | null>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModelModalOpen, setIsModelModalOpen] = useState(false);
   const [selectedModelIds, setSelectedModelIds] =
     useStorageState<string[]>("selectedModels");
   const [models, setModels] = useState<ModelItem[]>([]);
@@ -143,7 +144,10 @@ export function useChatLogic({
   // ★ saveMessagesToHistory の宣言を正しい位置に配置
   const saveMessagesToHistory = useCallback(
     (currentMessagesToSave: AppMessage[]) => {
-      if (isShared || !roomId) return;
+      if (isShared) return; // 共有ビューでは保存しない
+
+      // roomIdがない場合はデフォルトIDを使用
+      const saveRoomId = roomId || "default";
 
       const conversationTurns: ConversationTurn[] = [];
       let currentUserMessage: (AppMessage & { role: "user" }) | null = null;
@@ -189,8 +193,11 @@ export function useChatLogic({
         });
       }
 
-      storage.set(`chatMessages_${roomId}`, conversationTurns);
+      storage.set(`chatMessages_${saveRoomId}`, conversationTurns);
       setStoredMessages(conversationTurns);
+
+      // チャットが保存されたことをSidebarに通知
+      window.dispatchEvent(new Event("chatListUpdate"));
     },
     [isShared, roomId, setStoredMessages]
   );
@@ -1676,6 +1683,9 @@ export function useChatLogic({
     isModalOpen,
     handleOpenModal: () => setIsModalOpen(true),
     handleCloseModal: () => setIsModalOpen(false),
+    isModelModalOpen,
+    handleOpenModelModal: () => setIsModelModalOpen(true),
+    handleCloseModelModal: () => setIsModelModalOpen(false),
     models: models || [],
     updateModels: (newModels: ModelItem[]) => {
       setModels(newModels);

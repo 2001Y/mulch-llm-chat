@@ -63,11 +63,7 @@ export default function SharedChatPage() {
       initialMessages={initialMessages}
       initialError={initialError}
     >
-      <div className="chat-container">
-        <div className="chat-content">
-          <ChatPage isSharedView={true} />
-        </div>
-      </div>
+      <ChatPage isSharedView={true} />
     </ChatLogicProvider>
   );
 }

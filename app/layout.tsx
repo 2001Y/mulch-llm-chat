@@ -5,6 +5,7 @@ import { ManifestLink } from "components/ManifestLink";
 import { Toaster } from "sonner";
 import ClientOnly from "components/ClientOnly";
 import Sidebar from "components/Sidebar";
+import { ChatLogicProvider } from "contexts/ChatLogicContext";
 import "@/styles/layout.scss";
 import { Glegoo, JetBrains_Mono } from "next/font/google";
 
@@ -67,13 +68,15 @@ export default function RootLayout({
         {/* /> */}
       </head>
       <body>
-        <div className="layout">
-          <Sidebar />
-          <main className="main-content">{children}</main>
-        </div>
-        <ClientOnly />
-        <Analytics />
-        <Toaster />
+        <ChatLogicProvider isShared={false}>
+          <div className="layout">
+            <Sidebar />
+            <main className="main-content">{children}</main>
+          </div>
+          <ClientOnly />
+          <Analytics />
+          <Toaster />
+        </ChatLogicProvider>
       </body>
     </html>
   );

@@ -16,12 +16,13 @@ export default function InlineModelSelector({
   onOpenModelModal,
   className = "",
 }: InlineModelSelectorProps) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedIndex, setSelectedIndex] = useState(-1);
-  const [isInputFocused, setIsInputFocused] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const suggestionsRef = useRef<HTMLUListElement>(null);
+  const [isDragMode, setIsDragMode] = useState(false);
+  const [draggedModelId, setDraggedModelId] = useState<string | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [longPressTimer, setLongPressTimer] = useState<ReturnType<
+    typeof setTimeout
+  > | null>(null);
 
   // モバイル判定
   useEffect(() => {
@@ -33,81 +34,10 @@ export default function InlineModelSelector({
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // 検索結果をフィルタリング
-  const filteredModels = allModels.filter((model) => {
-    if (!searchQuery.trim()) return false;
-    const query = searchQuery.toLowerCase();
-    return (
-      model.name.toLowerCase().includes(query) ||
-      model.id.toLowerCase().includes(query)
-    );
-  });
+  // 選択済みモデルのみを取得
+  const selectedModels = models.filter((model) => model.selected);
 
-  // 選択されているモデルの数を表示
-  const selectedCount = models.filter((m) => m.selected).length;
-
-  // モデルの選択/選択解除
-  const toggleModel = useCallback(
-    (targetModel: ModelItem) => {
-      const updatedModels = models.map((model) =>
-        model.id === targetModel.id
-          ? { ...model, selected: !model.selected }
-          : model
-      );
-
-      // 新しいモデルの場合は追加（nameをidと同じハイフン形式に設定）
-      if (!models.find((m) => m.id === targetModel.id)) {
-        updatedModels.push({
-          id: targetModel.id,
-          name: targetModel.id, // 表示名もIDと同じハイフン形式にする
-          selected: true,
-        });
-      }
-
-      onUpdateModels(updatedModels);
-    },
-    [models, onUpdateModels]
-  );
-
-  // キーボード操作
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (!isInputFocused || filteredModels.length === 0) return;
-
-      switch (e.key) {
-        case "ArrowDown":
-          e.preventDefault();
-          setSelectedIndex((prev) =>
-            prev < filteredModels.length - 1 ? prev + 1 : 0
-          );
-          break;
-        case "ArrowUp":
-          e.preventDefault();
-          setSelectedIndex((prev) =>
-            prev > 0 ? prev - 1 : filteredModels.length - 1
-          );
-          break;
-        case "Enter":
-          e.preventDefault();
-          if (selectedIndex >= 0 && selectedIndex < filteredModels.length) {
-            toggleModel(filteredModels[selectedIndex]);
-            setSearchQuery("");
-            setSelectedIndex(-1);
-            inputRef.current?.blur();
-          }
-          break;
-        case "Escape":
-          e.preventDefault();
-          setSearchQuery("");
-          setSelectedIndex(-1);
-          inputRef.current?.blur();
-          break;
-      }
-    },
-    [filteredModels, selectedIndex, isInputFocused, toggleModel]
-  );
-
-  // 既存モデルの選択解除（PC版のみ）
+  // モデルを削除
   const removeModel = useCallback(
     (modelId: string) => {
       const updatedModels = models.map((model) =>
@@ -118,141 +48,196 @@ export default function InlineModelSelector({
     [models, onUpdateModels]
   );
 
-  // 検索クエリが変更されたときに選択インデックスをリセット
-  useEffect(() => {
-    setSelectedIndex(-1);
-  }, [searchQuery]);
+  // モデルの順序を変更
+  const reorderModels = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (fromIndex === toIndex) return;
 
-  // 選択されたアイテムをビューにスクロール
-  useEffect(() => {
-    if (selectedIndex >= 0 && suggestionsRef.current) {
-      const selectedElement = suggestionsRef.current.children[
-        selectedIndex
-      ] as HTMLElement;
-      if (selectedElement) {
-        selectedElement.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest",
-        });
-      }
+      const reorderedSelected = [...selectedModels];
+      const [movedModel] = reorderedSelected.splice(fromIndex, 1);
+      reorderedSelected.splice(toIndex, 0, movedModel);
+
+      // 元のmodels配列を更新（順序を保持）
+      const updatedModels = models.map((model) => ({
+        ...model,
+        selected: false,
+      }));
+
+      // 新しい順序で選択状態を設定
+      reorderedSelected.forEach((selectedModel) => {
+        const index = updatedModels.findIndex((m) => m.id === selectedModel.id);
+        if (index !== -1) {
+          updatedModels[index].selected = true;
+        }
+      });
+
+      onUpdateModels(updatedModels);
+    },
+    [selectedModels, models, onUpdateModels]
+  );
+
+  // ドラッグ開始
+  const handleDragStart = (e: React.DragEvent, modelId: string) => {
+    setDraggedModelId(modelId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", modelId);
+  };
+
+  // ドラッグオーバー
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverIndex(index);
+  };
+
+  // ドラッグリーブ
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  // ドロップ
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    const draggedId = e.dataTransfer.getData("text/plain");
+    const dragIndex = selectedModels.findIndex((m) => m.id === draggedId);
+
+    if (dragIndex !== -1) {
+      reorderModels(dragIndex, dropIndex);
     }
-  }, [selectedIndex]);
 
-  // SP版：選択済みモデルのみ表示 + 「^モデルを編集」ボタン
-  if (isMobile) {
-    return (
-      <div className={`inline-model-selector mobile ${className}`}>
-        <div className="selected-models-display">
-          <ul className="selected-models-list mobile">
-            {models
-              .filter((model) => model.selected)
-              .map((model) => (
-                <li key={model.id} className="selected-model-item mobile">
-                  <span className="model-name">
-                    {model.name.includes("/")
-                      ? model.name.split("/")[1]
-                      : model.name}
-                  </span>
-                </li>
-              ))}
-          </ul>
+    setDraggedModelId(null);
+    setDragOverIndex(null);
+  };
 
-          {/* ^モデルを編集ボタン */}
-          <button
-            type="button"
-            className="edit-models-button"
-            onClick={onOpenModelModal}
-            title="モデルを編集"
-          >
-            <span className="button-icon">^</span>
-            <span className="button-text">モデルを編集</span>
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // ドラッグ終了
+  const handleDragEnd = () => {
+    setDraggedModelId(null);
+    setDragOverIndex(null);
+  };
 
-  // PC版：従来通りの検索・編集機能付き
+  // 長押し開始（モバイル用）
+  const handleTouchStart = (modelId: string) => {
+    if (!isMobile) return;
+
+    const timer = setTimeout(() => {
+      setIsDragMode(true);
+      // 軽微な触覚フィードバック
+      if ("vibrate" in navigator) {
+        navigator.vibrate(100);
+      }
+    }, 800); // 800ms長押しで並び替えモード
+
+    setLongPressTimer(timer);
+  };
+
+  // 長押し終了
+  const handleTouchEnd = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+  };
+
+  // 並び替えモード終了
+  const exitDragMode = () => {
+    setIsDragMode(false);
+    setDraggedModelId(null);
+    setDragOverIndex(null);
+  };
+
+  // タッチでの並び替え（簡易実装）
+  const handleModelTap = (index: number) => {
+    if (!isDragMode) return;
+
+    if (draggedModelId === null) {
+      // 最初のタップ：ドラッグするモデルを選択
+      setDraggedModelId(selectedModels[index].id);
+    } else {
+      // 2回目のタップ：ドロップ位置を決定
+      const dragIndex = selectedModels.findIndex(
+        (m) => m.id === draggedModelId
+      );
+      reorderModels(dragIndex, index);
+      setDraggedModelId(null);
+    }
+  };
+
   return (
-    <div className={`inline-model-selector desktop ${className}`}>
-      {/* 現在選択されているモデルのリスト */}
-      <ul className="selected-models-list">
-        {models
-          .filter((model) => model.selected)
-          .map((model) => (
-            <li key={model.id} className="selected-model-item">
+    <div
+      className={`inline-model-selector unified ${className} ${
+        isDragMode ? "drag-mode" : ""
+      }`}
+    >
+      <div className="selected-models-display">
+        <ul className="selected-models-list">
+          <li>
+            <button
+              type="button"
+              className="add-models-button"
+              onClick={onOpenModelModal}
+              title="モデルを追加"
+            >
+              <span className="button-icon">+</span>
+              <span className="button-text">モデルを追加</span>
+            </button>
+          </li>
+
+          {selectedModels.map((model, index) => (
+            <li
+              key={model.id}
+              className={`selected-model-item ${
+                draggedModelId === model.id ? "dragging" : ""
+              } ${dragOverIndex === index ? "drag-over" : ""}`}
+              draggable={!isMobile || isDragMode}
+              onDragStart={(e) => handleDragStart(e, model.id)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, index)}
+              onDragEnd={handleDragEnd}
+              onTouchStart={() => handleTouchStart(model.id)}
+              onTouchEnd={handleTouchEnd}
+              onClick={() => handleModelTap(index)}
+            >
               <span className="model-name">
                 {model.name.includes("/")
                   ? model.name.split("/")[1]
                   : model.name}
               </span>
+
+              {/* 削除ボタン */}
               <button
                 type="button"
-                onClick={() => removeModel(model.id)}
                 className="remove-model-button"
-                title="Remove model"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeModel(model.id);
+                }}
+                title={`${model.name}を削除`}
               >
                 ×
               </button>
             </li>
           ))}
-
-        {/* 検索・追加用のインプット */}
-        <li className="model-input-item">
-          <input
-            ref={inputRef}
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => setIsInputFocused(true)}
-            onBlur={() => {
-              // 少し遅延させてクリックイベントを許可
-              setTimeout(() => {
-                setIsInputFocused(false);
-                setSelectedIndex(-1);
-              }, 200);
-            }}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              selectedCount === 0 ? "モデルを追加..." : "モデルを追加..."
-            }
-            className="model-search-input"
-          />
-        </li>
-      </ul>
-
-      {/* モデル選択候補のドロップダウン */}
-      {isInputFocused && filteredModels.length > 0 && (
-        <ul ref={suggestionsRef} className="model-suggestions">
-          {filteredModels.slice(0, 8).map((model, index) => {
-            const isSelected = models.find((m) => m.id === model.id)?.selected;
-            return (
-              <li
-                key={model.id}
-                className={`model-suggestion-item ${
-                  index === selectedIndex ? "highlighted" : ""
-                } ${isSelected ? "already-selected" : ""}`}
-                onClick={() => {
-                  toggleModel(model);
-                  setSearchQuery("");
-                  setSelectedIndex(-1);
-                  inputRef.current?.blur();
-                }}
-              >
-                <div className="model-info">
-                  <span className="model-display-name">
-                    {model.name.includes("/")
-                      ? model.name.split("/")[1]
-                      : model.name}
-                  </span>
-                  <span className="model-id">{model.id}</span>
-                </div>
-                {isSelected && <span className="selected-indicator">✓</span>}
-              </li>
-            );
-          })}
         </ul>
-      )}
+
+        {/* 並び替えモード用の操作パネル（モバイルのみ） */}
+        {isMobile && isDragMode && (
+          <div className="drag-mode-panel">
+            <span className="drag-mode-text">
+              {draggedModelId
+                ? "ドロップ位置をタップ"
+                : "モデルをタップして選択"}
+            </span>
+            <button
+              type="button"
+              className="exit-drag-mode"
+              onClick={exitDragMode}
+            >
+              完了
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
