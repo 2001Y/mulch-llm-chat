@@ -543,6 +543,13 @@ export default function InputSection({
                   Stop<span className="shortcut">⌘⌫</span>
                 </span>
               </button>
+            ) : selectedModelsCount === 1 ? (
+              <SubmitButton
+                isPrimaryOnly={true}
+                models={models}
+                isInputEmpty={isInputEmpty}
+                isModelsLoaded={showModelSelectionAndButtonName}
+              />
             ) : (
               <>
                 <SubmitButton

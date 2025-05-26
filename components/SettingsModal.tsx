@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import BaseModal from "./BaseModal";
 import useStorageState from "hooks/useLocalStorage";
 import { useChatLogicContext } from "contexts/ChatLogicContext";
+import { storage } from "hooks/useLocalStorage";
 
 interface Tool {
   type: string;
@@ -19,17 +20,13 @@ export default function SettingsModal() {
     resetCurrentChat,
   } = useChatLogicContext();
 
-  // API Keys State
-  const [openRouterApiKey, setOpenRouterApiKey] =
-    useStorageState<string>("openrouter_api_key");
-  const [tempOpenRouterApiKey, setTempOpenRouterApiKey] = useState<string>("");
+  const [mounted, setMounted] = useState(false);
+  const [isGitHubLoading, setIsGitHubLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
 
-  // Load API key into temp state when modal opens
   useEffect(() => {
-    if (isModalOpen) {
-      setTempOpenRouterApiKey(openRouterApiKey || "");
-    }
-  }, [isModalOpen, openRouterApiKey]);
+    setMounted(true);
+  }, []);
 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingToolDefinition, setEditingToolDefinition] = useState("");
@@ -43,27 +40,65 @@ export default function SettingsModal() {
 
   const [toolFunctions, setToolFunctions] = useStorageState("toolFunctions");
 
-  const handleSaveApiKeys = () => {
-    setOpenRouterApiKey(tempOpenRouterApiKey);
+  // OpenRouter ログイン処理
+  const handleOpenRouterLogin = () => {
+    window.open(
+      "https://openrouter.ai/auth?callback_url=" +
+        encodeURIComponent(window.location.origin + "/api/auth/callback"),
+      "_blank",
+      "width=500,height=600"
+    );
+  };
 
-    // 保存完了を表示
-    const saveSuccessMessage = document.createElement("div");
-    saveSuccessMessage.innerText = "APIキーを保存しました";
-    saveSuccessMessage.className = "save-success-message";
-    saveSuccessMessage.style.position = "absolute";
-    saveSuccessMessage.style.bottom = "10px";
-    saveSuccessMessage.style.left = "50%";
-    saveSuccessMessage.style.transform = "translateX(-50%)";
-    saveSuccessMessage.style.backgroundColor = "rgba(0, 255, 0, 0.2)";
-    saveSuccessMessage.style.color = "#00ff00";
-    saveSuccessMessage.style.padding = "8px 16px";
-    saveSuccessMessage.style.borderRadius = "4px";
-    saveSuccessMessage.style.zIndex = "9999";
+  // OpenRouter ログアウト処理
+  const handleOpenRouterLogout = () => {
+    storage.remove("accessToken");
+    window.dispatchEvent(new Event("tokenChange"));
+    window.location.reload();
+  };
 
-    document.body.appendChild(saveSuccessMessage);
-    setTimeout(() => {
-      document.body.removeChild(saveSuccessMessage);
-    }, 3000);
+  // GitHub ログイン処理
+  const handleGitHubLogin = () => {
+    setIsGitHubLoading(true);
+    setAuthError("");
+    const githubAuthUrl = "/api/auth/github/login";
+    const width = 600;
+    const height = 700;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+
+    const oauthWindow = window.open(
+      githubAuthUrl,
+      "githubOAuth",
+      `width=${width},height=${height},top=${top},left=${left}`
+    );
+
+    if (
+      !oauthWindow ||
+      oauthWindow.closed ||
+      typeof oauthWindow.closed === "undefined"
+    ) {
+      setAuthError(
+        "GitHub認証ウィンドウを開けませんでした。ポップアップがブロックされていないか確認してください。"
+      );
+      setIsGitHubLoading(false);
+      return;
+    }
+
+    // ウィンドウが閉じられたかチェック
+    const checkClosed = setInterval(() => {
+      if (oauthWindow.closed) {
+        setIsGitHubLoading(false);
+        clearInterval(checkClosed);
+      }
+    }, 1000);
+  };
+
+  // GitHub ログアウト処理
+  const handleGitHubLogout = () => {
+    storage.remove("gistToken");
+    storage.remove("gistOAuthSuccess");
+    window.dispatchEvent(new Event("storage"));
   };
 
   const handleResetChat = () => {
@@ -77,6 +112,13 @@ export default function SettingsModal() {
     }
   };
 
+  if (!mounted) {
+    return null;
+  }
+
+  const isOpenRouterLoggedIn = !!storage.getAccessToken();
+  const isGitHubLoggedIn = !!storage.getGistToken();
+
   return (
     <BaseModal
       isOpen={isModalOpen}
@@ -85,21 +127,100 @@ export default function SettingsModal() {
       className="settings-modal"
     >
       <div className="settings-modal-content">
-        {/* API Keys Section */}
-        <h3>API Keys</h3>
-        <div className="api-keys-section settings-input-area">
-          <label htmlFor="openrouter-api-key">OpenRouter API Key:</label>
-          <input
-            type="password"
-            id="openrouter-api-key"
-            className="model-input"
-            placeholder="sk-or-xxxxxxxxxxxxxxxxxxxxxxxxxx"
-            value={tempOpenRouterApiKey}
-            onChange={(e) => setTempOpenRouterApiKey(e.target.value)}
-          />
-          <button onClick={handleSaveApiKeys} className="add-button">
-            Save API Key
-          </button>
+        {/* Authentication Section */}
+        <h3>認証設定</h3>
+
+        {/* OpenRouter Authentication */}
+        <div className="auth-section settings-input-area">
+          <div className="auth-item">
+            <div className="auth-info">
+              <h4>OpenRouter</h4>
+              <p>AI モデルへのアクセスに必要です</p>
+              <div className="auth-status">
+                ステータス:{" "}
+                {isOpenRouterLoggedIn ? (
+                  <span style={{ color: "#00ff00" }}>✓ 認証済み</span>
+                ) : (
+                  <span style={{ color: "#ff6b6b" }}>未認証</span>
+                )}
+              </div>
+            </div>
+            <div className="auth-actions">
+              {isOpenRouterLoggedIn ? (
+                <button
+                  onClick={handleOpenRouterLogout}
+                  className="logout-button"
+                  style={{
+                    backgroundColor: "rgba(255, 59, 48, 0.2)",
+                    color: "#ff3b30",
+                    borderColor: "rgba(255, 59, 48, 0.4)",
+                  }}
+                >
+                  ログアウト
+                </button>
+              ) : (
+                <button
+                  onClick={handleOpenRouterLogin}
+                  className="login-button add-button"
+                >
+                  OpenRouterでログイン
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* GitHub Gist Authentication */}
+        <div className="auth-section settings-input-area">
+          <div className="auth-item">
+            <div className="auth-info">
+              <h4>GitHub Gist</h4>
+              <p>チャット履歴の共有とバックアップに必要です</p>
+              <div className="auth-status">
+                ステータス:{" "}
+                {isGitHubLoggedIn ? (
+                  <span style={{ color: "#00ff00" }}>✓ 認証済み</span>
+                ) : (
+                  <span style={{ color: "#ff6b6b" }}>未認証</span>
+                )}
+              </div>
+            </div>
+            <div className="auth-actions">
+              {isGitHubLoggedIn ? (
+                <button
+                  onClick={handleGitHubLogout}
+                  className="logout-button"
+                  style={{
+                    backgroundColor: "rgba(255, 59, 48, 0.2)",
+                    color: "#ff3b30",
+                    borderColor: "rgba(255, 59, 48, 0.4)",
+                  }}
+                >
+                  ログアウト
+                </button>
+              ) : (
+                <button
+                  onClick={handleGitHubLogin}
+                  className="login-button add-button"
+                  disabled={isGitHubLoading}
+                >
+                  {isGitHubLoading ? "認証中..." : "GitHubでログイン"}
+                </button>
+              )}
+            </div>
+          </div>
+          {authError && (
+            <div
+              className="error-message"
+              style={{
+                color: "#ff6b6b",
+                fontSize: "0.9rem",
+                marginTop: "0.5rem",
+              }}
+            >
+              {authError}
+            </div>
+          )}
         </div>
 
         {/* Danger Zone - Chat Reset */}

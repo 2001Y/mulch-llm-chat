@@ -213,8 +213,6 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
       className="model-modal"
     >
       <div className="model-modal-content">
-        {/* 検索インターフェース */}
-        <h3>モデルを追加</h3>
         <div className="model-search-area">
           <div className="search-input-container">
             <input
