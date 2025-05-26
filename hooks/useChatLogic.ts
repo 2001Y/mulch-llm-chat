@@ -75,9 +75,24 @@ type OptimisticMessageAction =
       newContent: string;
     }; // 新しいアクションタイプ
 
-// デフォルトモデルの定義
-const DEFAULT_MODEL_IDS = ["openai/gpt-4o-mini", "google/gemini-2.0-flash-001"];
-console.log("[DEFAULT_MODEL_IDS] Defined:", DEFAULT_MODEL_IDS);
+// デフォルト値を取得する関数
+const fetchDefaults = async () => {
+  try {
+    const response = await fetch("/api/defaults");
+    if (!response.ok) {
+      throw new Error("Failed to fetch defaults");
+    }
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error fetching defaults:", error);
+    // フォールバック値
+    return {
+      models: ["openai/gpt-4o-mini", "google/gemini-2.0-flash-001"],
+      tools: [],
+    };
+  }
+};
 
 export function useChatLogic({
   isShared = false,
@@ -134,6 +149,7 @@ export function useChatLogic({
 
   // モデルの初期化状態を追跡するためのref
   const modelsInitialized = useRef(false);
+  const toolsInitialized = useRef(false);
 
   // 現在のチャット情報を取得
   const getCurrentChatInfo = useCallback(() => {
@@ -1113,17 +1129,22 @@ export function useChatLogic({
         );
 
         if (validModels.length === 0) {
-          // 有効なモデルがない場合はデフォルトモデルだけでも設定
+          // 有効なモデルがない場合はデフォルト値をAPIから取得
           console.warn(
-            "[useEffect loadOpenRouterModels] No valid models found, using default model"
+            "[useEffect loadOpenRouterModels] No valid models found, using default models from API"
           );
-          setAllModels([
-            {
-              id: "openrouter/auto",
-              name: "Auto (recommended)",
+          try {
+            const defaults = await fetchDefaults();
+            const defaultModels = defaults.models.map((modelId: string) => ({
+              id: modelId,
+              name: modelId.split("/").pop() || modelId,
               selected: false,
-            },
-          ]);
+            }));
+            setAllModels(defaultModels);
+          } catch (err) {
+            console.error("Failed to fetch default models:", err);
+            setAllModels([]);
+          }
           return;
         }
 
@@ -1132,25 +1153,48 @@ export function useChatLogic({
           name: model.name || model.id,
           selected: false, // 初期選択状態はfalse
         }));
-        setAllModels(formattedModels);
+
+        // 重複チェック：重複したIDを排除
+        const uniqueModels = formattedModels.filter(
+          (model, index, self) =>
+            index === self.findIndex((m) => m.id === model.id)
+        );
+
+        if (formattedModels.length !== uniqueModels.length) {
+          console.warn(
+            `[useEffect loadOpenRouterModels] Removed ${
+              formattedModels.length - uniqueModels.length
+            } duplicate models`
+          );
+        }
+
+        setAllModels(uniqueModels);
         console.log(
           "[useEffect loadOpenRouterModels] AllModels loaded:",
-          formattedModels.length
+          uniqueModels.length
         );
       } catch (err) {
         console.error("Failed to fetch models from OpenRouter:", err);
-        // エラー時にもデフォルトモデルだけは設定
-        setAllModels([
-          {
-            id: "openrouter/auto",
-            name: "Auto (recommended)",
+        // エラー時もデフォルト値をAPIから取得
+        try {
+          const defaults = await fetchDefaults();
+          const defaultModels = defaults.models.map((modelId: string) => ({
+            id: modelId,
+            name: modelId.split("/").pop() || modelId,
             selected: false,
-          },
-        ]);
+          }));
+          setAllModels(defaultModels);
+          console.log(
+            "[useEffect loadOpenRouterModels] Using default models due to error"
+          );
+        } catch (defaultsErr) {
+          console.error("Failed to fetch default models:", defaultsErr);
+          setAllModels([]);
+        }
       }
     };
     loadOpenRouterModels();
-  }, []); // fetchOpenRouterModelsを依存配列から削除、初回のみ実行
+  }, []);
 
   // モデルリストの初期化と同期ロジック
   useEffect(() => {
@@ -1171,50 +1215,106 @@ export function useChatLogic({
     }
 
     // --- ここからが実際の初期化処理 ---
-    console.log(
-      "[useEffect models init] Performing initial model list synchronization."
-    );
-
-    const currentSelectedIds = selectedModelIds || [];
-    let finalSelectedIds: string[];
-
-    if (currentSelectedIds.length > 0) {
+    const initializeModels = async () => {
       console.log(
-        `[useEffect models init] Using stored selected model IDs (count: ${currentSelectedIds.length})`
+        "[useEffect models init] Performing initial model list synchronization."
       );
-      finalSelectedIds = currentSelectedIds;
-    } else {
+
+      const currentSelectedIds = selectedModelIds || [];
+      let finalSelectedIds: string[];
+
+      if (currentSelectedIds.length > 0) {
+        console.log(
+          `[useEffect models init] Using stored selected model IDs (count: ${currentSelectedIds.length})`
+        );
+        finalSelectedIds = currentSelectedIds;
+      } else {
+        console.log(
+          "[useEffect models init] No stored selected models, fetching defaults."
+        );
+        // APIからデフォルトモデルを取得
+        const defaults = await fetchDefaults();
+        finalSelectedIds = [...defaults.models];
+      }
+
+      // ローカルストレージのIDのみを元にmodelsを構築（OpenRouter一覧とはマージしない）
+      const newModelList: ModelItem[] = finalSelectedIds.map((modelId) => {
+        // OpenRouter一覧から名前を取得（見つからない場合はIDをそのまま使用）
+        const openRouterModel = AllModels.find((m) => m.id === modelId);
+        return {
+          id: modelId,
+          name: openRouterModel?.name || modelId,
+          selected: true, // ローカルストレージにあるものはすべて選択状態
+        };
+      });
+
       console.log(
-        "[useEffect models init] No stored selected models, using default models."
+        `[useEffect models init] Setting models. Total: ${
+          newModelList.length
+        }, Selected: ${finalSelectedIds.length} (${finalSelectedIds.join(
+          ", "
+        )})`
       );
-      // デフォルトモデルを設定（OpenRouter一覧に存在するかの確認は不要）
-      finalSelectedIds = [...DEFAULT_MODEL_IDS];
+
+      setModels(newModelList);
+      setSelectedModelIds(finalSelectedIds);
+      modelsInitialized.current = true;
+      console.log(
+        "[useEffect models init] Initial model synchronization complete."
+      );
+    };
+
+    initializeModels();
+  }, [selectedModelIds, setSelectedModelIds, AllModels]);
+
+  // ツールリストの初期化ロジック
+  useEffect(() => {
+    // tools が undefined (useStorageState がロード中) なら処理しない
+    if (tools === undefined) {
+      console.log("[useEffect tools sync] Skipping: tools is undefined");
+      return;
     }
 
-    // ローカルストレージのIDのみを元にmodelsを構築（OpenRouter一覧とはマージしない）
-    const newModelList: ModelItem[] = finalSelectedIds.map((modelId) => {
-      // OpenRouter一覧から名前を取得（見つからない場合はIDをそのまま使用）
-      const openRouterModel = AllModels.find((m) => m.id === modelId);
-      return {
-        id: modelId,
-        name: openRouterModel?.name || modelId,
-        selected: true, // ローカルストレージにあるものはすべて選択状態
-      };
-    });
+    // 既に初期化が完了していれば、再度の初期化処理は行わない
+    if (toolsInitialized.current) {
+      console.log(
+        "[useEffect tools sync] Already initialized, skipping initial sync."
+      );
+      return;
+    }
 
-    console.log(
-      `[useEffect models init] Setting models. Total: ${
-        newModelList.length
-      }, Selected: ${finalSelectedIds.length} (${finalSelectedIds.join(", ")})`
-    );
+    // --- ここからが実際の初期化処理 ---
+    const initializeTools = async () => {
+      console.log(
+        "[useEffect tools init] Performing initial tools list synchronization."
+      );
 
-    setModels(newModelList);
-    setSelectedModelIds(finalSelectedIds);
-    modelsInitialized.current = true;
-    console.log(
-      "[useEffect models init] Initial model synchronization complete."
-    );
-  }, [selectedModelIds, setSelectedModelIds, AllModels]);
+      const currentTools = tools || [];
+
+      if (currentTools.length > 0) {
+        console.log(
+          `[useEffect tools init] Using stored tools (count: ${currentTools.length})`
+        );
+      } else {
+        console.log(
+          "[useEffect tools init] No stored tools, fetching defaults."
+        );
+        // APIからデフォルトツールを取得
+        const defaults = await fetchDefaults();
+        setTools(defaults.tools);
+        console.log(
+          `[useEffect tools init] Set default tools: ${defaults.tools.length} tools`
+        );
+      }
+
+      toolsInitialized.current = true;
+      console.log(
+        "[useEffect tools init] Initial tools synchronization complete."
+      );
+    };
+
+    initializeTools();
+  }, [tools, setTools]);
 
   // 初期メッセージ読み込みuseEffect
   useEffect(() => {

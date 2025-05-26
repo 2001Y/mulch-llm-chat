@@ -950,7 +950,6 @@ html {
 }
 
 .modal-content {
-  padding: 3vw 4vw;
   padding-bottom: max(env(safe-area-inset-bottom), 5vw);
   $border-radius: $border-radius * 1.5;
   max-height: 95vh;
@@ -1855,6 +1854,28 @@ textarea[data-fieldsizing="content"] {
   }
 }
 
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
 .error-message {
   color: #ff6b6b;
   margin-bottom: 1rem;
@@ -2182,6 +2203,170 @@ textarea[data-fieldsizing="content"] {
             background: rgba(255, 59, 48, 0.3);
             border-color: rgba(255, 59, 48, 0.5);
             transform: scale(1.05);
+          }
+        }
+      }
+    }
+
+    // 新しいモデル検索エリアのスタイル
+    .model-search-area {
+      margin: 1rem 0;
+
+      .search-input-container {
+        position: relative;
+        margin-bottom: 0.5rem;
+
+        .model-search-input {
+          width: 100%;
+          height: 3rem;
+          background: rgba(255, 255, 255, 0.1);
+          color: #fff;
+          padding: 0 1rem;
+          border-radius: $border-radius;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          transition: all 0.3s ease;
+          font-size: 1rem;
+
+          &:focus {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba($accent-color, 0.5);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba($accent-color, 0.2);
+          }
+
+          &::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+          }
+        }
+      }
+
+      .model-search-results {
+        position: relative;
+        max-height: 400px;
+        overflow-y: auto;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: $border-radius;
+        margin-top: 0.5rem;
+
+        .model-suggestions-list {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+
+          .model-suggestion-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+            &:last-child {
+              border-bottom: none;
+            }
+
+            &:hover {
+              background: rgba(255, 255, 255, 0.08);
+            }
+
+            &.highlighted {
+              background: rgba($accent-color, 0.15);
+              border: 2px solid $accent-color;
+              border-radius: calc($border-radius / 2);
+              padding: calc(0.8rem - 2px) calc(1rem - 2px);
+              box-shadow: 0 0 8px rgba($accent-color, 0.3);
+
+              .model-name {
+                color: #fff;
+                font-weight: 600;
+              }
+            }
+
+            &.selected {
+              background: rgba($accent-color, 0.1);
+              border-left: 3px solid $accent-color;
+              padding-left: calc(1rem - 3px);
+
+              .model-name {
+                color: $accent-color;
+                font-weight: 600;
+              }
+
+              &.highlighted {
+                background: rgba($accent-color, 0.25);
+                border: 2px solid $accent-color;
+                border-radius: calc($border-radius / 2);
+                padding: calc(0.8rem - 2px) calc(1rem - 2px);
+                padding-left: calc(1rem - 2px);
+                box-shadow: 0 0 12px rgba($accent-color, 0.5);
+              }
+            }
+
+            .model-name {
+              color: #fff;
+              font-weight: 500;
+              flex: 1;
+            }
+
+            .checkmark {
+              font-size: 1.2rem;
+              margin-left: 0.5rem;
+              animation: pulse 1.5s ease-in-out infinite;
+            }
+
+            .keyboard-indicator {
+              font-size: 1rem;
+              margin-left: 0.5rem;
+              opacity: 0.8;
+              animation: blink 1.2s ease-in-out infinite;
+            }
+          }
+
+          .no-results,
+          .loading {
+            padding: 1rem;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.5);
+            font-style: italic;
+          }
+
+          .loading {
+            animation: pulse 2s ease-in-out infinite;
+          }
+        }
+      }
+    }
+
+    // 使用方法のヒント
+    .model-usage-hint {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: calc($border-radius - 2px);
+
+      p {
+        margin: 0 0 0.5rem;
+        color: rgba(255, 255, 255, 0.8);
+        font-weight: 500;
+      }
+
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+
+        li {
+          padding: 0.2rem 0;
+          color: rgba(255, 255, 255, 0.6);
+          font-size: 0.9rem;
+
+          &:before {
+            content: "•";
+            margin-right: 0.5rem;
+            color: $accent-color;
           }
         }
       }

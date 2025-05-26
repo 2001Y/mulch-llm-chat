@@ -7,6 +7,7 @@ import ClientOnly from "components/ClientOnly";
 import Sidebar from "components/Sidebar";
 import { ChatLogicProvider } from "contexts/ChatLogicContext";
 import "@/styles/layout.scss";
+import "@/styles/modals.scss";
 import { Glegoo, JetBrains_Mono } from "next/font/google";
 
 const glegoo = Glegoo({

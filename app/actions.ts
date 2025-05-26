@@ -16,17 +16,12 @@ export async function fetchOpenRouterModels() {
     }
     const data = await response.json();
 
-    // モデルの形式を修正：id, nameという形で返す
+    // シンプルな形式でモデル情報を返す（id, name, context_lengthのみ）
     const models = data.data.map((model: any) => ({
       id: model.id, // このidはOpenRouterのAPI呼び出し時に使用する
       name: model.name || model.id.split("/").pop(), // 名前がなければIDの最後の部分を使用
+      context_length: model.context_length || 0, // コンテキスト長を追加
     }));
-
-    // デフォルトモデルを先頭に追加
-    models.unshift({
-      id: "openrouter/auto",
-      name: "Auto (recommended)",
-    });
 
     console.log("[fetchOpenRouterModels] Fetched models count:", models.length);
     console.log("[fetchOpenRouterModels] Sample model:", models[0]);
@@ -34,16 +29,7 @@ export async function fetchOpenRouterModels() {
     return models;
   } catch (error: any) {
     console.error("Error fetching OpenRouter models:", error);
-    // エラーが発生した場合でもデフォルトモデルだけは返す
-    return [
-      {
-        id: "openrouter/auto",
-        name: "Auto (recommended)",
-      },
-      {
-        id: "anthropic/claude-3.5-sonnet",
-        name: "Claude 3.5 Sonnet",
-      },
-    ];
+    // エラーが発生した場合は空配列を返す（デフォルトは/api/defaultsから取得）
+    return [];
   }
 }
