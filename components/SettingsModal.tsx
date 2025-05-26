@@ -22,10 +22,49 @@ export default function SettingsModal() {
 
   const [mounted, setMounted] = useState(false);
   const [isGitHubLoading, setIsGitHubLoading] = useState(false);
+  const [isOpenRouterLoading, setIsOpenRouterLoading] = useState(false);
   const [authError, setAuthError] = useState("");
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  // OpenRouterとGitHubのOAuth認証メッセージを処理
+  useEffect(() => {
+    const handleAuthMessage = (event: MessageEvent) => {
+      const { type, token, error } = event.data;
+
+      if (type === "openrouter_oauth_success" && token) {
+        console.log("OpenRouter OAuth成功 (postMessage):", token);
+        storage.set("accessToken", token);
+        window.dispatchEvent(new Event("tokenChange"));
+        setIsOpenRouterLoading(false);
+        setAuthError("");
+        // 成功メッセージを表示（オプション）
+        // alert("OpenRouterとの認証に成功しました。");
+      } else if (type === "openrouter_oauth_error") {
+        console.error("OpenRouter OAuthエラー (postMessage):", error);
+        setAuthError(`OpenRouter認証エラー: ${error || "不明なエラー"}`);
+        setIsOpenRouterLoading(false);
+      } else if (type === "github_oauth_success" && token) {
+        console.log("GitHub OAuth成功 (postMessage):", token);
+        storage.set("gistToken", token);
+        storage.set("gistOAuthSuccess", "true");
+        setIsGitHubLoading(false);
+        setAuthError("");
+        // 成功メッセージを表示（オプション）
+        // alert("GitHubとの認証に成功しました。");
+      } else if (type === "github_oauth_error") {
+        console.error("GitHub OAuthエラー (postMessage):", error);
+        setAuthError(`GitHub認証エラー: ${error || "不明なエラー"}`);
+        setIsGitHubLoading(false);
+      }
+    };
+
+    window.addEventListener("message", handleAuthMessage);
+    return () => {
+      window.removeEventListener("message", handleAuthMessage);
+    };
   }, []);
 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -42,12 +81,35 @@ export default function SettingsModal() {
 
   // OpenRouter ログイン処理
   const handleOpenRouterLogin = () => {
-    window.open(
+    setIsOpenRouterLoading(true);
+    setAuthError("");
+
+    const oauthWindow = window.open(
       "https://openrouter.ai/auth?callback_url=" +
         encodeURIComponent(window.location.origin + "/api/auth/callback"),
       "_blank",
       "width=500,height=600"
     );
+
+    if (
+      !oauthWindow ||
+      oauthWindow.closed ||
+      typeof oauthWindow.closed === "undefined"
+    ) {
+      setAuthError(
+        "OpenRouter認証ウィンドウを開けませんでした。ポップアップがブロックされていないか確認してください。"
+      );
+      setIsOpenRouterLoading(false);
+      return;
+    }
+
+    // ウィンドウが閉じられたかチェック
+    const checkClosed = setInterval(() => {
+      if (oauthWindow.closed) {
+        setIsOpenRouterLoading(false);
+        clearInterval(checkClosed);
+      }
+    }, 1000);
   };
 
   // OpenRouter ログアウト処理
@@ -162,8 +224,9 @@ export default function SettingsModal() {
                 <button
                   onClick={handleOpenRouterLogin}
                   className="login-button add-button"
+                  disabled={isOpenRouterLoading}
                 >
-                  OpenRouterでログイン
+                  {isOpenRouterLoading ? "認証中..." : "OpenRouterでログイン"}
                 </button>
               )}
             </div>
