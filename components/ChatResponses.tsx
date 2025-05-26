@@ -254,6 +254,7 @@ export default function Responses({
                           className={`ai-response-tiptap ${
                             readOnly ? "is-readonly" : ""
                           }`}
+                          placeholder="AI response will appear here..."
                         />
                       </div>
                       {isLlmGenerating && (

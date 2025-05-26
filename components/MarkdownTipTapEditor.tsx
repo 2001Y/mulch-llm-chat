@@ -22,6 +22,7 @@ import tippy, {
   Props as TippyProps,
 } from "tippy.js"; // ★ tippy.js をインポート
 import MentionList, { MentionListProps } from "./MentionList"; // ★ MentionListProps もインポート
+import Placeholder from "@tiptap/extension-placeholder"; // ★ Placeholder拡張をインポート
 import "highlight.js/styles/a11y-dark.css"; // ★ CSSを直接インポートに戻す
 
 interface ModelMentionItemForSuggestion {
@@ -39,6 +40,7 @@ interface MarkdownTipTapEditorProps {
   aiModelSuggestions?: ModelMentionItemForSuggestion[]; // 親からAIモデル候補リストを受け取る
   onSelectAiModel?: (modelId: string) => void; // ★ AIモデル選択コールバック
   children?: React.ReactNode; // ★ アクションボタンなどを受け取るためのchildren
+  placeholder?: string; // ★ プレースホルダーテキスト
 }
 
 // 親コンポーネントが参照できるハンドル型を定義
@@ -71,6 +73,7 @@ export const MarkdownTipTapEditor = forwardRef<
       aiModelSuggestions = [], // デフォルトは空配列
       onSelectAiModel, // ★ propsから受け取る
       children, // ★ アクションボタンなどを受け取るためのchildren
+      placeholder = "Type your message...", // ★ デフォルトプレースホルダー
     },
     ref
   ) => {
@@ -245,6 +248,9 @@ export const MarkdownTipTapEditor = forwardRef<
             char: "@",
             allowSpaces: false,
           },
+        }),
+        Placeholder.configure({
+          placeholder: placeholder,
         }),
       ],
       content: value,

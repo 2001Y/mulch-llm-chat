@@ -90,6 +90,9 @@ html {
     width: 1.1em;
     aspect-ratio: 1/1;
   }
+  @media (max-width: 768px) {
+    display: none;
+  }
 }
 
 .loginButton {
@@ -275,6 +278,15 @@ html {
         font-size: inherit;
         line-height: 1.6;
         flex: 1;
+
+        // プレースホルダーのスタイリング
+        p.is-editor-empty:first-child::before {
+          content: attr(data-placeholder);
+          float: left;
+          color: color.mix(#fff, #000, 30%);
+          pointer-events: none;
+          height: 0;
+        }
       }
 
       .editor-actions {
@@ -295,12 +307,6 @@ html {
           color: color.mix(#fff, #000, 30%);
         }
       }
-
-      .send-button {
-        aspect-ratio: 1/1;
-        background: color.mix(#fff, $accent-color, 10%);
-      }
-
       .files-previews {
         position: absolute;
         bottom: 70%;
@@ -385,6 +391,62 @@ html {
     }
     .input-models-tools-container {
       display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+
+      .tab-navigation {
+        display: flex;
+        gap: 0.25rem;
+        overflow-x: auto;
+        width: 100%;
+        padding: 0 1em;
+
+        .tab-button {
+          padding: 0.375rem 0.75rem;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 6px;
+          color: rgba(255, 255, 255, 0.7);
+          font-size: 0.8rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          white-space: nowrap;
+
+          &:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.9);
+          }
+
+          &.active {
+            background: rgba($accent-color, 0.2);
+            border-color: rgba($accent-color, 0.4);
+            color: #fff;
+            font-weight: 500;
+          }
+        }
+      }
+
+      .my-models-display {
+        .my-models-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.25rem;
+
+          .my-model-item {
+            padding: 0.25rem 0.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.8);
+          }
+        }
+
+        .no-my-models {
+          color: rgba(255, 255, 255, 0.5);
+          font-size: 0.8rem;
+          font-style: italic;
+        }
+      }
     }
   }
 
@@ -464,7 +526,16 @@ html {
     }
 
     &.add-files-button {
+    }
+
+    &.input-tools-button {
       margin-right: auto;
+    }
+
+    &.send-primary-button {
+      @media (max-width: 768px) {
+        display: none;
+      }
     }
 
     &.send-button,
@@ -1436,6 +1507,20 @@ button {
 
 .markdown-editor {
   min-height: 5em;
+}
+
+// AI Response TipTap Editor のプレースホルダースタイル
+.ai-response-tiptap {
+  .ProseMirror {
+    p.is-editor-empty:first-child::before {
+      content: attr(data-placeholder);
+      float: left;
+      color: rgba(255, 255, 255, 0.3);
+      pointer-events: none;
+      height: 0;
+      font-style: italic;
+    }
+  }
 }
 
 // Markdown Styles

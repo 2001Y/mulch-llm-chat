@@ -4,6 +4,7 @@ import React, {
   useRef,
   ChangeEvent,
   useMemo,
+  useCallback,
 } from "react";
 import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
@@ -14,6 +15,8 @@ import type { AppMessage } from "types/chat";
 import type { ModelItem } from "hooks/useChatLogic";
 import useStorageState from "hooks/useLocalStorage";
 import { useChatLogicContext } from "contexts/ChatLogicContext";
+import { useMyModels } from "hooks/useMyModels";
+import TabNavigation from "./shared/TabNavigation";
 
 interface Props {
   mainInput: boolean;
@@ -156,6 +159,9 @@ export default function InputSection({
     handleOpenModelModal,
     handleOpenToolsModal,
   } = useChatLogicContext();
+  const { myModels } = useMyModels();
+  const [activeTab, setActiveTab] = useState<string>("models");
+  const [categories, setCategories] = useState<Record<string, any>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const [isEdited, setIsEdited] = useState(false);
@@ -173,6 +179,125 @@ export default function InputSection({
   // 選択されているモデルの数を取得
   const selectedModelsCount =
     models?.filter((model) => model.selected).length || 0;
+
+  // デバッグ用：現在選択されているモデルをログ出力
+  useEffect(() => {
+    if (models && models.length > 0) {
+      console.log(
+        `[InputSection] Current selected models (${selectedModelsCount}):`,
+        models.filter((m) => m.selected).map((m) => m.name)
+      );
+    }
+  }, [models, selectedModelsCount]);
+
+  // カテゴリ情報を取得
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        console.log("[InputSection] Fetching categories from /api/defaults");
+        const response = await fetch("/api/defaults");
+        const data = await response.json();
+        if (data.categories) {
+          console.log(
+            "[InputSection] Categories loaded:",
+            Object.keys(data.categories)
+          );
+          setCategories(data.categories);
+        } else {
+          console.warn("[InputSection] No categories found in API response");
+        }
+      } catch (error) {
+        console.error("Failed to fetch categories:", error);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  // カテゴリプリセットを送信用モデルに適用する関数
+  const applyCategoryToSendingModels = useCallback(
+    async (categoryKey: string) => {
+      const category = categories[categoryKey];
+      if (!category) {
+        console.warn(`Category "${categoryKey}" not found`);
+        return;
+      }
+
+      try {
+        console.log(
+          `[InputSection] Applying category "${category.name}" (${categoryKey})`
+        );
+        console.log(`[InputSection] Current models before update:`, models);
+
+        // AllModelsから該当するモデルを検索
+        const categoryModels: ModelItem[] = [];
+
+        for (const modelId of category.models) {
+          const foundModel = AllModels?.find((m) => m.id === modelId);
+          if (foundModel) {
+            categoryModels.push({
+              id: foundModel.id,
+              name: foundModel.name,
+              selected: true,
+            });
+          } else {
+            // AllModelsにない場合はIDから名前を生成
+            categoryModels.push({
+              id: modelId,
+              name: modelId.split("/").pop() || modelId,
+              selected: true,
+            });
+          }
+        }
+
+        // 送信用モデルリストを更新（既存のモデルをリセット）
+        updateModels(categoryModels);
+
+        // アクティブタブを更新
+        setActiveTab(categoryKey);
+
+        console.log(
+          `[InputSection] Applied category "${category.name}" with ${categoryModels.length} models:`,
+          categoryModels.map((m) => m.name)
+        );
+      } catch (error) {
+        console.error("Failed to apply category:", error);
+      }
+    },
+    [categories, AllModels, updateModels, models]
+  );
+
+  // タブ設定（ModelModalと全く同じ構成）
+  const inputTabs = useMemo(() => {
+    const baseTabs = [
+      {
+        key: "models",
+        label: "My モデル",
+        count: myModels?.length || 0,
+        onClick: handleOpenModelModal, // Myモデルクリック時にモーダルを開く
+      },
+    ];
+
+    const categoryTabs = Object.entries(categories).map(([key, category]) => ({
+      key,
+      label: category.name,
+      count: category.count,
+      onClick: () => applyCategoryToSendingModels(key), // シングルクリックで送信用モデルに適用
+      onDoubleClick: handleOpenModelModal, // ダブルクリックでモーダルを開く
+    }));
+
+    const allTabs = [...baseTabs, ...categoryTabs];
+    console.log(
+      "[InputSection] Generated tabs:",
+      allTabs.map((t) => ({ key: t.key, label: t.label }))
+    );
+    return allTabs;
+  }, [
+    myModels,
+    categories,
+    handleOpenModelModal,
+    applyCategoryToSendingModels,
+  ]);
 
   const isInputEmpty = () => {
     return !chatInput || chatInput.trim().length === 0;
@@ -467,20 +592,11 @@ export default function InputSection({
 
         {/* 控えめなモデル・ツール選択ボタン */}
         <div className="input-models-tools-container">
-          <button
-            type="button"
-            onClick={handleOpenModelModal}
-            className="input-models-button"
-          >
-            {selectedModelsCount} Model{selectedModelsCount !== 1 ? "s" : ""}
-          </button>
-          <button
-            type="button"
-            onClick={handleOpenToolsModal}
-            className="input-tools-button"
-          >
-            {tools?.length || 0} Tools
-          </button>
+          <TabNavigation
+            tabs={inputTabs}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
         </div>
 
         <MarkdownTipTapEditor
@@ -492,6 +608,11 @@ export default function InputSection({
           className="input-container chat-input-area chat-tiptap-editor"
           aiModelSuggestions={aiModelSuggestionsForTiptap}
           onSelectAiModel={selectSingleModel}
+          placeholder={
+            isEditMode
+              ? "Edit your message here..."
+              : "Type your message here..."
+          }
         >
           <div className="input-actions">
             <button
@@ -522,6 +643,14 @@ export default function InputSection({
               style={{ display: "none" }}
               multiple
             />
+
+            <button
+              type="button"
+              onClick={handleOpenToolsModal}
+              className="action-button input-tools-button"
+            >
+              {tools?.length || 0} Tools
+            </button>
 
             {isGenerating ? (
               <button

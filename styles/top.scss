@@ -292,35 +292,35 @@ body {
 }
 
 // Responsive Design
-@media (max-width: 768px) {
-  .hero {
-    .heroContent {
-      h1 {
-        font-size: 2rem;
-      }
+// @media (max-width: 768px) {
+//   .hero {
+//     .heroContent {
+//       h1 {
+//         font-size: 2rem;
+//       }
 
-      p {
-        font-size: 1rem;
-      }
-    }
-  }
+//       p {
+//         font-size: 1rem;
+//       }
+//     }
+//   }
 
-  .features {
-    .featureList {
-      grid-template-columns: 1fr;
-    }
-  }
+//   .features {
+//     .featureList {
+//       grid-template-columns: 1fr;
+//     }
+//   }
 
-  .howItWorks {
-    .steps {
-      flex-direction: column;
-    }
-  }
+//   .howItWorks {
+//     .steps {
+//       flex-direction: column;
+//     }
+//   }
 
-  .footer {
-    .container {
-      flex-direction: column;
-      gap: 1rem;
-    }
-  }
-}
+//   .footer {
+//     .container {
+//       flex-direction: column;
+//       gap: 1rem;
+//     }
+//   }
+// }

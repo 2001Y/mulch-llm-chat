@@ -6,7 +6,10 @@ import React, {
   useMemo,
 } from "react";
 import BaseModal from "./BaseModal";
+import ModelList from "./shared/ModelList";
+import TabNavigation from "./shared/TabNavigation";
 import { useChatLogicContext } from "contexts/ChatLogicContext";
+import { useMyModels } from "hooks/useMyModels";
 import type { ModelItem } from "hooks/useChatLogic";
 
 interface ModelModalProps {
@@ -20,36 +23,101 @@ interface OpenRouterModel {
   context_length?: number;
 }
 
-// コンテキスト長を簡潔に表示するヘルパー関数
-const formatContextLength = (contextLength?: number): string => {
-  if (!contextLength || contextLength === 0) return "";
-
-  if (contextLength >= 1000000) {
-    return `${(contextLength / 1000000).toFixed(1)}M`;
-  } else if (contextLength >= 1000) {
-    return `${(contextLength / 1000).toFixed(0)}K`;
-  } else {
-    return `${contextLength}`;
-  }
-};
+interface ModelCategory {
+  name: string;
+  description: string;
+  count: number;
+  models: string[];
+}
 
 export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
   const { models, updateModels, AllModels } = useChatLogicContext();
+  const { myModels, updateMyModels, addToMyModels, removeFromMyModels } =
+    useMyModels();
   const [searchInput, setSearchInput] = useState<string>("");
   const [filteredModels, setFilteredModels] = useState<OpenRouterModel[]>([]);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const [isFocused, setIsFocused] = useState(false); // キーボード操作の有効化に使用
+  const [activeTab, setActiveTab] = useState<string>("models"); // "models" or category name
+  const [categories, setCategories] = useState<Record<string, ModelCategory>>(
+    {}
+  );
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+
+  // カテゴリ情報を取得
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch("/api/defaults");
+        const data = await response.json();
+        if (data.categories) {
+          setCategories(data.categories);
+        }
+      } catch (error) {
+        console.error("Failed to fetch categories:", error);
+      }
+    };
+
+    if (isOpen) {
+      fetchCategories();
+    }
+  }, [isOpen]);
 
   // 選択されたモデルのIDセット（メモ化して無限ループを防ぐ）
   const selectedModelIds = useMemo(() => {
     return new Set(models?.map((m) => m.id) || []);
   }, [models]);
 
+  // Myモデルの選択されたIDセット
+  const mySelectedModelIds = useMemo(() => {
+    return new Set(myModels?.map((m) => m.id) || []);
+  }, [myModels]);
+
+  // カテゴリプリセットを送信用モデルに適用する関数
+  const applyCategoryToSendingModels = useCallback(
+    async (categoryKey: string) => {
+      const category = categories[categoryKey];
+      if (!category) return;
+
+      try {
+        // AllModelsから該当するモデルを検索
+        const categoryModels: ModelItem[] = [];
+
+        for (const modelId of category.models) {
+          const foundModel = AllModels?.find((m) => m.id === modelId);
+          if (foundModel) {
+            categoryModels.push({
+              id: foundModel.id,
+              name: foundModel.name,
+              selected: true,
+            });
+          } else {
+            // AllModelsにない場合はIDから名前を生成
+            categoryModels.push({
+              id: modelId,
+              name: modelId.split("/").pop() || modelId,
+              selected: true,
+            });
+          }
+        }
+
+        // 送信用モデルリストを更新（既存のモデルをリセット）
+        updateModels(categoryModels);
+
+        console.log(
+          `Applied category "${category.name}" with ${categoryModels.length} models to sending models`
+        );
+      } catch (error) {
+        console.error("Failed to apply category:", error);
+      }
+    },
+    [categories, AllModels, updateModels]
+  );
+
   // 検索とフィルタリング
   useEffect(() => {
-    if (!AllModels) {
+    if (activeTab !== "models" || !AllModels) {
       setFilteredModels([]);
       return;
     }
@@ -93,22 +161,22 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
       });
     }
 
-    // 選択されたモデルを上部に移動
+    // Myモデルの選択されたモデルを上部に移動
     const selectedModels = filtered.filter((model) =>
-      selectedModelIds.has(model.id)
+      mySelectedModelIds.has(model.id)
     );
     const unselectedModels = filtered.filter(
-      (model) => !selectedModelIds.has(model.id)
+      (model) => !mySelectedModelIds.has(model.id)
     );
 
     setFilteredModels([...selectedModels, ...unselectedModels]);
     setHighlightedIndex(-1);
-  }, [searchInput, AllModels, selectedModelIds]);
+  }, [searchInput, AllModels, mySelectedModelIds, activeTab]);
 
   // キーボード操作の処理
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (!filteredModels.length) return;
+      if (activeTab !== "models" || !filteredModels.length) return;
 
       switch (e.key) {
         case "ArrowDown":
@@ -142,10 +210,10 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
           break;
       }
     },
-    [filteredModels, highlightedIndex]
+    [filteredModels, highlightedIndex, activeTab]
   );
 
-  // モデルの選択/選択解除
+  // モデルの選択/選択解除（送信用モデル）
   const handleToggleModel = useCallback(
     (model: OpenRouterModel) => {
       const currentModels = models || [];
@@ -170,6 +238,29 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
     [models, updateModels]
   );
 
+  // Myモデルの選択/選択解除
+  const handleToggleMyModel = useCallback(
+    (model: OpenRouterModel) => {
+      const isSelected = mySelectedModelIds.has(model.id);
+
+      if (isSelected) {
+        // 選択解除
+        removeFromMyModels(model.id);
+      } else {
+        // 選択
+        const newModel: ModelItem = {
+          id: model.id,
+          name: model.name,
+          selected: true,
+        };
+        addToMyModels(newModel);
+        // モデル選択時に検索入力をクリア
+        setSearchInput("");
+      }
+    },
+    [mySelectedModelIds, addToMyModels, removeFromMyModels]
+  );
+
   // ハイライトされた項目をスクロール表示
   useEffect(() => {
     if (highlightedIndex >= 0 && listRef.current) {
@@ -187,14 +278,14 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
 
   // モーダルが開いたときにフォーカス
   useEffect(() => {
-    if (isOpen && searchInputRef.current) {
+    if (isOpen && searchInputRef.current && activeTab === "models") {
       setTimeout(() => {
         searchInputRef.current?.focus();
       }, 100);
     }
-  }, [isOpen]);
+  }, [isOpen, activeTab]);
 
-  // 選択されたモデルを直接削除する関数
+  // 選択されたモデルを直接削除する関数（送信用モデル）
   const handleDeleteModel = useCallback(
     (modelId: string) => {
       const updatedModels = models.filter(
@@ -205,6 +296,38 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
     [models, updateModels]
   );
 
+  // Myモデルを直接削除する関数
+  const handleDeleteMyModel = useCallback(
+    (modelId: string) => {
+      removeFromMyModels(modelId);
+    },
+    [removeFromMyModels]
+  );
+
+  // タブ設定
+  const tabs = useMemo(() => {
+    const baseTabs = [
+      {
+        key: "models",
+        label: "My モデル",
+        count: myModels?.length || 0,
+      },
+    ];
+
+    const categoryTabs = Object.entries(categories).map(([key, category]) => ({
+      key,
+      label: category.name,
+      count: category.count,
+      onClick: () => {
+        applyCategoryToSendingModels(key); // シングルクリックで送信用モデルに適用
+        onClose(); // モーダルを閉じる
+      },
+      onDoubleClick: () => setActiveTab(key), // ダブルクリックでタブ切り替え
+    }));
+
+    return [...baseTabs, ...categoryTabs];
+  }, [myModels, categories, applyCategoryToSendingModels]);
+
   return (
     <BaseModal
       isOpen={isOpen}
@@ -213,73 +336,70 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
       className="model-modal"
     >
       <div className="model-modal-content">
-        <div className="model-search-area">
-          <div className="search-input-container">
-            <input
-              ref={searchInputRef}
-              type="text"
-              className="model-search-input"
-              placeholder="🔍 モデルを検索または全て表示"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-              onKeyDown={handleKeyDown}
+        {/* タブナビゲーション */}
+        <TabNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+        />
+
+        {/* モデル選択タブ */}
+        {activeTab === "models" && (
+          <div className="model-search-area">
+            <div className="search-input-container">
+              <input
+                ref={searchInputRef}
+                type="text"
+                className="model-search-input"
+                placeholder="🔍 モデルを検索または全て表示"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                onKeyDown={handleKeyDown}
+              />
+            </div>
+
+            {/* 検索結果・全モデルリスト - 常時表示 */}
+            <ModelList
+              models={filteredModels}
+              selectedModelIds={mySelectedModelIds}
+              highlightedIndex={highlightedIndex}
+              onToggleModel={handleToggleMyModel}
+              onDeleteModel={handleDeleteMyModel}
+              searchInput={searchInput}
+              listRef={listRef}
             />
           </div>
+        )}
 
-          {/* 検索結果・全モデルリスト - 常時表示 */}
-          <div className="model-search-results">
-            <ul ref={listRef} className="model-suggestions-list">
-              {filteredModels.map((model, index) => {
-                const isSelected = selectedModelIds.has(model.id);
-                const isHighlighted = index === highlightedIndex;
-                const contextText = formatContextLength(model.context_length);
+        {/* カテゴリタブ */}
+        {activeTab !== "models" && categories[activeTab] && (
+          <div className="category-content">
+            <div className="category-info">
+              <h3>{categories[activeTab].name}</h3>
+              <p>{categories[activeTab].description}</p>
+            </div>
 
-                return (
-                  <li
-                    key={model.id}
-                    className={`model-suggestion-item ${
-                      isSelected ? "selected" : ""
-                    } ${isHighlighted ? "highlighted" : ""}`}
-                    onClick={() => handleToggleModel(model)}
-                  >
-                    <div className="model-info">
-                      <span className="model-name">{model.name}</span>
-                      {contextText && (
-                        <span className="model-context">{contextText}</span>
-                      )}
-                    </div>
-                    <div className="model-indicators">
-                      {isSelected && <span className="checkmark">✅</span>}
-                      {isSelected && (
-                        <button
-                          className="delete-button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteModel(model.id);
-                          }}
-                          title="削除"
-                        >
-                          ×
-                        </button>
-                      )}
-                      {isHighlighted && (
-                        <span className="keyboard-indicator">⌨️</span>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-              {filteredModels.length === 0 && searchInput.trim() !== "" && (
-                <li className="no-results">該当するモデルが見つかりません</li>
-              )}
-              {filteredModels.length === 0 && searchInput.trim() === "" && (
-                <li className="loading">モデルを読み込み中...</li>
-              )}
-            </ul>
+            <div className="category-models">
+              <h4>含まれるモデル ({categories[activeTab].count}個)</h4>
+              <ul className="category-model-list">
+                {categories[activeTab].models.map((modelId) => {
+                  const model = AllModels?.find((m) => m.id === modelId);
+                  const displayName =
+                    model?.name || modelId.split("/").pop() || modelId;
+
+                  return (
+                    <li key={modelId} className="category-model-item">
+                      <span className="model-name">{displayName}</span>
+                      <span className="model-id">{modelId}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </BaseModal>
   );

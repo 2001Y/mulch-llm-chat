@@ -119,7 +119,7 @@ export function useChatLogic({
   const [selectedModelIds, setSelectedModelIds] =
     useStorageState<string[]>("selectedModels");
   const [models, setModels] = useState<ModelItem[]>([]);
-  const [chatInput, setChatInput] = useState<string>('""');
+  const [chatInput, setChatInput] = useState<string>("");
 
   const [messages, setMessages] = useState<AppMessage[]>(initialMessages || []);
   // 生成中にメッセージがリセットされないようにするためのフラグ
