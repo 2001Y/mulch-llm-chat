@@ -152,6 +152,9 @@ export default function InputSection({
     setSelectedModelIds,
     updateModels,
     models,
+    tools,
+    handleOpenModelModal,
+    handleOpenToolsModal,
   } = useChatLogicContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
@@ -166,6 +169,10 @@ export default function InputSection({
   const showModelSelectionAndButtonName = useMemo(() => {
     return models && models.length > 0;
   }, [models]);
+
+  // 選択されているモデルの数を取得
+  const selectedModelsCount =
+    models?.filter((model) => model.selected).length || 0;
 
   const isInputEmpty = () => {
     return !chatInput || chatInput.trim().length === 0;
@@ -224,7 +231,7 @@ export default function InputSection({
         event.preventDefault();
 
         // 編集モードの場合は編集内容を新規メッセージとして送信
-        if (isEditMode && isEdited) {
+        if (isEditMode) {
           // 編集内容をそのまま新規メッセージとして送信
           const form = view.dom.closest("form");
           if (form) {
@@ -267,7 +274,7 @@ export default function InputSection({
         event.preventDefault();
 
         // 編集モードの場合は編集内容を新規メッセージとして送信
-        if (isEditMode && isEdited) {
+        if (isEditMode) {
           // 編集内容をそのまま新規メッセージとして送信
           const form = view.dom.closest("form");
           if (form) {
@@ -457,6 +464,24 @@ export default function InputSection({
         ref={sectionRef}
       >
         <input type="hidden" name="chatInput" value={chatInput} />
+
+        {/* 控えめなモデル・ツール選択ボタン */}
+        <div className="input-models-tools-container">
+          <button
+            type="button"
+            onClick={handleOpenModelModal}
+            className="input-models-button"
+          >
+            {selectedModelsCount} Model{selectedModelsCount !== 1 ? "s" : ""}
+          </button>
+          <button
+            type="button"
+            onClick={handleOpenToolsModal}
+            className="input-tools-button"
+          >
+            {tools?.length || 0} Tools
+          </button>
+        </div>
 
         <MarkdownTipTapEditor
           ref={tiptapEditorRef}

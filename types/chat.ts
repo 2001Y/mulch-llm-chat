@@ -7,6 +7,15 @@ export interface ToolCall {
   };
 }
 
+export interface Tool {
+  type: string;
+  function: {
+    name: string;
+    description: string;
+    parameters: any;
+  };
+}
+
 export interface MessageUI {
   isGenerating?: boolean;
   isSelected?: boolean;

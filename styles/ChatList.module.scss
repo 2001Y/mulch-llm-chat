@@ -182,3 +182,36 @@
     color-scheme: dark;
   }
 }
+
+// ヘッダー版のChatItemContentスタイル
+.chatItemContentHeader {
+  .chatItemMeta {
+    flex-direction: column;
+    align-items: flex-start;
+    margin-top: 0.2em;
+    gap: 0.1em;
+  }
+
+  .chatItemFirstMessage {
+    font-size: 0.9em;
+    margin-bottom: 0.1em;
+    line-height: 1.2;
+  }
+
+  .chatItemTimestamp {
+    font-size: 0.7em;
+    order: 2;
+  }
+
+  .chatItemTitle {
+    font-size: 0.7em;
+    margin-right: 0;
+    order: 1;
+    opacity: 0.8;
+
+    &::before {
+      content: "#";
+      margin-right: 0.2em;
+    }
+  }
+}

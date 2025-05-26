@@ -196,14 +196,27 @@ function BentoGrid({
       if (!grid) return;
 
       const gridWidth = grid.clientWidth;
-      const singleSetWidth = gridWidth / 3; // 1セット分の幅
       const windowWidth = window.innerWidth;
 
+      // グリッド幅が十分でない場合は最小値を設定
+      if (gridWidth < 100) {
+        setRepeatCount(3);
+        return;
+      }
+
+      const singleSetWidth = gridWidth / 3; // 1セット分の幅
+
+      // singleSetWidthが小さすぎる場合の安全性チェック
+      if (singleSetWidth < 50) {
+        setRepeatCount(3);
+        return;
+      }
+
       // ウィンドウ幅が1セット分より大きい場合、セット数を増やす
-      const neededSets = Math.max(
-        3,
-        Math.ceil((windowWidth / singleSetWidth) * 1.5)
-      );
+      const calculatedSets = Math.ceil((windowWidth / singleSetWidth) * 1.5);
+      // repeatCountの上限を20に設定（安全性のため）
+      const neededSets = Math.max(3, Math.min(20, calculatedSets));
+
       setRepeatCount(neededSets);
     };
 
@@ -225,7 +238,7 @@ function BentoGrid({
     // 中央のセットにスクロール + アイテム幅の半分をオフセット
     let middleSetPosition = grid.scrollWidth / 3 - itemWidth / 2;
 
-    // 奇数番目のグリッド��場合、さらにアイテム幅の半分を追加
+    // 奇数番目のグリッド場合、さらにアイテム幅の半分を追加
     if (index % 2 === 1) {
       middleSetPosition += itemWidth / 2;
     }

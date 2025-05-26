@@ -255,11 +255,10 @@ html {
       max-width: 100%;
       background: rgba(color.mix(#fff, #000, 10%), $background-opacity);
       backdrop-filter: blur($blur-intensity);
-      border-radius: $border-radius $border-radius 0 0;
+      border-radius: $border-radius;
       box-shadow: $shadow;
       font-size: 1rem;
       padding: 0.8em 1em;
-      // margin: 0 $body-padding;
       position: relative;
       border: 1px solid rgba(255, 255, 255, 0.05);
       align-items: stretch;
@@ -279,8 +278,6 @@ html {
       }
 
       .editor-actions {
-        // margin-top: 0.8em;
-
         .input-actions {
           display: flex;
           gap: 0.5em;
@@ -301,7 +298,6 @@ html {
 
       .send-button {
         aspect-ratio: 1/1;
-        margin: 0.5em;
         background: color.mix(#fff, $accent-color, 10%);
       }
 
@@ -367,16 +363,33 @@ html {
     }
   }
 
+  // デフォルト（チャット内版）では input-actions を非表示 - 詳細度を上げる
+  &:not(.full-input):not(.fixed) {
+    .editor-actions .input-actions {
+      display: none;
+      gap: 0.5em;
+    }
+
+    // チャット内版でフォーカス時のみ input-actions を表示
+    .input-container.chat-input-area:focus-within {
+      .editor-actions .input-actions {
+        display: flex;
+      }
+    }
+  }
+
+  // 画面下部固定版では下部角丸なし
+  &.full-input.fixed {
+    .input-container.chat-input-area {
+      border-radius: $border-radius $border-radius 0 0; // 画面下部固定版は下部角丸なし
+    }
+  }
+
   .action-button,
   .shortcut-area,
   .model-radio label {
     height: 2rem;
     border: 1px solid rgba(255, 255, 255, 0.05);
-  }
-
-  .input-actions {
-    display: flex;
-    gap: 0.5em;
   }
 
   $button-icon-size: 1.2em;
@@ -1579,8 +1592,18 @@ textarea[data-fieldsizing="content"] {
   height: calc(100vh - $height_header - 200px);
   overflow-y: auto;
 
-  @media (min-width: 768px) {
+  // デスクトップでは非表示
+  @media (min-width: 769px) {
     display: none;
+  }
+
+  // モバイルではデフォルト非表示、チャットがある場合のみ表示
+  @media (max-width: 768px) {
+    display: none;
+
+    .has-chats & {
+      display: block;
+    }
   }
 }
 
@@ -2247,6 +2270,70 @@ textarea[data-fieldsizing="content"] {
           transform: translateY(-1px);
         }
       }
+    }
+  }
+}
+
+// BentoFeaturesの表示制御
+.bento-grid {
+  // デスクトップでは常に表示
+  @media (min-width: 769px) {
+    display: flex;
+  }
+
+  // モバイルではチャットリストがない場合のみ表示
+  @media (max-width: 768px) {
+    display: flex;
+
+    // チャットリストがある場合は非表示
+    .has-chats & {
+      display: none;
+    }
+  }
+}
+
+// InputSection内の控えめなモデル・ツール選択ボタン
+.input-models-tools-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+
+  &:hover {
+    opacity: 1;
+  }
+
+  .input-models-button,
+  .input-tools-button {
+    display: flex;
+    align-items: center;
+    padding: 0.3rem 0.6rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: calc($border-radius / 2);
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.75rem;
+    font-weight: 400;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.8);
+    }
+  }
+
+  .input-tools-button {
+    color: rgba($accent-color, 0.6);
+    border-color: rgba($accent-color, 0.1);
+
+    &:hover {
+      background: rgba($accent-color, 0.05);
+      border-color: rgba($accent-color, 0.2);
+      color: rgba($accent-color, 0.9);
     }
   }
 }

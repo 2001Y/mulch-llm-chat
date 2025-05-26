@@ -8,6 +8,7 @@ import { useChats } from "hooks/useLocalStorage";
 import { storage } from "hooks/useLocalStorage";
 import { navigateWithTransition } from "@/utils/navigation";
 import GistConnectionModal from "./GistConnectionModal";
+import ChatItemContent from "./ChatItemContent";
 import { saveToGist } from "@/utils/gistUtils";
 
 interface ChatItem {
@@ -70,48 +71,49 @@ export default function ChatList() {
     };
   }, [selectedChatForSharing]);
 
-  useEffect(() => {
-    const loadChats = () => {
-      setIsLoadingChats(true);
-      const chatItems: ChatItem[] = [];
-      chatIds.forEach((chatId) => {
-        const key = `chatMessages_${chatId}`;
-        const chatData = storage.get(key) || [];
-        if (chatData.length > 0) {
-          // ConversationTurn形式のデータから最初のメッセージを取得
-          const firstTurn = chatData[0];
+  const loadChats = useCallback(() => {
+    setIsLoadingChats(true);
+    const chatItems: ChatItem[] = [];
+    chatIds.forEach((chatId) => {
+      const key = `chatMessages_${chatId}`;
+      const chatData = storage.get(key) || [];
+      if (chatData.length > 0) {
+        // ConversationTurn形式のデータから最初のメッセージを取得
+        const firstTurn = chatData[0];
 
-          // タイムスタンプを後ろから順に探索（ConversationTurn形式に対応）
-          let timestamp = null;
-          for (let j = chatData.length - 1; j >= 0; j--) {
-            const turn = chatData[j];
-            if (turn && turn.userMessage && turn.userMessage.timestamp) {
-              timestamp = turn.userMessage.timestamp;
-              break;
-            }
+        // タイムスタンプを後ろから順に探索（ConversationTurn形式に対応）
+        let timestamp = null;
+        for (let j = chatData.length - 1; j >= 0; j--) {
+          const turn = chatData[j];
+          if (turn && turn.userMessage && turn.userMessage.timestamp) {
+            timestamp = turn.userMessage.timestamp;
+            break;
           }
-
-          // 最初のユーザーメッセージを取得
-          const firstMessage =
-            firstTurn && firstTurn.userMessage && firstTurn.userMessage.content
-              ? firstTurn.userMessage.content.slice(0, 50) +
-                (firstTurn.userMessage.content.length > 50 ? "..." : "")
-              : "No messages";
-
-          chatItems.push({
-            id: chatId,
-            title: chatId,
-            firstMessage: firstMessage,
-            timestamp: timestamp || -1,
-          });
         }
-      });
-      setChats(chatItems.sort((a, b) => b.timestamp - a.timestamp));
-      setIsLoadingChats(false);
-      console.log("[ChatList] Loaded chats:", chatItems);
-    };
-    loadChats();
+
+        // 最初のユーザーメッセージを取得
+        const firstMessage =
+          firstTurn && firstTurn.userMessage && firstTurn.userMessage.content
+            ? firstTurn.userMessage.content.slice(0, 50) +
+              (firstTurn.userMessage.content.length > 50 ? "..." : "")
+            : "No messages";
+
+        chatItems.push({
+          id: chatId,
+          title: chatId,
+          firstMessage: firstMessage,
+          timestamp: timestamp || -1,
+        });
+      }
+    });
+    setChats(chatItems.sort((a, b) => b.timestamp - a.timestamp));
+    setIsLoadingChats(false);
+    console.log("[ChatList] Loaded chats:", chatItems);
   }, [chatIds]);
+
+  useEffect(() => {
+    loadChats();
+  }, [loadChats]);
 
   const handleDelete = (chatId: string, event: React.MouseEvent) => {
     event.preventDefault();
@@ -243,25 +245,12 @@ export default function ChatList() {
             }`}
             onClick={(e) => handleChatClick(e, chat.id)}
           >
-            <div className={styles.chatItemContent}>
-              <div className={styles.chatItemFirstMessage}>
-                {chat.firstMessage}
-              </div>
-              <div className={styles.chatItemMeta}>
-                <div className={styles.chatItemTimestamp}>
-                  {chat.timestamp === -1
-                    ? "0000/00/00"
-                    : new Date(chat.timestamp).toLocaleString(undefined, {
-                        year: "numeric",
-                        month: "2-digit",
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                </div>
-                <div className={styles.chatItemTitle}>{chat.title}</div>
-              </div>
-            </div>
+            <ChatItemContent
+              firstMessage={chat.firstMessage}
+              timestamp={chat.timestamp}
+              title={chat.title}
+              variant="list"
+            />
             <div className={styles.chatItemActions}>
               <button
                 className={styles.menuButton}

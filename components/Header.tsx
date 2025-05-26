@@ -109,11 +109,6 @@ function FreeVersionBadge() {
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
-  const [showBackButton, setShowBackButton] = useState(false);
-
-  useEffect(() => {
-    setShowBackButton(pathname !== "/" && window.innerWidth <= 768);
-  }, [pathname]);
 
   const handleNavigation = (e: React.MouseEvent, href: string) => {
     e.preventDefault();
@@ -122,7 +117,7 @@ export default function Header() {
 
   return (
     <header>
-      {showBackButton && (
+      {pathname !== "/" && (
         <button
           className="back-button"
           onClick={(e) => handleNavigation(e, "/")}

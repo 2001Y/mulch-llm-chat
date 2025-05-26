@@ -200,6 +200,7 @@ export default function useStorageState<V = any>(
 
 export function useChats() {
   const [chatIds, setChatIds] = useState<string[]>([]);
+  const prevChatIdsRef = useRef<string[]>([]);
 
   const loadChats = useCallback(() => {
     const ids = Object.keys(localStorage)
@@ -207,8 +208,20 @@ export function useChats() {
         (key) =>
           key.startsWith("chatMessages_") && key !== "chatMessages_default"
       )
-      .map((key) => key.replace("chatMessages_", ""));
-    setChatIds(ids);
+      .map((key) => key.replace("chatMessages_", ""))
+      .sort(); // ソートして一貫性を保つ
+
+    // 配列の内容が変わった場合のみ更新
+    const prevIds = prevChatIdsRef.current;
+    const idsChanged =
+      ids.length !== prevIds.length ||
+      ids.some((id, index) => id !== prevIds[index]);
+
+    if (idsChanged) {
+      prevChatIdsRef.current = ids;
+      setChatIds(ids);
+    }
+
     return ids.length > 0;
   }, []);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, Suspense } from "react";
 import "@/styles/chat.scss";
 import { useParams } from "next/navigation";
 import MainHeader from "./MainHeader";
@@ -8,6 +8,8 @@ import ChatResponses from "./ChatResponses";
 import InputSection from "./InputSection";
 import SettingsModal from "./SettingsModal";
 import ModelModal from "./ModelModal";
+import ModelSelectorSlideout from "./ModelSelectorSlideout";
+import ToolsModal from "./ToolsModal";
 import BentoFeatures from "./BentoFeatures";
 import ChatList from "./ChatList";
 import { useChatLogicContext } from "contexts/ChatLogicContext";
@@ -31,60 +33,70 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
     handleSaveOnly,
     isModelModalOpen,
     handleCloseModelModal,
+    isModelSelectorSlideoutOpen,
+    handleCloseModelSelectorSlideout,
+    isToolsModalOpen,
+    handleCloseToolsModal,
   } = useChatLogicContext();
 
-  const [hasActualChats, setHasActualChats] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
+  // チャットリストの有無をbodyクラスで管理
   useEffect(() => {
-    const checkActualChats = () => {
-      const chatKeys = Object.keys(localStorage).filter(
-        (key) =>
-          key.startsWith("chatMessages_") &&
-          key !== "chatMessages_default" &&
-          (() => {
-            const item = localStorage.getItem(key);
-            if (item && item !== "undefined") {
-              try {
-                return (JSON.parse(item) || []).some(
-                  (msg: any) =>
-                    typeof msg.user === "string" && msg.user.trim() !== ""
-                );
-              } catch (e) {
-                console.error(`Failed to parse localStorage item ${key}:`, e);
+    const checkAndSetChatClass = () => {
+      const chatKeys = Object.keys(localStorage).filter((key) =>
+        key.startsWith("chatMessages_")
+      );
+
+      let hasValidChats = false;
+      for (const key of chatKeys) {
+        const item = localStorage.getItem(key);
+        if (item && item !== "undefined") {
+          try {
+            const parsed = JSON.parse(item);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              // ConversationTurn形式またはAppMessage形式の有効なデータがあるかチェック
+              const hasData = parsed.some((item: any) => {
+                if (item.userMessage && item.assistantResponses) {
+                  // ConversationTurn形式
+                  return true;
+                } else if (
+                  item.role === "user" &&
+                  typeof item.content === "string" &&
+                  item.content.trim() !== ""
+                ) {
+                  // AppMessage形式
+                  return true;
+                }
                 return false;
+              });
+              if (hasData) {
+                hasValidChats = true;
+                break;
               }
             }
-            return false;
-          })()
-      );
-      setHasActualChats(chatKeys.length > 0);
+          } catch (e) {
+            // 無効なデータは無視
+          }
+        }
+      }
+
+      if (hasValidChats) {
+        document.body.classList.add("has-chats");
+      } else {
+        document.body.classList.remove("has-chats");
+      }
     };
 
     if (!roomId && !isSharedView) {
-      checkActualChats();
-      window.addEventListener("storage", (e) => {
-        if (e.key?.startsWith("chatMessages_")) {
-          checkActualChats();
-        }
-      });
-      window.addEventListener("chatListUpdate", checkActualChats);
+      checkAndSetChatClass();
+      window.addEventListener("storage", checkAndSetChatClass);
+      window.addEventListener("chatListUpdate", checkAndSetChatClass);
 
       return () => {
-        window.removeEventListener("storage", checkActualChats);
-        window.removeEventListener("chatListUpdate", checkActualChats);
+        window.removeEventListener("storage", checkAndSetChatClass);
+        window.removeEventListener("chatListUpdate", checkAndSetChatClass);
       };
     }
   }, [roomId, isSharedView]);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
 
   console.log(
     "[DEBUG ChatPage] Rendering. roomId:",
@@ -129,12 +141,12 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
     return (
       <>
         <MainHeader onShare={handleShare} />
-        {(!isMobile || (isMobile && !hasActualChats)) && <BentoFeatures />}
-        {hasActualChats && (
-          <div className="chat-list-container">
+        <BentoFeatures />
+        <div className="chat-list-container">
+          <Suspense fallback={<div>Loading chats...</div>}>
             <ChatList />
-          </div>
-        )}
+          </Suspense>
+        </div>
         <InputSection
           mainInput={true}
           chatInput={chatInput}
@@ -158,6 +170,11 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
         />
         <SettingsModal />
         <ModelModal isOpen={isModelModalOpen} onClose={handleCloseModelModal} />
+        <ModelSelectorSlideout
+          isOpen={isModelSelectorSlideoutOpen}
+          onClose={handleCloseModelSelectorSlideout}
+        />
+        <ToolsModal isOpen={isToolsModalOpen} onClose={handleCloseToolsModal} />
       </>
     );
   }
@@ -188,6 +205,11 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
         />
         <SettingsModal />
         <ModelModal isOpen={isModelModalOpen} onClose={handleCloseModelModal} />
+        <ModelSelectorSlideout
+          isOpen={isModelSelectorSlideoutOpen}
+          onClose={handleCloseModelSelectorSlideout}
+        />
+        <ToolsModal isOpen={isToolsModalOpen} onClose={handleCloseToolsModal} />
       </>
     );
   }
@@ -198,6 +220,11 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
       <MainHeader onShare={handleShare} />
       <SettingsModal />
       <ModelModal isOpen={isModelModalOpen} onClose={handleCloseModelModal} />
+      <ModelSelectorSlideout
+        isOpen={isModelSelectorSlideoutOpen}
+        onClose={handleCloseModelSelectorSlideout}
+      />
+      <ToolsModal isOpen={isToolsModalOpen} onClose={handleCloseToolsModal} />
       <div className="error-container">
         <p>問題が発生しました。ページをリロードしてみてください。</p>
       </div>

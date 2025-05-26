@@ -20,12 +20,6 @@
 
   @media (max-width: 768px) {
     display: none;
-
-    .home-page & {
-      display: block;
-      width: 100%;
-      min-width: 100%;
-    }
   }
 
   .sidebar-header {
@@ -34,38 +28,6 @@
     display: flex;
     justify-content: space-between;
     gap: 1rem;
-
-    .sidebar-logo {
-      a {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        text-decoration: none;
-        color: inherit;
-      }
-
-      .logo-img {
-        box-shadow: $shadow;
-        border-radius: 8px;
-      }
-
-      h1 {
-        font-size: 1.2rem;
-        line-height: 1.2;
-        font-family: "Glegoo", serif;
-        font-weight: 700;
-        text-shadow: $shadow;
-        color: #fff;
-
-        small {
-          font-size: 0.6rem;
-          line-height: 1;
-          color: color.mix(#fff, #000, 45%);
-          display: block;
-          margin-top: 0.2rem;
-        }
-      }
-    }
 
     .sidebar-actions {
       display: flex;
@@ -93,32 +55,6 @@
         &:active {
           background-color: color.adjust($accent-color, $lightness: -20%);
           box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-        }
-      }
-
-      .sidebar-setting-button {
-        width: 2.5rem;
-        height: 2.5rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        border-radius: 6px;
-        color: rgba(255, 255, 255, 0.8);
-        cursor: pointer;
-        transition: all 0.2s ease;
-
-        &:hover {
-          background: rgba(255, 255, 255, 0.15);
-          border-color: rgba(255, 255, 255, 0.3);
-          color: #fff;
-          transform: scale(1.05);
-        }
-
-        svg {
-          width: 1.2rem;
-          height: 1.2rem;
         }
       }
     }
@@ -153,10 +89,6 @@
 
   @media (max-width: 768px) {
     width: 100%;
-
-    .home-page & {
-      display: none;
-    }
   }
 
   .main-header {
@@ -174,13 +106,23 @@
 
     .main-header-left,
     .main-header-right {
-      width: 120px;
+      // width: 120px;
       display: flex;
       align-items: center;
     }
 
     .main-header-left {
       justify-content: flex-start;
+      gap: 1rem;
+      flex: 1;
+      max-width: 60%;
+      overflow: hidden;
+
+      .main-header-chat-info {
+        flex: 1;
+        min-width: 0;
+        max-width: 100%;
+      }
     }
 
     .main-header-right {
@@ -222,6 +164,40 @@
 
       span {
         white-space: nowrap;
+      }
+    }
+
+    // BackButtonはモバイルサイズでのみ表示
+    .main-header-back-button {
+      display: none;
+
+      @media (max-width: 768px) {
+        display: flex;
+      }
+    }
+
+    // Headerのback-buttonも同様に制御
+    .back-button {
+      display: none;
+
+      @media (max-width: 768px) {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 6px;
+        color: rgba(255, 255, 255, 0.8);
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover {
+          background: rgba(255, 255, 255, 0.15);
+          border-color: rgba(255, 255, 255, 0.3);
+          color: #fff;
+          transform: translateY(-1px);
+        }
       }
     }
 
@@ -325,3 +301,356 @@
     }
   }
 }
+
+// ModelSelectorSlideout のスタイル
+.slideout-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 998;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+  backdrop-filter: blur(2px);
+
+  &.open {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
+// 共通Logoスタイル
+.logo {
+  a {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .logo-img {
+    box-shadow: $shadow;
+    border-radius: 8px;
+  }
+
+  h1 {
+    font-size: 1.2rem;
+    line-height: 1.2;
+    font-family: "Glegoo", serif;
+    font-weight: 700;
+    text-shadow: $shadow;
+    color: #fff;
+
+    small {
+      font-size: 0.6rem;
+      line-height: 1;
+      color: color.mix(#fff, #000, 45%);
+      display: block;
+      margin-top: 0.2rem;
+    }
+  }
+
+  // Header variant (smaller)
+  &--header {
+    display: none; // PCでは非表示
+
+    @media (max-width: 768px) {
+      display: flex;
+      margin-right: 1rem;
+    }
+
+    .logo-img {
+      border-radius: 6px;
+    }
+
+    h1 {
+      font-size: 1rem;
+
+      small {
+        font-size: 0.5rem;
+        margin-top: 0.1rem;
+      }
+    }
+
+    a {
+      gap: 0.8rem;
+    }
+  }
+
+  // Sidebar variant (default)
+  &--sidebar {
+    // デフォルトスタイルなので追加のスタイルなし
+  }
+}
+
+// 共通SettingButtonスタイル
+.setting-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #fff;
+    transform: scale(1.05);
+  }
+
+  svg {
+    width: 1.2rem;
+    height: 1.2rem;
+  }
+
+  // Header variant
+  &--header {
+    // 同じスタイルなので追加のスタイルなし
+  }
+
+  // Sidebar variant
+  &--sidebar {
+    // デフォルトスタイルなので追加のスタイルなし
+  }
+}
+
+// ToolsModalのスタイル
+.tools-modal {
+  .tools-modal-content {
+    .tools-list {
+      list-style: none;
+      padding: 0;
+      margin: 1rem 0;
+      gap: 0.5rem;
+      display: flex;
+      flex-direction: column;
+
+      li {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: $border-radius;
+        padding: 1rem;
+        transition: all 0.3s ease;
+
+        &:hover {
+          background: rgba(255, 255, 255, 0.08);
+          border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .tool-display {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 1rem;
+
+          .tool-info {
+            flex: 1;
+
+            .tool-name {
+              font-size: 1.1rem;
+              font-weight: 600;
+              color: #fff;
+              margin: 0 0 0.5rem;
+            }
+
+            .tool-description {
+              color: rgba(255, 255, 255, 0.8);
+              margin: 0 0 0.5rem;
+              line-height: 1.4;
+            }
+
+            .tool-details {
+              margin-top: 0.5rem;
+
+              summary {
+                color: rgba(255, 255, 255, 0.7);
+                cursor: pointer;
+                font-size: 0.9rem;
+                margin-bottom: 0.5rem;
+
+                &:hover {
+                  color: #fff;
+                }
+              }
+
+              .tool-parameters {
+                background: rgba(0, 0, 0, 0.3);
+                padding: 0.8rem;
+                border-radius: calc($border-radius / 2);
+                font-size: 0.8rem;
+                overflow-x: auto;
+                color: rgba(255, 255, 255, 0.9);
+                margin: 0.5rem 0 0;
+              }
+            }
+          }
+
+          .tool-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-shrink: 0;
+
+            button {
+              width: 2.5rem;
+              height: 2.5rem;
+              border-radius: 50%;
+              background: rgba(255, 255, 255, 0.1);
+              border: 1px solid rgba(255, 255, 255, 0.2);
+              color: rgba(255, 255, 255, 0.8);
+              cursor: pointer;
+              transition: all 0.2s ease;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+
+              &:hover {
+                background: rgba(255, 255, 255, 0.15);
+                color: #fff;
+                transform: scale(1.05);
+              }
+
+              &.edit-button:hover {
+                background: rgba($accent-color, 0.2);
+                border-color: rgba($accent-color, 0.4);
+                color: $accent-color;
+              }
+
+              &.delete-button:hover {
+                background: rgba(255, 59, 48, 0.2);
+                border-color: rgba(255, 59, 48, 0.4);
+                color: #ff3b30;
+              }
+            }
+          }
+        }
+
+        .tool-edit-form {
+          .tool-edit-input {
+            width: 100%;
+            min-height: 200px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: calc($border-radius / 2);
+            color: #fff;
+            padding: 1rem;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            resize: vertical;
+
+            &:focus {
+              outline: none;
+              border-color: rgba($accent-color, 0.5);
+              box-shadow: 0 0 0 2px rgba($accent-color, 0.2);
+            }
+          }
+
+          .tool-edit-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            justify-content: flex-end;
+
+            button {
+              padding: 0.5rem 1rem;
+              border-radius: calc($border-radius / 2);
+              font-size: 0.9rem;
+              font-weight: 500;
+              cursor: pointer;
+              transition: all 0.2s ease;
+
+              &.save-button {
+                background: $accent-color;
+                border: 1px solid $accent-color;
+                color: #fff;
+
+                &:hover {
+                  background: color.adjust($accent-color, $lightness: -10%);
+                }
+              }
+
+              &.cancel-button {
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                color: rgba(255, 255, 255, 0.8);
+
+                &:hover {
+                  background: rgba(255, 255, 255, 0.15);
+                  color: #fff;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    .tool-input-area {
+      margin-top: 1rem;
+
+      .tool-input {
+        width: 100%;
+        min-height: 240px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: $border-radius;
+        color: #fff;
+        padding: 1rem;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.9rem;
+        line-height: 1.4;
+        resize: vertical;
+
+        &:focus {
+          outline: none;
+          background: rgba(255, 255, 255, 0.08);
+          border-color: rgba($accent-color, 0.5);
+          box-shadow: 0 0 0 2px rgba($accent-color, 0.2);
+        }
+
+        &::placeholder {
+          color: rgba(255, 255, 255, 0.4);
+        }
+      }
+
+      .add-button {
+        width: 100%;
+        margin-top: 1rem;
+        padding: 0.8rem;
+        background: $accent-color;
+        border: 1px solid $accent-color;
+        border-radius: $border-radius;
+        color: #fff;
+        font-size: 1rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+
+        &:hover {
+          background: color.adjust($accent-color, $lightness: -10%);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba($accent-color, 0.3);
+        }
+      }
+    }
+  }
+}
+
+// モバイル対応（不完全なルールのため一時的にコメントアウト）
+// @media (max-width: 768px) {
+//   .some-element {
+//     max-height: 80vh;
+//   }
+// }
+
+// InputSection内の控えめなモデル・ツール選択ボタン

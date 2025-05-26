@@ -86,6 +86,8 @@ export function useChatLogic({
 }: UseChatLogicProps = {}) {
   const router = useRouter();
   const params = useParams();
+
+  // roomIdは個別チャットの場合のみ設定、トップページではundefined
   const roomId = params?.id
     ? decodeURIComponent(params.id as string)
     : undefined;
@@ -96,6 +98,9 @@ export function useChatLogic({
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isModelModalOpen, setIsModelModalOpen] = useState(false);
+  const [isModelSelectorSlideoutOpen, setIsModelSelectorSlideoutOpen] =
+    useState(false);
+  const [isToolsModalOpen, setIsToolsModalOpen] = useState(false);
   const [selectedModelIds, setSelectedModelIds] =
     useStorageState<string[]>("selectedModels");
   const [models, setModels] = useState<ModelItem[]>([]);
@@ -114,9 +119,13 @@ export function useChatLogic({
   >({});
   const [isAutoScroll, setIsAutoScroll] = useState(true);
   const [error, setError] = useState<string | null>(initialError);
+  // ★ storedMessages: ローカルストレージキーの説明
+  // - roomIdがある場合: `chatMessages_${roomId}` (例: chatMessages_abc123)
+  // - roomIdがない場合（トップページ）: 保存しない（メッセージ送信時に新しいIDを生成してナビゲート）
+  // これにより、トップページは常に新しいチャット開始画面として機能する
   const [storedMessages, setStoredMessages] = useStorageState<
     ConversationTurn[]
-  >(`chatMessages_${roomId || "default"}`); // ★ AppMessage[] から ConversationTurn[] に変更
+  >(roomId ? `chatMessages_${roomId}` : undefined); // roomIdがない場合はundefinedで保存しない
   const containerRef = useRef<HTMLDivElement>(null);
   const [AllModels, setAllModels] = useState<ModelItem[]>([]);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
@@ -125,6 +134,41 @@ export function useChatLogic({
 
   // モデルの初期化状態を追跡するためのref
   const modelsInitialized = useRef(false);
+
+  // 現在のチャット情報を取得
+  const getCurrentChatInfo = useCallback(() => {
+    if (!roomId) return null;
+
+    const chatData = storage.get(`chatMessages_${roomId}`) || [];
+    if (chatData.length === 0) return null;
+
+    // 最初のConversationTurnから情報を取得
+    const firstTurn = chatData[0];
+    if (!firstTurn || !firstTurn.userMessage) return null;
+
+    // タイムスタンプを後ろから順に探索
+    let timestamp = null;
+    for (let j = chatData.length - 1; j >= 0; j--) {
+      const turn = chatData[j];
+      if (turn && turn.userMessage && turn.userMessage.timestamp) {
+        timestamp = turn.userMessage.timestamp;
+        break;
+      }
+    }
+
+    // 最初のユーザーメッセージを取得
+    const firstMessage = firstTurn.userMessage.content
+      ? firstTurn.userMessage.content.slice(0, 50) +
+        (firstTurn.userMessage.content.length > 50 ? "..." : "")
+      : "No messages";
+
+    return {
+      id: roomId,
+      title: roomId,
+      firstMessage,
+      timestamp: timestamp || -1,
+    };
+  }, [roomId]);
 
   // regenerateAssistantResponse で使用する API キーの取得ロジック (handleSendから流用)
   const getApiKeyForRegeneration = () => {
@@ -144,10 +188,7 @@ export function useChatLogic({
   // ★ saveMessagesToHistory の宣言を正しい位置に配置
   const saveMessagesToHistory = useCallback(
     (currentMessagesToSave: AppMessage[]) => {
-      if (isShared) return; // 共有ビューでは保存しない
-
-      // roomIdがない場合はデフォルトIDを使用
-      const saveRoomId = roomId || "default";
+      if (isShared || !roomId) return; // 共有ビューまたはroomIdがない場合は保存しない
 
       const conversationTurns: ConversationTurn[] = [];
       let currentUserMessage: (AppMessage & { role: "user" }) | null = null;
@@ -193,7 +234,7 @@ export function useChatLogic({
         });
       }
 
-      storage.set(`chatMessages_${saveRoomId}`, conversationTurns);
+      storage.set(`chatMessages_${roomId}`, conversationTurns);
       setStoredMessages(conversationTurns);
 
       // チャットが保存されたことをSidebarに通知
@@ -428,9 +469,6 @@ export function useChatLogic({
       setError(null);
       setApiKeyError(null);
 
-      // リクエスト処理中フラグをセット
-      isProcessingRef.current = true;
-
       const currentOpenRouterApiKey =
         openRouterApiKey || process.env.OPENROUTER_API_KEY;
       if (!currentOpenRouterApiKey) {
@@ -440,14 +478,6 @@ export function useChatLogic({
         console.error("[handleSend] OpenRouter API Key is missing.");
         return;
       }
-
-      const userMessageId = generateId();
-      const newUserMessage: AppMessage & { role: "user"; id: string } = {
-        id: userMessageId,
-        role: "user",
-        content: userInput,
-        timestamp: Date.now(),
-      };
 
       const currentSelectedModels = models?.filter((m) => m.selected) || [];
       console.log(
@@ -460,48 +490,13 @@ export function useChatLogic({
         return;
       }
 
-      // 既存のメッセージ履歴に新しいユーザーメッセージを追加してAPIに渡す準備
-      // contentがChatCompletionContentPart[]のメッセージはstringに変換する必要があるかもしれない
-      const historyForApi: CoreMessage[] = optimisticMessages
-        .filter(
-          (msg) =>
-            (msg.role === "user" ||
-              msg.role === "assistant" ||
-              msg.role === "system") &&
-            typeof msg.content === "string" // contentがstringのメッセージのみを履歴として使用 (toolロールや複雑なcontentは一旦除外)
-        )
-        .map((msg) => {
-          // msg.contentがstringであることは上のfilterで保証されている
-          const coreMsg: CoreMessage = {
-            role: msg.role as "user" | "assistant" | "system",
-            content: msg.content as string,
-          };
-          // アシスタントメッセージの場合、tool_callsを付加することがある
-          if (
-            msg.role === "assistant" &&
-            msg.tool_calls &&
-            Array.isArray(msg.tool_calls)
-          ) {
-            // AppMessageのtool_callsをCoreMessageのtool_calls形式に変換する必要がある場合がある
-            // ここでは互換性があると仮定。実際の型に合わせて調整。
-            (coreMsg as any).tool_calls = msg.tool_calls.map((tc) => ({
-              id: tc.id,
-              type: tc.type,
-              function: {
-                name: tc.function.name,
-                arguments: tc.function.arguments,
-              },
-            }));
-          }
-          return coreMsg;
-        });
-
-      const messagesWithUser: CoreMessage[] = [
-        ...historyForApi,
-        { role: "user", content: userInput },
-      ];
-
-      setIsGenerating(true);
+      const userMessageId = generateId();
+      const newUserMessage: AppMessage & { role: "user"; id: string } = {
+        id: userMessageId,
+        role: "user",
+        content: userInput,
+        timestamp: Date.now(),
+      };
 
       const createdPlaceholders = currentSelectedModels.map((modelItem) => {
         // modelIdが必ず設定されていることを確認
@@ -520,6 +515,104 @@ export function useChatLogic({
         };
       });
 
+      // ユーザー入力をクリア
+      setChatInput("");
+
+      // トップページでメッセージ送信時は新しいIDを生成してローカルストレージに保存してからナビゲート
+      if (!roomId) {
+        const newRoomId = generateId();
+        console.log(`[handleSend] Creating new chat with ID: ${newRoomId}`);
+
+        // 新しいメッセージをローカルストレージに保存（新しいroomIdを使用）
+        const initialMessages = [newUserMessage, ...createdPlaceholders];
+        const conversationTurns: ConversationTurn[] = [
+          {
+            userMessage: newUserMessage,
+            assistantResponses: createdPlaceholders as (AppMessage & {
+              role: "assistant";
+            })[],
+          },
+        ];
+        storage.set(`chatMessages_${newRoomId}`, conversationTurns);
+
+        // セッション内遷移フラグを設定（個別ページで生成状態を維持するため）
+        sessionStorage.setItem(`navigation_${newRoomId}`, "true");
+        console.log(
+          `[handleSend] Set session navigation flag for roomId: ${newRoomId}`
+        );
+
+        // チャットが保存されたことをSidebarに通知
+        window.dispatchEvent(new Event("chatListUpdate"));
+
+        // 新IDページに遷移（状態はローカルストレージに保存済み）
+        router.push(`/${newRoomId}`);
+
+        return; // トップページからの遷移時は早期リターン（個別ページで自動的に生成処理が開始される）
+      }
+
+      // 個別チャットページでの処理：ローカルストレージ経由で統一フロー
+      // リクエスト処理中フラグをセット
+      isProcessingRef.current = true;
+
+      // 既存のメッセージに新しいユーザーメッセージとプレースホルダーを追加
+      const updatedMessages = [
+        ...messages,
+        newUserMessage,
+        ...createdPlaceholders,
+      ];
+
+      // ローカルストレージに即座に保存
+      const updatedConversationTurns: ConversationTurn[] = [];
+      let currentUserMessage: (AppMessage & { role: "user" }) | null = null;
+      let currentAssistantMessages: (AppMessage & { role: "assistant" })[] = [];
+
+      updatedMessages.forEach((msg) => {
+        if (!msg) return;
+        const cleanUi = { ...(msg.ui || {}) };
+        delete (cleanUi as any).timestamp;
+
+        const messageWithProperTimestamp = {
+          ...msg,
+          timestamp: msg.timestamp || Date.now(),
+          ui: cleanUi,
+        };
+
+        if (messageWithProperTimestamp.role === "user") {
+          if (currentUserMessage) {
+            updatedConversationTurns.push({
+              userMessage: currentUserMessage,
+              assistantResponses: currentAssistantMessages,
+            });
+          }
+          currentUserMessage = messageWithProperTimestamp as AppMessage & {
+            role: "user";
+          };
+          currentAssistantMessages = [];
+        } else if (
+          messageWithProperTimestamp.role === "assistant" &&
+          currentUserMessage
+        ) {
+          currentAssistantMessages.push(
+            messageWithProperTimestamp as AppMessage & { role: "assistant" }
+          );
+        }
+      });
+
+      if (currentUserMessage) {
+        updatedConversationTurns.push({
+          userMessage: currentUserMessage,
+          assistantResponses: currentAssistantMessages,
+        });
+      }
+
+      storage.set(`chatMessages_${roomId}`, updatedConversationTurns);
+      setStoredMessages(updatedConversationTurns);
+
+      // メッセージ状態を更新
+      setMessages(updatedMessages);
+      messagesBackupRef.current = updatedMessages;
+      lastValidMessagesTimestampRef.current = Date.now();
+
       // 安全に最適化状態を更新
       safeOptimisticUpdate({
         type: "addUserMessageAndPlaceholders",
@@ -527,391 +620,41 @@ export function useChatLogic({
         assistantPlaceholders: createdPlaceholders,
       });
 
-      // 現在のメッセージにユーザーメッセージとプレースホルダーを含めてバックアップ
-      const initialMessages = [
-        ...messages,
-        newUserMessage,
-        ...createdPlaceholders,
-      ];
-      console.log(
-        `[handleSend] 処理前にメッセージ${initialMessages.length}件をバックアップ`
-      );
-      messagesBackupRef.current = initialMessages;
-      lastValidMessagesTimestampRef.current = Date.now();
+      // チャットが保存されたことをSidebarに通知
+      window.dispatchEvent(new Event("chatListUpdate"));
 
-      // メッセージの状態を直接更新して安定させる
-      setMessages(initialMessages);
-
-      // messagesRef.current を使う代わりに、直前に作成した createdPlaceholders をループする
-      for (const placeholder of createdPlaceholders) {
-        const assistantMessageId = placeholder.id;
-        const modelIdForApi = placeholder.ui?.modelId;
-
-        if (!modelIdForApi) {
-          console.warn(
-            `Placeholder for ${assistantMessageId} has no modelId, skipping.`
-          );
-          continue;
-        }
-
-        const controller = new AbortController();
-        setAbortControllers((prev) => ({
-          ...prev,
-          [assistantMessageId]: controller,
-        }));
-
-        (async () => {
-          let accumulatedText = "";
-          let currentToolCalls: any[] = [];
-
-          try {
-            console.log(
-              `[handleSend] Preparing direct API request for model: ${modelIdForApi}`,
-              `\nMessage count: ${messagesWithUser.length}`,
-              `\nLast user message: ${
-                messagesWithUser[messagesWithUser.length - 1]?.content
-                  ? typeof messagesWithUser[messagesWithUser.length - 1]
-                      .content === "string"
-                    ? (
-                        messagesWithUser[messagesWithUser.length - 1]
-                          .content as string
-                      ).substring(0, 100)
-                    : "Complex content"
-                  : "None"
-              }`
-            );
-
-            // サイト情報のヘッダーを設定
-            const customHeaders: Record<string, string> = {
-              "X-Title": "Mulch LLM Chat",
-            };
-
-            // ユーザーのウェブサイトURLがあれば設定
-            if (typeof window !== "undefined") {
-              customHeaders["HTTP-Referer"] = window.location.origin;
-            }
-
-            // OpenRouterプロバイダーを作成
-            const openrouter = createOpenRouter({
-              apiKey: currentOpenRouterApiKey,
-            });
-
-            // リクエスト開始時間を記録
-            const apiRequestStartTime = Date.now();
-
-            console.log(
-              `[handleSend] Creating OpenRouter provider for model: ${modelIdForApi}`,
-              `\nRequest ID: ${userMessageId}`
-            );
-
-            // OpenRouterのモデルを取得
-            const providerModel = openrouter.chat(modelIdForApi);
-
-            // streamText呼び出しの準備
-            const streamOptions = {
-              model: providerModel,
-              messages: messagesWithUser,
-              system: "あなたは日本語で対応する親切なアシスタントです。",
-              headers: customHeaders,
-            };
-
-            // ツールが設定されている場合は追加
-            // if (tools && tools.length > 0) {
-            //   // ツールをstreamTextに渡す方法に合わせて調整
-            //   (streamOptions as any).tools = tools.map((t) =>
-            //     t.function ? { type: t.type, function: t.function } : t
-            //   );
-            //   (streamOptions as any).tool_choice = "auto";
-            //   console.log(
-            //     `[handleSend] Including ${tools.length} tools in direct request`
-            //   );
-            // }
-
-            console.log(
-              `[handleSend] Calling streamText directly with OpenRouter provider for model: ${modelIdForApi}`,
-              `\n[handleSend] streamOptions.messages: ${JSON.stringify(
-                messagesWithUser
-              )}`,
-              `\n[handleSend] streamOptions.tools: ${JSON.stringify(
-                (streamOptions as any).tools
-              )}`
-            );
-
-            // streamTextを直接呼び出し
-            const result = await streamText(streamOptions);
-
-            const requestDuration = Date.now() - apiRequestStartTime;
-            console.log(
-              `[handleSend] Received stream after ${requestDuration}ms for model: ${modelIdForApi}`
-            );
-
-            // 追加ログここから
-            // console.log(`[handleSend] result object for ${modelIdForApi}:`, JSON.stringify(result));
-            // try {
-            //   const textContent = await result.textPromise;
-            //   console.log(`[handleSend] textPromise result for ${modelIdForApi}:`, textContent);
-            // } catch (e: any) {
-            //   console.error(`[handleSend] Error resolving textPromise for ${modelIdForApi}:`, e.message, e.stack);
-            // }
-            // try {
-            //   const toolCalls = await result.toolCallsPromise;
-            //   console.log(`[handleSend] toolCallsPromise result for ${modelIdForApi}:`, toolCalls);
-            // } catch (e: any) {
-            //     console.error(`[handleSend] Error resolving toolCallsPromise for ${modelIdForApi}:`, e.message, e.stack);
-            // }
-            // 追加ログここまで
-
-            console.log(`[handleSend] 応答処理の開始: ${modelIdForApi}`);
-            console.log(
-              `[handleSend] result型: ${typeof result}, プロパティ: ${Object.keys(
-                result
-              ).join(", ")}`
-            );
-
-            // ストリームからテキストを読み取る
-            // StreamTextResultから得られるtextStreamはReadableStreamとAsyncIterableの両方として使えるが、
-            // for-awaitループでAsyncIterableとして扱う場合は必ずfor-awaitが完了するまで待つ必要がある
-            try {
-              console.log(
-                `[handleSend] ストリーミング処理開始: ${modelIdForApi}`
-              );
-              accumulatedText = ""; // 各モデルの処理開始時にリセット
-
-              // Vercel AI SDKの標準的なストリーミング処理
-              for await (const delta of result.fullStream) {
-                if (delta.type === "text-delta") {
-                  const textDelta = delta.textDelta;
-                  accumulatedText += textDelta;
-
-                  // UIをリアルタイムで更新
-                  const streamingUpdatePayload: AppMessage & {
-                    role: "assistant";
-                    id: string;
-                  } = {
-                    id: assistantMessageId,
-                    role: "assistant",
-                    content: accumulatedText,
-                    timestamp: Date.now(),
-                    ui: {
-                      modelId: modelIdForApi,
-                      isGenerating: true, // ストリーミング中はtrue
-                    },
-                  };
-                  safeOptimisticUpdate({
-                    type: "updateLlmResponse",
-                    updatedAssistantMessage: streamingUpdatePayload,
-                  });
-                  setMessages((prevMsgs) =>
-                    prevMsgs.map((m) =>
-                      m.id === assistantMessageId && m.role === "assistant"
-                        ? streamingUpdatePayload
-                        : m
-                    )
-                  );
-                } else {
-                  console.log(
-                    `[handleSend] Received non-text-delta for ${modelIdForApi}:`,
-                    JSON.stringify(delta)
-                  );
-                }
-              }
-
-              console.log(
-                `[handleSend] ストリーミング処理完了: ${modelIdForApi}, 全テキスト長: ${accumulatedText.length}`
-              );
-              console.log(
-                `[handleSend] Final accumulatedText for ${modelIdForApi}:`,
-                accumulatedText
-              );
-              console.log(
-                `[handleSend] Final currentToolCalls for ${modelIdForApi}:`,
-                JSON.stringify(currentToolCalls)
-              );
-            } catch (streamError: any) {
-              console.error(
-                `[handleSend] Error processing stream for model ${modelIdForApi}:`,
-                streamError
-              );
-              console.error(
-                `[handleSend] エラーの詳細: name=${streamError.name}, message=${streamError.message}, stack=${streamError.stack}`
-              );
-              if (streamError.cause) {
-                console.error(`[handleSend] エラーの原因: `, streamError.cause);
-              }
-              accumulatedText = `ストリーム処理中にエラーが発生しました: ${
-                streamError.message || "Unknown error"
-              }`;
-            }
-
-            // 応答内容の処理
-            if (accumulatedText.length === 0) {
-              // 空レスポンスの場合のフォールバックメッセージ
-              console.warn(
-                `[handleSend] Empty response detected for model: ${modelIdForApi}. Adding fallback message.`
-              );
-              accumulatedText = `（${modelIdForApi}からの応答が空でした。`;
-            } else if (
-              accumulatedText.includes("error occurred") ||
-              accumulatedText.includes("エラー")
-            ) {
-              // エラーメッセージが含まれている場合、より詳細な説明を追加
-              console.warn(
-                `[handleSend] Error message detected in response for model: ${modelIdForApi}`
-              );
-              if (!accumulatedText.includes("対処方法")) {
-                accumulatedText += `\n\n（このエラーの対処方法: API設定を確認するか、別のモデルを試してください。問題が続く場合は管理者に連絡してください。）`;
-              }
-            }
-
-            // 最終的なレスポンスを再度ログ出力
-            console.log(
-              `[handleSend] 最終的なレスポンス (model: ${modelIdForApi}): ${accumulatedText.substring(
-                0,
-                100
-              )}...`
-            );
-
-            // UIを更新
-            const optimisticUpdatePayload: AppMessage & {
-              role: "assistant";
-              id: string;
-            } = {
-              id: assistantMessageId,
-              role: "assistant",
-              content: accumulatedText,
-              timestamp: Date.now(),
-              ui: {
-                modelId: modelIdForApi,
-                isGenerating: true,
-              },
-            };
-            if (currentToolCalls.length > 0) {
-              optimisticUpdatePayload.tool_calls = [...currentToolCalls];
-            }
-            safeOptimisticUpdate({
-              type: "updateLlmResponse",
-              updatedAssistantMessage: optimisticUpdatePayload,
-            });
-          } catch (err: any) {
-            if (err.name === "AbortError") {
-              console.log(
-                `[handleSend] Request aborted for model: ${modelIdForApi}`
-              );
-              accumulatedText += "\n(ストリーミングがキャンセルされました)";
-            } else {
-              console.error(
-                `[handleSend] Error for model ${modelIdForApi}:`,
-                err
-              );
-              accumulatedText += `\n(エラー: ${err.message})`;
-              setError(
-                `モデル ${modelIdForApi} との通信でエラー: ${err.message}`
-              );
-            }
-          } finally {
-            const finalAssistantMessage: AppMessage & {
-              role: "assistant";
-              id: string;
-            } = {
-              id: assistantMessageId,
-              role: "assistant",
-              content: accumulatedText,
-              timestamp: Date.now(),
-              ui: {
-                modelId: modelIdForApi,
-                isGenerating: false,
-              },
-            };
-            if (currentToolCalls.length > 0) {
-              finalAssistantMessage.tool_calls = [...currentToolCalls];
-            }
-            safeOptimisticUpdate({
-              type: "updateLlmResponse",
-              updatedAssistantMessage: finalAssistantMessage,
-            });
-            setMessages((prevMsgs) =>
-              prevMsgs.map((m) => {
-                if (m.id === assistantMessageId && m.role === "assistant") {
-                  return finalAssistantMessage;
-                }
-                return m;
-              })
-            );
-
-            // 生成完了状態を更新
-            setAbortControllers((prev) => {
-              const newControllers = { ...prev };
-              delete newControllers[assistantMessageId];
-              // 他に生成中のものがなければ全体のisGeneratingをfalseに
-              if (Object.keys(newControllers).length === 0) {
-                setIsGenerating(false);
-              }
-              return newControllers;
-            });
-
-            // いずれかのアボートコントローラーがまだ存在する場合は生成中状態を維持
-            const remainingControllers = Object.keys(abortControllers).filter(
-              (id) => id !== assistantMessageId
-            );
-            if (remainingControllers.length === 0) {
-              setIsGenerating(false);
-
-              // すべてのレスポンス処理が完了したらフラグをリセット
-              console.log(
-                `[handleSend] All responses completed, resetting isProcessingRef flag`
-              );
-
-              // 処理完了後に改めてバックアップを更新
-              if (messagesRef.current.length > 0) {
-                console.log(
-                  `[handleSend] 処理完了後の最終バックアップを更新: ${messagesRef.current.length}件`
-                );
-                messagesBackupRef.current = [...messagesRef.current];
-                lastValidMessagesTimestampRef.current = Date.now();
-              }
-
-              // 最後に処理中フラグをリセット
-              isProcessingRef.current = false;
-            }
-          }
-        })();
-      }
-
-      // ユーザー入力をクリア
-      setChatInput("");
-
-      // 最新のメッセージがストレージに保存されるよう更新
-      if (!isShared && roomId) {
-        saveMessagesToHistory([
-          ...messages,
-          newUserMessage,
-          ...createdPlaceholders,
-        ]);
-      }
+      // LLM生成処理は別のuseEffectで自動検知される
     },
     [
       models,
       openRouterApiKey,
-      optimisticMessages,
-      tools,
-      isShared,
-      roomId,
       messages,
-      saveMessagesToHistory,
+      roomId,
+      setStoredMessages,
       setChatInput,
       setError,
       setApiKeyError,
-      setIsGenerating,
-      setAbortControllers,
+      router,
+      safeOptimisticUpdate,
     ]
   );
 
   const resetCurrentChat = useCallback(() => {
-    const chatStorageKey = `chatMessages_${roomId || "default"}`;
+    if (!roomId) {
+      console.log("[resetCurrentChat] No roomId, clearing local state only");
+      setMessages([]);
+      setError(null);
+      setApiKeyError(null);
+      isProcessingRef.current = false;
+      messagesBackupRef.current = [];
+      lastValidMessagesTimestampRef.current = 0;
+      safeOptimisticUpdate({ type: "resetMessages", payload: [] });
+      return;
+    }
+
+    const chatStorageKey = `chatMessages_${roomId}`;
     console.log(
-      `[resetCurrentChat] リセット開始: roomId=${
-        roomId || "default"
-      }, 現在のメッセージ数=${messages.length}`
+      `[resetCurrentChat] リセット開始: roomId=${roomId}, 現在のメッセージ数=${messages.length}`
     );
     storage.remove(chatStorageKey);
     setMessages([]);
@@ -928,9 +671,7 @@ export function useChatLogic({
     // safeOptimisticUpdateを使用
     safeOptimisticUpdate({ type: "resetMessages", payload: [] });
     console.log(
-      `[resetCurrentChat] チャット履歴をリセットしました: roomId=${
-        roomId || "default"
-      }`
+      `[resetCurrentChat] チャット履歴をリセットしました: roomId=${roomId}`
     );
   }, [
     roomId,
@@ -940,6 +681,206 @@ export function useChatLogic({
     safeOptimisticUpdate,
     messages.length,
   ]);
+
+  // 生成中ステータスのメッセージに対してLLM処理を開始する関数
+  const resumeLLMGeneration = useCallback(
+    async (generatingMessages: (AppMessage & { role: "assistant" })[]) => {
+      if (!roomId || generatingMessages.length === 0) return;
+
+      console.log(
+        `[resumeLLMGeneration] Starting LLM generation for ${generatingMessages.length} messages`
+      );
+
+      // 生成処理開始時にisProcessingRefをリセット
+      isProcessingRef.current = false;
+
+      const currentOpenRouterApiKey =
+        openRouterApiKey || process.env.OPENROUTER_API_KEY;
+      if (!currentOpenRouterApiKey) {
+        console.error("[resumeLLMGeneration] OpenRouter API Key is missing.");
+        return;
+      }
+
+      // 履歴メッセージを準備（生成中メッセージを除く）- messagesRef.currentを使用
+      const historyForApi: CoreMessage[] = messagesRef.current
+        .filter(
+          (msg) =>
+            (msg.role === "user" ||
+              msg.role === "assistant" ||
+              msg.role === "system") &&
+            typeof msg.content === "string" &&
+            !generatingMessages.some((gm) => gm.id === msg.id) // 生成中メッセージは除外
+        )
+        .map((msg) => ({
+          role: msg.role as "user" | "assistant" | "system",
+          content: msg.content as string,
+        }));
+
+      setIsGenerating(true);
+
+      // 各生成中メッセージに対してLLM処理を開始
+      for (const placeholder of generatingMessages) {
+        const assistantMessageId = placeholder.id;
+        const modelIdForApi = placeholder.ui?.modelId;
+
+        if (!modelIdForApi) {
+          console.warn(
+            `Placeholder for ${assistantMessageId} has no modelId, skipping.`
+          );
+          continue;
+        }
+
+        const controller = new AbortController();
+        setAbortControllers((prev) => ({
+          ...prev,
+          [assistantMessageId]: controller,
+        }));
+
+        // 非同期でLLM処理を実行
+        (async () => {
+          let accumulatedText = "";
+
+          try {
+            console.log(
+              `[resumeLLMGeneration] Processing model: ${modelIdForApi}`
+            );
+
+            const customHeaders: Record<string, string> = {
+              "X-Title": "Mulch LLM Chat",
+            };
+
+            if (typeof window !== "undefined") {
+              customHeaders["HTTP-Referer"] = window.location.origin;
+            }
+
+            const openrouter = createOpenRouter({
+              apiKey: currentOpenRouterApiKey,
+            });
+
+            const providerModel = openrouter.chat(modelIdForApi);
+
+            const streamOptions = {
+              model: providerModel,
+              messages: historyForApi,
+              system: "あなたは日本語で対応する親切なアシスタントです。",
+              headers: customHeaders,
+            };
+
+            const result = await streamText(streamOptions);
+
+            // ストリーミング処理
+            for await (const delta of result.fullStream) {
+              if (delta.type === "text-delta") {
+                accumulatedText += delta.textDelta;
+
+                // UIをリアルタイムで更新
+                const streamingUpdatePayload: AppMessage & {
+                  role: "assistant";
+                  id: string;
+                } = {
+                  id: assistantMessageId,
+                  role: "assistant",
+                  content: accumulatedText,
+                  timestamp: Date.now(),
+                  ui: {
+                    modelId: modelIdForApi,
+                    isGenerating: true,
+                  },
+                };
+
+                safeOptimisticUpdate({
+                  type: "updateLlmResponse",
+                  updatedAssistantMessage: streamingUpdatePayload,
+                });
+
+                setMessages((prevMsgs) =>
+                  prevMsgs.map((m) =>
+                    m.id === assistantMessageId && m.role === "assistant"
+                      ? streamingUpdatePayload
+                      : m
+                  )
+                );
+              }
+            }
+
+            console.log(
+              `[resumeLLMGeneration] Completed for model: ${modelIdForApi}`
+            );
+          } catch (err: any) {
+            if (err.name === "AbortError") {
+              console.log(
+                `[resumeLLMGeneration] Request aborted for model: ${modelIdForApi}`
+              );
+              accumulatedText += "\n(ストリーミングがキャンセルされました)";
+            } else {
+              console.error(
+                `[resumeLLMGeneration] Error for model ${modelIdForApi}:`,
+                err
+              );
+              accumulatedText += `\n(エラー: ${err.message})`;
+            }
+          } finally {
+            // 最終メッセージを保存
+            const finalAssistantMessage: AppMessage & {
+              role: "assistant";
+              id: string;
+            } = {
+              id: assistantMessageId,
+              role: "assistant",
+              content: accumulatedText,
+              timestamp: Date.now(),
+              ui: {
+                modelId: modelIdForApi,
+                isGenerating: false,
+              },
+            };
+
+            safeOptimisticUpdate({
+              type: "updateLlmResponse",
+              updatedAssistantMessage: finalAssistantMessage,
+            });
+
+            setMessages((prevMsgs) =>
+              prevMsgs.map((m) => {
+                if (m.id === assistantMessageId && m.role === "assistant") {
+                  return finalAssistantMessage;
+                }
+                return m;
+              })
+            );
+
+            // 生成完了状態を更新
+            setAbortControllers((prev) => {
+              const newControllers = { ...prev };
+              delete newControllers[assistantMessageId];
+
+              if (Object.keys(newControllers).length === 0) {
+                setIsGenerating(false);
+                isProcessingRef.current = false;
+              }
+              return newControllers;
+            });
+          }
+        })();
+      }
+    },
+    [
+      roomId,
+      openRouterApiKey,
+      setMessages,
+      setIsGenerating,
+      setAbortControllers,
+      safeOptimisticUpdate,
+    ]
+  );
+
+  const sortMessages = (arr: AppMessage[]): AppMessage[] => {
+    return arr.sort((a, b) => {
+      const aTime = a.timestamp || 0; // a.ui?.timestamp を a.timestamp に変更
+      const bTime = b.timestamp || 0; // b.ui?.timestamp を b.timestamp に変更
+      return aTime - bTime;
+    });
+  };
 
   const handleStopAllGeneration = useCallback(() => {
     console.log("Stopping all generations...");
@@ -951,18 +892,10 @@ export function useChatLogic({
     setAbortControllers({});
   }, [abortControllers, setAbortControllers]);
 
-  const sortMessages = (arr: AppMessage[]): AppMessage[] => {
-    return arr.sort((a, b) => {
-      const aTime = a.timestamp || 0; // a.ui?.timestamp を a.timestamp に変更
-      const bTime = b.timestamp || 0; // b.ui?.timestamp を b.timestamp に変更
-      return aTime - bTime;
-    });
-  };
-
   const handleResetAndRegenerate = useCallback(
     async (messageId: string, newContent?: string) => {
-      setIsGenerating(true);
       setError(null);
+      setApiKeyError(null);
       isProcessingRef.current = true;
       messagesBackupRef.current = messages;
 
@@ -977,7 +910,6 @@ export function useChatLogic({
           "[ChatLogic] User message not found or not a user message for regeneration:",
           messageId
         );
-        setIsGenerating(false);
         isProcessingRef.current = false;
         return;
       }
@@ -993,33 +925,78 @@ export function useChatLogic({
         console.error(
           "[ChatLogic] Cannot regenerate non-string content without new string input."
         );
-        setIsGenerating(false);
         isProcessingRef.current = false;
         return;
       }
 
+      // 現在選択されているモデルを確認
+      const currentSelectedModels = models?.filter((m) => m.selected) || [];
+      if (currentSelectedModels.length === 0) {
+        setError("送信先のモデルが選択されていません。");
+        console.error("[handleResetAndRegenerate] No model selected.");
+        isProcessingRef.current = false;
+        return;
+      }
+
+      // 編集されたユーザーメッセージまでを残し、その後のメッセージをすべて削除
       const updatedMessages = messages
         .slice(0, userMessageIndex + 1)
         .map((msg) =>
           msg.id === messageId
             ? {
                 ...msg,
-                content: contentForRegeneration, // string型を保証
+                content: contentForRegeneration,
                 timestamp: Date.now(),
-                ui: {
-                  ...(msg.ui || {}),
-                  edited: typeof newContent === "string",
-                },
               }
             : msg
         );
 
-      setMessages(updatedMessages);
-      await handleSend(contentForRegeneration); // string型を渡す
+      // 新しいアシスタントメッセージのプレースホルダーを作成
+      const createdPlaceholders = currentSelectedModels.map((modelItem) => ({
+        id: generateId(),
+        role: "assistant" as const,
+        content: "",
+        timestamp: Date.now(),
+        ui: {
+          modelId: modelItem.id,
+          isGenerating: true,
+        },
+      }));
+
+      // 最終的なメッセージリスト（編集されたユーザーメッセージ + 新しいプレースホルダー）
+      const finalMessages = [...updatedMessages, ...createdPlaceholders];
+
+      console.log(
+        `[handleResetAndRegenerate] Resetting conversation from message ${messageId}. Original messages: ${messages.length}, Final messages: ${finalMessages.length}`
+      );
+
+      // メッセージ状態を更新
+      setMessages(finalMessages);
+      messagesBackupRef.current = finalMessages;
+      lastValidMessagesTimestampRef.current = Date.now();
+
+      // optimisticMessagesも同期
+      safeOptimisticUpdate({
+        type: "resetMessages",
+        payload: finalMessages,
+      });
+
+      // ローカルストレージに保存
+      saveMessagesToHistory(finalMessages);
+
+      // LLM生成はuseEffectで自動検知される（通常の送信と同じフロー）
 
       isProcessingRef.current = false;
     },
-    [messages, handleSend, openRouterApiKey, models, tools]
+    [
+      messages,
+      models,
+      setError,
+      setApiKeyError,
+      setMessages,
+      safeOptimisticUpdate,
+      saveMessagesToHistory,
+    ]
   );
 
   const handleSaveOnly = useCallback(
@@ -1247,6 +1224,7 @@ export function useChatLogic({
     }
 
     if (!isShared && roomId && !initialLoadComplete) {
+      // roomIdがある場合のみメッセージを読み込む
       // storedMessages は ConversationTurn[] なので、フラット化が必要
       // ただし、古い形式のデータ（AppMessage[]）が残っている可能性もあるため、互換性処理を追加
       try {
@@ -1295,17 +1273,42 @@ export function useChatLogic({
             flattenedMessages = [];
           }
 
-          // 古いデータ形式からの移行とisGeneratingのリセット
+          // セッション内フラグを確認（同一セッション内での遷移かどうか）
+          const isWithinSession =
+            sessionStorage.getItem(`navigation_${roomId}`) === "true";
+
+          console.log(
+            `[ChatLogic] Loading messages. isWithinSession: ${isWithinSession}, roomId: ${roomId}`
+          );
+
+          // 古いデータ形式からの移行とisGeneratingの処理
           const processedLoadedMessages = flattenedMessages.map(
             (msg: AppMessage) => {
               // ui.timestamp への参照を削除
-              return {
+              const cleanedMessage = {
                 ...msg,
                 timestamp: msg.timestamp || Date.now(), // ui.timestampは参照しない
-                ui: { ...(msg.ui || {}), isGenerating: false },
+                ui: { ...(msg.ui || {}) },
               };
+
+              // 同一セッション内での遷移の場合は、isGenerating状態を維持
+              // アプリ再起動時（セッションフラグがない場合）はfalseにリセット
+              if (!isWithinSession) {
+                cleanedMessage.ui.isGenerating = false;
+              }
+              // isWithinSessionがtrueの場合は、元の isGenerating 状態を維持
+
+              return cleanedMessage;
             }
           );
+
+          // セッションフラグをクリア（一度使用したら削除）
+          if (isWithinSession) {
+            sessionStorage.removeItem(`navigation_${roomId}`);
+            console.log(
+              `[ChatLogic] Cleared session navigation flag for roomId: ${roomId}`
+            );
+          }
 
           setMessages(processedLoadedMessages);
           messagesBackupRef.current = [...processedLoadedMessages];
@@ -1330,6 +1333,7 @@ export function useChatLogic({
       }
       setInitialLoadComplete(true);
     } else if (isShared && initialMessages) {
+      // 共有ビューの場合
       // initialMessages は AppMessage[] なのでそのまま
       const validInitialMessages = initialMessages.filter(
         (msg: any) =>
@@ -1342,65 +1346,18 @@ export function useChatLogic({
         payload: validInitialMessages,
       });
       setInitialLoadComplete(true);
-    } else if (!roomId && !isShared && !initialLoadComplete) {
-      // デフォルトメッセージ (chatMessages_default) の読み込みも ConversationTurn[] を想定して修正
-      try {
-        const defaultStoredTurns = storage.get(`chatMessages_default`) as
-          | ConversationTurn[]
-          | AppMessage[]
-          | undefined;
-        if (
-          defaultStoredTurns &&
-          Array.isArray(defaultStoredTurns) &&
-          defaultStoredTurns.length > 0
-        ) {
-          const firstItem = defaultStoredTurns[0];
-          let flattenedDefault: AppMessage[] = [];
-
-          if (
-            firstItem &&
-            typeof firstItem === "object" &&
-            "userMessage" in firstItem &&
-            "assistantResponses" in firstItem
-          ) {
-            // 新しい形式 (ConversationTurn[]) の場合
-            (defaultStoredTurns as ConversationTurn[]).forEach((turn) => {
-              flattenedDefault.push(turn.userMessage);
-              turn.assistantResponses.forEach((asMsg) =>
-                flattenedDefault.push(asMsg)
-              );
-            });
-          } else if (
-            firstItem &&
-            typeof firstItem === "object" &&
-            "id" in firstItem &&
-            "role" in firstItem
-          ) {
-            // 古い形式 (AppMessage[]) の場合
-            flattenedDefault = defaultStoredTurns as unknown as AppMessage[]; // ★ unknown を経由してキャスト
-          }
-
-          // ★ mapのコールバック関数を実装
-          const processedDefault = flattenedDefault.map((msg: AppMessage) => ({
-            ...msg,
-            timestamp: msg.timestamp || Date.now(),
-            ui: { ...(msg.ui || {}), isGenerating: false },
-          }));
-          setMessages(processedDefault);
-          messagesBackupRef.current = [...processedDefault];
-          safeOptimisticUpdate({
-            type: "resetMessages",
-            payload: processedDefault,
-          });
-        } else {
-          safeOptimisticUpdate({ type: "resetMessages", payload: [] });
-          setMessages([]);
-        }
-      } catch (error) {
-        console.error("[ChatLogic] Error processing default messages:", error);
-        safeOptimisticUpdate({ type: "resetMessages", payload: [] });
-        setMessages([]);
-      }
+    } else if (!roomId && !isShared) {
+      // roomIdがない場合（トップページ）は常にメッセージをクリア
+      console.log("[ChatLogic] Clearing messages for top page (no roomId)");
+      messagesBackupRef.current = [];
+      safeOptimisticUpdate({ type: "resetMessages", payload: [] });
+      setMessages([]);
+      setInitialLoadComplete(true);
+    } else if (!initialLoadComplete) {
+      // その他の場合でまだ初期化されていない場合
+      console.log("[ChatLogic] Initializing empty state for new chat");
+      safeOptimisticUpdate({ type: "resetMessages", payload: [] });
+      setMessages([]);
       setInitialLoadComplete(true);
     }
   }, [
@@ -1413,6 +1370,62 @@ export function useChatLogic({
     safeOptimisticUpdate,
     saveMessagesToHistory, // saveMessagesToHistory を依存配列に追加
   ]);
+
+  // 生成中メッセージの検知と再開処理用の別useEffect
+  useEffect(() => {
+    if (!roomId || !initialLoadComplete || isShared) return;
+
+    const generatingMessages = messages.filter(
+      (msg) => msg.role === "assistant" && msg.ui?.isGenerating === true
+    ) as (AppMessage & { role: "assistant" })[];
+
+    console.log(
+      `[useEffect] Checking for generating messages. Found: ${generatingMessages.length}, isGenerating: ${isGenerating}`
+    );
+
+    if (generatingMessages.length > 0) {
+      if (!isGenerating) {
+        console.log(
+          `[useEffect] Found ${generatingMessages.length} generating messages, starting LLM generation`
+        );
+        setTimeout(() => {
+          resumeLLMGeneration(generatingMessages);
+        }, 100);
+      } else {
+        console.log(
+          `[useEffect] Generation already in progress for ${generatingMessages.length} messages`
+        );
+      }
+    } else {
+      console.log("[useEffect] No generating messages found");
+    }
+  }, [
+    roomId,
+    initialLoadComplete,
+    isShared,
+    messages,
+    isGenerating,
+    resumeLLMGeneration,
+  ]);
+
+  // 初期メッセージ読み込み完了後の生成チェック用useEffect
+  useEffect(() => {
+    if (!roomId || !initialLoadComplete || isShared || !messages.length) return;
+
+    const generatingMessages = messages.filter(
+      (msg) => msg.role === "assistant" && msg.ui?.isGenerating === true
+    ) as (AppMessage & { role: "assistant" })[];
+
+    if (generatingMessages.length > 0 && !isGenerating) {
+      console.log(
+        `[useEffect] Initial load complete, starting generation for ${generatingMessages.length} messages`
+      );
+      // 少し遅延してから実行することで、他の状態更新との競合を回避
+      setTimeout(() => {
+        resumeLLMGeneration(generatingMessages);
+      }, 200);
+    }
+  }, [initialLoadComplete]); // initialLoadCompleteの変化のみを監視
 
   // ローカルストレージへの保存useEffect (saveMessagesToHistory を使う)
   useEffect(() => {
@@ -1435,6 +1448,7 @@ export function useChatLogic({
       setInitialLoadComplete(true);
       return;
     }
+
     const loadedTurns = (await storage.get(`chatMessages_${roomId}`)) as
       | ConversationTurn[] // ★ 読み込む型は ConversationTurn[]
       | null
@@ -1449,18 +1463,44 @@ export function useChatLogic({
           flattenedMessages.push(assistantMsg);
         });
       });
+
+      // セッション内フラグを確認（同一セッション内での遷移かどうか）
+      const isWithinSession =
+        sessionStorage.getItem(`navigation_${roomId}`) === "true";
+
+      console.log(
+        `[loadMessages] Loading messages. isWithinSession: ${isWithinSession}, roomId: ${roomId}`
+      );
+
       // 古いデータ形式 (ui.timestamp を含む) からの移行措置
       const processedMessages = flattenedMessages.map((msg: AppMessage) => {
         // ★ ui.timestamp への参照を削除
-        return {
+        const cleanedMessage = {
           ...msg,
           timestamp: msg.timestamp || Date.now(), // ui.timestampは参照しない
           ui: {
             ...(msg.ui || {}),
-            isGenerating: false, // 起動時は常にfalse
           },
         };
+
+        // 同一セッション内での遷移の場合は、isGenerating状態を維持
+        // アプリ再起動時（セッションフラグがない場合）はfalseにリセット
+        if (!isWithinSession) {
+          cleanedMessage.ui.isGenerating = false;
+        }
+        // isWithinSessionがtrueの場合は、元の isGenerating 状態を維持
+
+        return cleanedMessage;
       });
+
+      // セッションフラグをクリア（一度使用したら削除）
+      if (isWithinSession) {
+        sessionStorage.removeItem(`navigation_${roomId}`);
+        console.log(
+          `[loadMessages] Cleared session navigation flag for roomId: ${roomId}`
+        );
+      }
+
       setMessages(processedMessages);
     } else if (initialMessages) {
       setMessages(initialMessages); // initialMessages は AppMessage[]
@@ -1663,6 +1703,7 @@ export function useChatLogic({
           // 他に生成中のものがなければ全体のisGeneratingをfalseに
           if (Object.keys(newControllers).length === 0) {
             setIsGenerating(false);
+            isProcessingRef.current = false;
           }
           return newControllers;
         });
@@ -1686,6 +1727,15 @@ export function useChatLogic({
     isModelModalOpen,
     handleOpenModelModal: () => setIsModelModalOpen(true),
     handleCloseModelModal: () => setIsModelModalOpen(false),
+    isModelSelectorSlideoutOpen,
+    handleOpenModelSelectorSlideout: () => setIsModelSelectorSlideoutOpen(true),
+    handleCloseModelSelectorSlideout: () =>
+      setIsModelSelectorSlideoutOpen(false),
+    isToolsModalOpen,
+    handleOpenToolsModal: () => setIsToolsModalOpen(true),
+    handleCloseToolsModal: () => setIsToolsModalOpen(false),
+    tools: tools || [],
+    updateTools: (newTools: any[]) => setTools(newTools),
     models: models || [],
     updateModels: (newModels: ModelItem[]) => {
       setModels(newModels);
@@ -1719,5 +1769,7 @@ export function useChatLogic({
     regenerateAssistantResponse,
     selectedModelIds: selectedModelIds || [],
     setSelectedModelIds,
+    resumeLLMGeneration,
+    getCurrentChatInfo,
   };
 }
