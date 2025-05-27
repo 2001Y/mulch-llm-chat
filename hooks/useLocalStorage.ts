@@ -163,6 +163,24 @@ export default function useStorageState<V = any>(
       return () => {
         window.removeEventListener("tokenChange", handleTokenChange);
       };
+    } else if (key === "openrouter_api_key") {
+      // openrouter_api_keyの場合はtokenChangeイベントを監視
+      const handleTokenChange = () => {
+        const newValue = storage.get(key) as V | undefined;
+        console.log(
+          `[useStorageState] tokenChangeイベント受信 - ${key}:`,
+          newValue
+        );
+        setStoredValue(newValue);
+      };
+
+      window.addEventListener("tokenChange", handleTokenChange);
+      // 初回チェック
+      handleTokenChange();
+
+      return () => {
+        window.removeEventListener("tokenChange", handleTokenChange);
+      };
     } else {
       // その他のキーは通常のstorageイベントを監視
       const handleStorageChange = (e: StorageEvent) => {

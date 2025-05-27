@@ -1860,10 +1860,18 @@ export function useChatLogic({
     ]
   );
 
-  // OpenRouter認証成功時にAPIキーエラーをクリア
+  // OpenRouter認証成功時にAPIキーエラーをクリアし、APIキー状態を更新
   useEffect(() => {
     const handleTokenChange = () => {
       const currentToken = storage.get("openrouter_api_key"); // accessTokenではなくopenrouter_api_keyを確認
+      console.log(
+        "[useChatLogic] tokenChangeイベント受信 - 現在のトークン:",
+        currentToken
+      );
+
+      // APIキーの状態を強制的に更新
+      setOpenRouterApiKey(currentToken);
+
       if (currentToken && apiKeyError) {
         console.log(
           "[useChatLogic] OpenRouter token detected, clearing API key error"
@@ -1890,7 +1898,7 @@ export function useChatLogic({
     return () => {
       window.removeEventListener("tokenChange", handleTokenChange);
     };
-  }, [apiKeyError, isModalOpen]);
+  }, [apiKeyError, isModalOpen, setOpenRouterApiKey]);
 
   return {
     isModalOpen,

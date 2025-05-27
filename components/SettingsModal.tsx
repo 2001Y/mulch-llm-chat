@@ -158,12 +158,24 @@ export default function SettingsModal() {
     setAuthError("");
 
     const callbackUrl = window.location.origin + "/api/auth/callback";
-    const authUrl =
-      "https://openrouter.ai/auth?callback_url=" +
-      encodeURIComponent(callbackUrl);
+
+    // PKCEパラメータを生成（簡易版）
+    const codeVerifier = generateRandomString(128);
+    const codeChallenge = btoa(codeVerifier)
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=/g, "");
+
+    // セッションストレージにcode_verifierを保存（コールバック時に使用）
+    sessionStorage.setItem("openrouter_code_verifier", codeVerifier);
+
+    const authUrl = `https://openrouter.ai/auth?callback_url=${encodeURIComponent(
+      callbackUrl
+    )}&code_challenge=${codeChallenge}&code_challenge_method=plain`;
 
     console.log("[SettingsModal] コールバックURL:", callbackUrl);
     console.log("[SettingsModal] 認証URL:", authUrl);
+    console.log("[SettingsModal] Code Challenge:", codeChallenge);
 
     const oauthWindow = window.open(authUrl, "_blank", "width=500,height=600");
 
@@ -190,8 +202,21 @@ export default function SettingsModal() {
         console.log("[SettingsModal] OpenRouter認証ウィンドウが閉じられました");
         setIsOpenRouterLoading(false);
         clearInterval(checkClosed);
+        // セッションストレージをクリア
+        sessionStorage.removeItem("openrouter_code_verifier");
       }
     }, 1000);
+  };
+
+  // ランダム文字列生成関数
+  const generateRandomString = (length: number) => {
+    const charset =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+    let result = "";
+    for (let i = 0; i < length; i++) {
+      result += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+    return result;
   };
 
   // OpenRouter ログアウト処理
