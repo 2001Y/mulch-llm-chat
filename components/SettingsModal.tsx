@@ -31,18 +31,34 @@ export default function SettingsModal() {
   useEffect(() => {
     setMounted(true);
     // 初期状態を設定
-    setIsOpenRouterLoggedIn(!!storage.get("openrouter_api_key"));
-    setIsGitHubLoggedIn(!!storage.getGistToken());
+    const openRouterToken = storage.get("openrouter_api_key");
+    const githubToken = storage.getGistToken();
+
+    console.log(
+      "[SettingsModal] 初期状態設定 - OpenRouterトークン:",
+      openRouterToken
+    );
+    console.log("[SettingsModal] 初期状態設定 - GitHubトークン:", githubToken);
+
+    setIsOpenRouterLoggedIn(!!openRouterToken);
+    setIsGitHubLoggedIn(!!githubToken);
   }, []);
 
   // 認証状態の変更を監視
   useEffect(() => {
     const handleTokenChange = () => {
-      setIsOpenRouterLoggedIn(!!storage.get("openrouter_api_key"));
+      const token = storage.get("openrouter_api_key");
+      console.log("[SettingsModal] tokenChangeイベント受信 - トークン:", token);
+      setIsOpenRouterLoggedIn(!!token);
     };
 
     const handleStorageChange = () => {
-      setIsGitHubLoggedIn(!!storage.getGistToken());
+      const token = storage.getGistToken();
+      console.log(
+        "[SettingsModal] storageChangeイベント受信 - GitHubトークン:",
+        token
+      );
+      setIsGitHubLoggedIn(!!token);
     };
 
     window.addEventListener("tokenChange", handleTokenChange);
@@ -57,14 +73,33 @@ export default function SettingsModal() {
   // OpenRouterとGitHubのOAuth認証メッセージを処理
   useEffect(() => {
     const handleAuthMessage = (event: MessageEvent) => {
+      console.log("[SettingsModal] Received postMessage:", event.data);
       const { type, token, error } = event.data;
 
       if (type === "openrouter_oauth_success" && token) {
-        console.log("OpenRouter OAuth成功 (postMessage):", token);
+        console.log(
+          "[SettingsModal] OpenRouter OAuth成功 (postMessage):",
+          token
+        );
+        console.log(
+          "[SettingsModal] 保存前のローカルストレージ状態:",
+          storage.get("openrouter_api_key")
+        );
+
         storage.set("openrouter_api_key", token);
+
+        console.log(
+          "[SettingsModal] 保存後のローカルストレージ状態:",
+          storage.get("openrouter_api_key")
+        );
+        console.log("[SettingsModal] tokenChangeイベントを発行");
+
         window.dispatchEvent(new Event("tokenChange"));
         setIsOpenRouterLoading(false);
         setAuthError("");
+
+        // 認証状態を即座に更新
+        setIsOpenRouterLoggedIn(true);
 
         // 成功トースト通知を表示
         toast.success("認証成功", {
@@ -118,21 +153,28 @@ export default function SettingsModal() {
 
   // OpenRouter ログイン処理
   const handleOpenRouterLogin = () => {
+    console.log("[SettingsModal] OpenRouterログイン開始");
     setIsOpenRouterLoading(true);
     setAuthError("");
 
-    const oauthWindow = window.open(
+    const callbackUrl = window.location.origin + "/api/auth/callback";
+    const authUrl =
       "https://openrouter.ai/auth?callback_url=" +
-        encodeURIComponent(window.location.origin + "/api/auth/callback"),
-      "_blank",
-      "width=500,height=600"
-    );
+      encodeURIComponent(callbackUrl);
+
+    console.log("[SettingsModal] コールバックURL:", callbackUrl);
+    console.log("[SettingsModal] 認証URL:", authUrl);
+
+    const oauthWindow = window.open(authUrl, "_blank", "width=500,height=600");
 
     if (
       !oauthWindow ||
       oauthWindow.closed ||
       typeof oauthWindow.closed === "undefined"
     ) {
+      console.error(
+        "[SettingsModal] OpenRouter認証ウィンドウを開けませんでした"
+      );
       setAuthError(
         "OpenRouter認証ウィンドウを開けませんでした。ポップアップがブロックされていないか確認してください。"
       );
@@ -140,9 +182,12 @@ export default function SettingsModal() {
       return;
     }
 
+    console.log("[SettingsModal] OpenRouter認証ウィンドウを開きました");
+
     // ウィンドウが閉じられたかチェック
     const checkClosed = setInterval(() => {
       if (oauthWindow.closed) {
+        console.log("[SettingsModal] OpenRouter認証ウィンドウが閉じられました");
         setIsOpenRouterLoading(false);
         clearInterval(checkClosed);
       }
