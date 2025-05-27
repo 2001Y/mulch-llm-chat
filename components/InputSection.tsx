@@ -47,6 +47,12 @@ const SubmitButton = ({
 }) => {
   const { pending } = useFormStatus();
 
+  // モデルが選択されているかチェック
+  const hasSelectedModel = models && models.some((model) => model.selected);
+
+  // 送信可能かどうかの判定：入力が空でない かつ モデルが選択されている
+  const canSubmit = !isInputEmpty() && hasSelectedModel;
+
   if (isPrimaryOnly) {
     return (
       <button
@@ -54,9 +60,9 @@ const SubmitButton = ({
         name="submitType"
         value="primary"
         className={`action-button send-primary-button icon-button ${
-          !isInputEmpty() ? "active" : ""
+          canSubmit ? "active" : ""
         }`}
-        disabled={isInputEmpty() || pending}
+        disabled={!canSubmit || pending}
       >
         {pending ? (
           <span className="loading-spinner"></span>
@@ -82,10 +88,20 @@ const SubmitButton = ({
               Send to{" "}
               <code>
                 {(() => {
-                  if (!isModelsLoaded || !Array.isArray(models)) return "model";
+                  if (
+                    !isModelsLoaded ||
+                    !Array.isArray(models) ||
+                    models.length === 0
+                  ) {
+                    return "model"; // モデルが読み込まれていない場合のフォールバック
+                  }
                   const selectedModel = models.find((model) => model.selected);
-                  if (!selectedModel || typeof selectedModel.name !== "string")
-                    return "model";
+                  if (
+                    !selectedModel ||
+                    typeof selectedModel.name !== "string"
+                  ) {
+                    return "model"; // 選択されたモデルがない場合のフォールバック
+                  }
                   return selectedModel.name.includes("/")
                     ? selectedModel.name.split("/")[1]
                     : selectedModel.name;
@@ -104,9 +120,9 @@ const SubmitButton = ({
         name="submitType"
         value="normal"
         className={`action-button send-button icon-button ${
-          !isInputEmpty() ? "active" : ""
+          canSubmit ? "active" : ""
         }`}
-        disabled={isInputEmpty() || pending}
+        disabled={!canSubmit || pending}
       >
         {pending ? (
           <span className="loading-spinner"></span>
@@ -172,10 +188,6 @@ export default function InputSection({
   );
   const tiptapEditorRef = useRef<EditorHandle>(null);
 
-  const showModelSelectionAndButtonName = useMemo(() => {
-    return models && models.length > 0;
-  }, [models]);
-
   // 選択されているモデルの数を取得
   const selectedModelsCount =
     models?.filter((model) => model.selected).length || 0;
@@ -203,6 +215,32 @@ export default function InputSection({
             Object.keys(data.categories)
           );
           setCategories(data.categories);
+
+          // ファーストアクセス時（modelsが空）の場合、デフォルトカテゴリを自動適用
+          if ((!models || models.length === 0) && !roomId) {
+            const defaultCategoryKey = "コスパ優秀"; // デフォルトカテゴリ
+            if (data.categories[defaultCategoryKey]) {
+              console.log(
+                "[InputSection] Auto-applying default category for first access"
+              );
+              // applyCategoryToSendingModelsが定義される前に呼ばれる可能性があるため、
+              // 直接カテゴリモデルを適用する
+              const category = data.categories[defaultCategoryKey];
+              const categoryModels = category.models.map((modelId: string) => ({
+                id: modelId,
+                name: modelId.split("/").pop() || modelId,
+                selected: true,
+              }));
+
+              setTimeout(() => {
+                updateModels(categoryModels);
+                setActiveTab(defaultCategoryKey);
+                console.log(
+                  `[InputSection] Applied default category "${category.name}" with ${categoryModels.length} models`
+                );
+              }, 100);
+            }
+          }
         } else {
           console.warn("[InputSection] No categories found in API response");
         }
@@ -212,7 +250,7 @@ export default function InputSection({
     };
 
     fetchCategories();
-  }, []);
+  }, []); // 依存配列からmodelsとroomIdを削除（初回のみ実行）
 
   // カテゴリプリセットを送信用モデルに適用する関数
   const applyCategoryToSendingModels = useCallback(
@@ -346,12 +384,19 @@ export default function InputSection({
     handleKeyDown: (view: EditorView, event: KeyboardEvent): boolean => {
       if (event.isComposing) return false;
 
+      // モデルが選択されているかチェック
+      const hasSelectedModel = models && models.some((model) => model.selected);
+
+      // 送信可能かどうかの判定：入力が空でない かつ モデルが選択されている
+      const canSubmit = !isInputEmpty() && hasSelectedModel;
+
       // Ctrl+Shift+Enter (Cmd+Shift+Enter): プライマリモデル単一送信
       if (
         event.key === "Enter" &&
         (event.metaKey || event.ctrlKey) &&
         event.shiftKey &&
-        !isGenerating
+        !isGenerating &&
+        canSubmit
       ) {
         event.preventDefault();
 
@@ -394,7 +439,8 @@ export default function InputSection({
         event.key === "Enter" &&
         (event.metaKey || event.ctrlKey) &&
         !event.shiftKey &&
-        !isGenerating
+        !isGenerating &&
+        canSubmit
       ) {
         event.preventDefault();
 
@@ -505,6 +551,18 @@ export default function InputSection({
       | null;
 
     if (!submittedChatInput || !submittedChatInput.trim()) return;
+
+    // モデルが選択されているかチェック
+    const hasSelectedModel = models && models.some((model) => model.selected);
+    if (!hasSelectedModel) {
+      console.warn("[InputSection] No model selected, cannot submit");
+      toast.error("モデルを選択してください", {
+        description:
+          "メッセージを送信するには、少なくとも1つのモデルを選択する必要があります。",
+        duration: 3000,
+      });
+      return;
+    }
 
     // プライマリ送信の場合、元のモデル選択状態をバックアップ
     let originalModelState: ModelItem[] | undefined;
@@ -672,12 +730,20 @@ export default function InputSection({
                   Stop<span className="shortcut">⌘⌫</span>
                 </span>
               </button>
+            ) : selectedModelsCount === 0 ? (
+              // モデルが選択されていない場合は基本的な送信ボタンを表示
+              <SubmitButton
+                isPrimaryOnly={false}
+                models={models}
+                isInputEmpty={isInputEmpty}
+                isModelsLoaded={true}
+              />
             ) : selectedModelsCount === 1 ? (
               <SubmitButton
                 isPrimaryOnly={true}
                 models={models}
                 isInputEmpty={isInputEmpty}
-                isModelsLoaded={showModelSelectionAndButtonName}
+                isModelsLoaded={true}
               />
             ) : (
               <>
@@ -685,13 +751,13 @@ export default function InputSection({
                   isPrimaryOnly={true}
                   models={models}
                   isInputEmpty={isInputEmpty}
-                  isModelsLoaded={showModelSelectionAndButtonName}
+                  isModelsLoaded={true}
                 />
                 <SubmitButton
                   isPrimaryOnly={false}
                   models={models}
                   isInputEmpty={isInputEmpty}
-                  isModelsLoaded={showModelSelectionAndButtonName}
+                  isModelsLoaded={true}
                 />
               </>
             )}

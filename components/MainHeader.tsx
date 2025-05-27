@@ -81,10 +81,10 @@ export default function MainHeader({ onShare }: MainHeaderProps) {
 
       <div className="main-header-right">
         {isHomePage ? (
-          // トップページでは設定ボタンを表示
+          // トップページでは設定ボタンをモバイルでのみ表示
           <SettingButton onClick={handleOpenModal} variant="header" />
         ) : (
-          // 個別ページでは共有ボタンを表示
+          // 個別ページでは共有ボタンをモバイルでのみ表示
           <button
             className="main-header-share-button"
             onClick={handleShareClick}

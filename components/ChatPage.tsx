@@ -25,6 +25,7 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
     handleSend,
     initialLoadComplete,
     error,
+    apiKeyError,
     roomId,
     chatInput,
     setChatInput,
@@ -37,6 +38,7 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
     handleCloseModelSelectorSlideout,
     isToolsModalOpen,
     handleCloseToolsModal,
+    handleOpenModal,
   } = useChatLogicContext();
 
   // チャットリストの有無をbodyクラスで管理
@@ -188,6 +190,34 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
     return (
       <>
         <MainHeader onShare={handleShare} />
+
+        {/* APIキーエラー表示 */}
+        {apiKeyError && !isSharedView && (
+          <div className="api-key-error-banner">
+            <div className="error-content">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <span>{apiKeyError}</span>
+              <button onClick={handleOpenModal} className="error-action-button">
+                設定を開く
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="responses-container" id="responses-container">
           <ChatResponses readOnly={isSharedView} />
         </div>

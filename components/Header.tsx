@@ -19,10 +19,10 @@ function AuthButton() {
   }
 
   const handleOpenModal = context?.handleOpenModal;
-  const isLoggedIn = !!storage.getAccessToken();
+  const isLoggedIn = !!storage.get("openrouter_api_key");
 
   const handleLogout = () => {
-    storage.remove("accessToken");
+    storage.remove("openrouter_api_key");
     window.dispatchEvent(new Event("tokenChange"));
     window.location.reload();
   };
@@ -101,7 +101,7 @@ function FreeVersionBadge() {
     return null;
   }
 
-  return !storage.getAccessToken() ? (
+  return !storage.get("openrouter_api_key") ? (
     <div className="free-version">Free Version</div>
   ) : null;
 }

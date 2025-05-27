@@ -23,6 +23,7 @@ import {
   type ConversationTurn, // ★ ConversationTurn をインポート
 } from "types/chat"; // ★ インポート修正
 export type { AppMessage as Message }; // AppMessage を Message として再エクスポート
+import { toast } from "sonner";
 
 // Markedのインスタンスを作成し、拡張機能とオプションを設定
 const markedInstance = new Marked(
@@ -191,10 +192,22 @@ export function useChatLogic({
     const currentOpenRouterApiKey =
       openRouterApiKey || process.env.OPENROUTER_API_KEY;
     if (!currentOpenRouterApiKey) {
-      setApiKeyError(
-        "OpenRouter APIキーが設定されていません。右上の設定ボタンからAPIキーを設定してください。OpenRouterのウェブサイト(https://openrouter.ai)でアカウント作成後、APIキーを取得できます。"
+      const errorMessage =
+        "OpenRouter APIキーが設定されていません。設定モーダルを開いて認証を行ってください。";
+      setApiKeyError(errorMessage);
+      console.error(
+        "[API Key Check] OpenRouter API Key is missing. Opening settings modal."
       );
-      console.error("[API Key Check] OpenRouter API Key is missing.");
+
+      // トースト通知でユーザーに分かりやすく伝える
+      toast.error("APIキーが必要です", {
+        description:
+          "再生成にはOpenRouterでの認証が必要です。設定画面を開きました。",
+        duration: 5000,
+      });
+
+      // APIキーがない場合は自動で設定モーダルを開く
+      setIsModalOpen(true);
       return null;
     }
     setApiKeyError(null); // エラーがなければクリア
@@ -488,10 +501,21 @@ export function useChatLogic({
       const currentOpenRouterApiKey =
         openRouterApiKey || process.env.OPENROUTER_API_KEY;
       if (!currentOpenRouterApiKey) {
-        setApiKeyError(
-          "OpenRouter APIキーが設定されていません。右上の設定ボタンからAPIキーを設定してください。OpenRouterのウェブサイト(https://openrouter.ai)でアカウント作成後、APIキーを取得できます。"
+        const errorMessage =
+          "OpenRouter APIキーが設定されていません。設定モーダルを開いて認証を行ってください。";
+        setApiKeyError(errorMessage);
+        console.error(
+          "[handleSend] OpenRouter API Key is missing. Opening settings modal."
         );
-        console.error("[handleSend] OpenRouter API Key is missing.");
+
+        // トースト通知でユーザーに分かりやすく伝える
+        toast.error("APIキーが必要です", {
+          description: "OpenRouterでの認証が必要です。設定画面を開きました。",
+          duration: 5000,
+        });
+
+        // APIキーがない場合は自動で設定モーダルを開く
+        setIsModalOpen(true);
         return;
       }
 
@@ -713,7 +737,22 @@ export function useChatLogic({
       const currentOpenRouterApiKey =
         openRouterApiKey || process.env.OPENROUTER_API_KEY;
       if (!currentOpenRouterApiKey) {
-        console.error("[resumeLLMGeneration] OpenRouter API Key is missing.");
+        const errorMessage =
+          "OpenRouter APIキーが設定されていません。設定モーダルを開いて認証を行ってください。";
+        setApiKeyError(errorMessage);
+        console.error(
+          "[resumeLLMGeneration] OpenRouter API Key is missing. Opening settings modal."
+        );
+
+        // トースト通知でユーザーに分かりやすく伝える
+        toast.error("APIキーが必要です", {
+          description:
+            "メッセージ生成にはOpenRouterでの認証が必要です。設定画面を開きました。",
+          duration: 5000,
+        });
+
+        // APIキーがない場合は自動で設定モーダルを開く
+        setIsModalOpen(true);
         return;
       }
 
@@ -887,6 +926,7 @@ export function useChatLogic({
       setIsGenerating,
       setAbortControllers,
       safeOptimisticUpdate,
+      setApiKeyError,
     ]
   );
 
@@ -1819,6 +1859,38 @@ export function useChatLogic({
       tools,
     ]
   );
+
+  // OpenRouter認証成功時にAPIキーエラーをクリア
+  useEffect(() => {
+    const handleTokenChange = () => {
+      const currentToken = storage.get("openrouter_api_key"); // accessTokenではなくopenrouter_api_keyを確認
+      if (currentToken && apiKeyError) {
+        console.log(
+          "[useChatLogic] OpenRouter token detected, clearing API key error"
+        );
+        setApiKeyError(null);
+
+        // 認証成功のトースト通知（設定モーダル以外からの場合）
+        if (!isModalOpen) {
+          toast.success("認証完了", {
+            description:
+              "OpenRouterとの認証が完了しました。メッセージを送信できます。",
+            duration: 3000,
+          });
+        }
+      }
+    };
+
+    // tokenChangeイベントをリッスン
+    window.addEventListener("tokenChange", handleTokenChange);
+
+    // 初回チェック
+    handleTokenChange();
+
+    return () => {
+      window.removeEventListener("tokenChange", handleTokenChange);
+    };
+  }, [apiKeyError, isModalOpen]);
 
   return {
     isModalOpen,

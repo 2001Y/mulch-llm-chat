@@ -3,6 +3,7 @@ import BaseModal from "./BaseModal";
 import useStorageState from "hooks/useLocalStorage";
 import { useChatLogicContext } from "contexts/ChatLogicContext";
 import { storage } from "hooks/useLocalStorage";
+import { toast } from "sonner";
 
 interface Tool {
   type: string;
@@ -24,9 +25,33 @@ export default function SettingsModal() {
   const [isGitHubLoading, setIsGitHubLoading] = useState(false);
   const [isOpenRouterLoading, setIsOpenRouterLoading] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [isOpenRouterLoggedIn, setIsOpenRouterLoggedIn] = useState(false);
+  const [isGitHubLoggedIn, setIsGitHubLoggedIn] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    // 初期状態を設定
+    setIsOpenRouterLoggedIn(!!storage.get("openrouter_api_key"));
+    setIsGitHubLoggedIn(!!storage.getGistToken());
+  }, []);
+
+  // 認証状態の変更を監視
+  useEffect(() => {
+    const handleTokenChange = () => {
+      setIsOpenRouterLoggedIn(!!storage.get("openrouter_api_key"));
+    };
+
+    const handleStorageChange = () => {
+      setIsGitHubLoggedIn(!!storage.getGistToken());
+    };
+
+    window.addEventListener("tokenChange", handleTokenChange);
+    window.addEventListener("storage", handleStorageChange);
+
+    return () => {
+      window.removeEventListener("tokenChange", handleTokenChange);
+      window.removeEventListener("storage", handleStorageChange);
+    };
   }, []);
 
   // OpenRouterとGitHubのOAuth認証メッセージを処理
@@ -36,28 +61,52 @@ export default function SettingsModal() {
 
       if (type === "openrouter_oauth_success" && token) {
         console.log("OpenRouter OAuth成功 (postMessage):", token);
-        storage.set("accessToken", token);
+        storage.set("openrouter_api_key", token);
         window.dispatchEvent(new Event("tokenChange"));
         setIsOpenRouterLoading(false);
         setAuthError("");
-        // 成功メッセージを表示（オプション）
-        // alert("OpenRouterとの認証に成功しました。");
+
+        // 成功トースト通知を表示
+        toast.success("認証成功", {
+          description:
+            "OpenRouterとの認証が完了しました。AIモデルが利用可能になりました。",
+          duration: 4000,
+        });
       } else if (type === "openrouter_oauth_error") {
         console.error("OpenRouter OAuthエラー (postMessage):", error);
         setAuthError(`OpenRouter認証エラー: ${error || "不明なエラー"}`);
         setIsOpenRouterLoading(false);
+
+        // エラートースト通知を表示
+        toast.error("認証エラー", {
+          description: `OpenRouter認証に失敗しました: ${
+            error || "不明なエラー"
+          }`,
+          duration: 5000,
+        });
       } else if (type === "github_oauth_success" && token) {
         console.log("GitHub OAuth成功 (postMessage):", token);
         storage.set("gistToken", token);
         storage.set("gistOAuthSuccess", "true");
         setIsGitHubLoading(false);
         setAuthError("");
-        // 成功メッセージを表示（オプション）
-        // alert("GitHubとの認証に成功しました。");
+
+        // 成功トースト通知を表示
+        toast.success("認証成功", {
+          description:
+            "GitHubとの認証が完了しました。チャット共有機能が利用可能になりました。",
+          duration: 4000,
+        });
       } else if (type === "github_oauth_error") {
         console.error("GitHub OAuthエラー (postMessage):", error);
         setAuthError(`GitHub認証エラー: ${error || "不明なエラー"}`);
         setIsGitHubLoading(false);
+
+        // エラートースト通知を表示
+        toast.error("認証エラー", {
+          description: `GitHub認証に失敗しました: ${error || "不明なエラー"}`,
+          duration: 5000,
+        });
       }
     };
 
@@ -66,18 +115,6 @@ export default function SettingsModal() {
       window.removeEventListener("message", handleAuthMessage);
     };
   }, []);
-
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editingToolDefinition, setEditingToolDefinition] = useState("");
-  const [editingToolFunction, setEditingToolFunction] = useState("");
-
-  const [storedTools, setStoredTools] = useStorageState("tools");
-  const tools: Tool[] = storedTools || [];
-  const setTools = (newTools: Tool[]) => {
-    setStoredTools(newTools);
-  };
-
-  const [toolFunctions, setToolFunctions] = useStorageState("toolFunctions");
 
   // OpenRouter ログイン処理
   const handleOpenRouterLogin = () => {
@@ -114,7 +151,7 @@ export default function SettingsModal() {
 
   // OpenRouter ログアウト処理
   const handleOpenRouterLogout = () => {
-    storage.remove("accessToken");
+    storage.remove("openrouter_api_key");
     window.dispatchEvent(new Event("tokenChange"));
     window.location.reload();
   };
@@ -178,9 +215,6 @@ export default function SettingsModal() {
     return null;
   }
 
-  const isOpenRouterLoggedIn = !!storage.getAccessToken();
-  const isGitHubLoggedIn = !!storage.getGistToken();
-
   return (
     <BaseModal
       isOpen={isModalOpen}
@@ -191,6 +225,16 @@ export default function SettingsModal() {
       <div className="settings-modal-content">
         {/* Authentication Section */}
         <h3>認証設定</h3>
+        <p
+          style={{
+            color: "rgba(255, 255, 255, 0.7)",
+            fontSize: "0.9rem",
+            marginBottom: "1rem",
+            lineHeight: "1.4",
+          }}
+        >
+          AIモデルとの対話には認証が必要です。下記のサービスでログインしてください。
+        </p>
 
         {/* OpenRouter Authentication */}
         <div className="auth-section settings-input-area">

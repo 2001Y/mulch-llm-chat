@@ -34,35 +34,13 @@ function AuthButton() {
     return null;
   }
 
-  const isLoggedIn = !!storage.getAccessToken();
-
-  return isLoggedIn ? (
+  return (
     <>
       {handleOpenModal && (
         <SettingButton onClick={handleOpenModal} variant="sidebar" />
       )}
     </>
-  ) : (
-    <button onClick={handleLogin} className="sidebar-login-button">
-      Login with OpenRouter
-    </button>
   );
-}
-
-function FreeVersionBadge() {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return null;
-  }
-
-  return !storage.getAccessToken() ? (
-    <div className="sidebar-free-version">Free Version</div>
-  ) : null;
 }
 
 export default function Sidebar() {
@@ -84,7 +62,6 @@ export default function Sidebar() {
         <div className="sidebar-actions">
           <AuthButton />
         </div>
-        <FreeVersionBadge />
       </div>
 
       {/* チャット一覧 */}

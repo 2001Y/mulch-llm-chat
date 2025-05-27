@@ -55,15 +55,22 @@ export const storage = {
     localStorage.removeItem(key);
   },
 
-  getAccessToken: () => {
+  getOpenRouterApiKey: () => {
     if (typeof window === "undefined") return null;
-    const token = storage.get("accessToken");
+    const token = storage.get("openrouter_api_key");
     return token && token !== "" ? token : null;
   },
 
   getGistToken: () => {
     if (typeof window === "undefined") return null;
     const token = storage.get("gistToken");
+    return token && token !== "" ? token : null;
+  },
+
+  // 後方互換性のため残しておく（非推奨）
+  getAccessToken: () => {
+    if (typeof window === "undefined") return null;
+    const token = storage.get("openrouter_api_key"); // openrouter_api_keyを参照
     return token && token !== "" ? token : null;
   },
 };
