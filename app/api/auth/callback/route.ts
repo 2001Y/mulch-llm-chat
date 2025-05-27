@@ -142,6 +142,55 @@ export async function GET(request: NextRequest) {
       `${apiKey.substring(0, 10)}...`
     );
 
+    // Safari用のリダイレクト認証かどうかをUser-Agentで判定
+    const userAgent = request.headers.get("user-agent") || "";
+    const isSafari = /safari/i.test(userAgent) && !/chrome/i.test(userAgent);
+
+    console.log("[OpenRouter Callback] Safari検出:", isSafari);
+    console.log("[OpenRouter Callback] User-Agent:", userAgent);
+
+    if (isSafari) {
+      // Safari用: localStorageに保存してリダイレクト
+      const htmlResponse = `
+        <html>
+          <head><title>OpenRouter OAuth Success</title></head>
+          <body>
+            <script>
+              console.log('[OpenRouter Callback Safari] APIキーをlocalStorageに保存');
+              try {
+                localStorage.setItem('openrouter_api_key', '${apiKey}');
+                console.log('[OpenRouter Callback Safari] 保存完了');
+                
+                // tokenChangeイベントを発火
+                window.dispatchEvent(new Event('tokenChange'));
+                
+                // 元のページに戻る
+                const returnUrl = sessionStorage.getItem('openrouter_return_url') || '/';
+                sessionStorage.removeItem('openrouter_return_url');
+                
+                // 認証成功パラメータを追加
+                const url = new URL(returnUrl);
+                url.searchParams.set('auth', 'success');
+                
+                console.log('[OpenRouter Callback Safari] リダイレクト先:', url.toString());
+                window.location.href = url.toString();
+              } catch (error) {
+                console.error('[OpenRouter Callback Safari] エラー:', error);
+                document.body.innerHTML = '<p>認証に成功しましたが、データの保存に失敗しました。ページを再読み込みしてください。</p>';
+              }
+            </script>
+            <p>認証中...</p>
+          </body>
+        </html>
+      `;
+
+      return new NextResponse(htmlResponse, {
+        status: 200,
+        headers: { "Content-Type": "text/html" },
+      });
+    }
+
+    // 他のブラウザ用: 従来のpostMessage方式
     // 親ウィンドウにAPIキーを送信し、このウィンドウを閉じるHTMLを返す
     const htmlResponse = `
       <html>

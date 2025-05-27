@@ -42,6 +42,25 @@ export default function SettingsModal() {
 
     setIsOpenRouterLoggedIn(!!openRouterToken);
     setIsGitHubLoggedIn(!!githubToken);
+
+    // Safari用: ページ読み込み時に認証完了をチェック
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("auth") === "success") {
+      // URLパラメータをクリア（履歴を汚さないため）
+      const url = new URL(window.location.href);
+      url.searchParams.delete("auth");
+      window.history.replaceState({}, "", url.toString());
+
+      // 認証成功の通知
+      if (openRouterToken) {
+        console.log("[SettingsModal] Safari認証完了を検出");
+        toast.success("認証成功", {
+          description:
+            "OpenRouterとの認証が完了しました。AIモデルが利用可能になりました。",
+          duration: 4000,
+        });
+      }
+    }
   }, []);
 
   // 認証状態の変更を監視
@@ -157,6 +176,30 @@ export default function SettingsModal() {
     setIsOpenRouterLoading(true);
     setAuthError("");
 
+    // Safariかどうかを検出
+    const isSafari =
+      /^((?!chrome|android).)*safari/i.test(navigator.userAgent) ||
+      navigator.vendor === "Apple Computer, Inc.";
+
+    console.log("[SettingsModal] Safari検出:", isSafari);
+
+    if (isSafari) {
+      // Safari用: リダイレクトベースの認証
+      console.log("[SettingsModal] Safari用リダイレクト認証を開始");
+      const callbackUrl = window.location.origin + "/api/auth/callback";
+      const authUrl = `https://openrouter.ai/auth?callback_url=${encodeURIComponent(
+        callbackUrl
+      )}`;
+
+      // 現在のページのURLを保存（認証後に戻るため）
+      sessionStorage.setItem("openrouter_return_url", window.location.href);
+
+      // 直接リダイレクト
+      window.location.href = authUrl;
+      return;
+    }
+
+    // 他のブラウザ用: 従来のポップアップ方式
     const callbackUrl = window.location.origin + "/api/auth/callback";
 
     // PKCEパラメータを生成（簡易版）
