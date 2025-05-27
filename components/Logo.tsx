@@ -25,8 +25,8 @@ export default function Logo({ onClick, variant = "sidebar" }: LogoProps) {
           className="logo-img"
         />
         <h1>
-          Multi AI Chat
-          <small>OpenRouter Chat Client</small>
+          OpenRouter Studio
+          <small>Chat with Multiple LLMs</small>
         </h1>
       </Link>
     </div>

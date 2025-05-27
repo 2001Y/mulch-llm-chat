@@ -33,7 +33,13 @@ export default function ClientOnly() {
           !(event.target as HTMLElement).closest(".responses-container") &&
           !(event.target as HTMLElement).closest(".chat-input-area") &&
           !(event.target as HTMLElement).closest(".modal-content") &&
-          !(event.target as HTMLElement).closest(".modal-backdrop"))
+          !(event.target as HTMLElement).closest(".modal-backdrop") &&
+          !(event.target as HTMLElement).closest(".tab-navigation") &&
+          !(event.target as HTMLElement).closest(
+            ".input-models-tools-container"
+          ) &&
+          !(event.target as HTMLElement).closest(".grid") &&
+          !(event.target as HTMLElement).closest(".bento-grid"))
       ) {
         event.preventDefault();
       }
