@@ -30,7 +30,16 @@ export const storage = {
       }
       return parsed;
     } catch (error) {
+      // OpenRouter APIキーの場合、文字列として直接保存されている可能性がある
+      if (key === "openrouter_api_key" && typeof item === "string" && item.length > 0) {
+        console.warn(`[storage.get] ${key}が文字列として保存されています。JSON形式に修正します。`);
+        // 正しい形式で再保存（無限ループを避けるため直接localStorage操作）
+        localStorage.setItem(key, JSON.stringify(item));
+        return item;
+      }
       console.error(`Failed to parse stored data for ${key}:`, error);
+      // 破損したデータをクリア
+      localStorage.removeItem(key);
       return undefined;
     }
   },

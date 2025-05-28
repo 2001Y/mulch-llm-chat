@@ -158,7 +158,8 @@ export async function GET(request: NextRequest) {
             <script>
               console.log('[OpenRouter Callback Safari] APIキーをlocalStorageに保存');
               try {
-                localStorage.setItem('openrouter_api_key', '${apiKey}');
+                // storage.set()と同じ形式でJSON文字列として保存
+                localStorage.setItem('openrouter_api_key', JSON.stringify('${apiKey}'));
                 console.log('[OpenRouter Callback Safari] 保存完了');
                 
                 // tokenChangeイベントを発火
