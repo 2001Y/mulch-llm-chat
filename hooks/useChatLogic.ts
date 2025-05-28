@@ -25,6 +25,16 @@ import {
 export type { AppMessage as Message }; // AppMessage を Message として再エクスポート
 import { toast } from "sonner";
 
+// === デバッグ設定 ===
+const DEBUG_LOGS = {
+  MESSAGES: true, // メッセージ状態変化ログ
+  RESUME_LLM: true, // resumeLLMGeneration関連ログ
+  TOOLS: true, // Tools関連ログ
+  STORAGE: false, // ローカルストレージ保存ログ
+  GENERAL: true, // 一般的なログ
+};
+// === デバッグ設定終了 ===
+
 // Markedのインスタンスを作成し、拡張機能とオプションを設定
 const markedInstance = new Marked(
   markedHighlight({
@@ -332,25 +342,32 @@ export function useChatLogic({
 
   // メッセージの状態変化を追跡
   useEffect(() => {
-    console.log(
-      `[useEffect messages] メッセージ状態変化直前: ${messages.length}件, isProcessingRef: ${isProcessingRef.current}`
-    );
-    // 各メッセージの詳細をログ出力
-    messages.forEach((msg, index) => {
-      console.log(
-        `[useEffect messages] msg[${index}]: id=${msg.id}, role=${
-          msg.role
-        }, content='${
-          typeof msg.content === "string"
-            ? msg.content.substring(0, 30) + "..."
-            : "Non-string content"
-        }', ui=${JSON.stringify(msg.ui)}`
-      );
-    });
+    // 生成中メッセージがある場合のみ詳細ログを出力
+    const generatingCount = messages.filter(
+      (msg) => msg.role === "assistant" && msg.ui?.isGenerating === true
+    ).length;
 
-    console.log(
-      `[useEffect messages] メッセージ状態変化: ${messages.length}件`
-    );
+    if (generatingCount > 0) {
+      console.log(
+        `[useEffect messages] メッセージ状態変化直前: ${messages.length}件, isProcessingRef: ${isProcessingRef.current}`
+      );
+      // 各メッセージの詳細をログ出力
+      messages.forEach((msg, index) => {
+        console.log(
+          `[useEffect messages] msg[${index}]: id=${msg.id}, role=${
+            msg.role
+          }, content='${
+            typeof msg.content === "string"
+              ? msg.content.substring(0, 30) + "..."
+              : "Non-string content"
+          }', ui=${JSON.stringify(msg.ui)}`
+        );
+      });
+
+      console.log(
+        `[useEffect messages] メッセージ状態変化: ${messages.length}件`
+      );
+    }
 
     // 処理中でメッセージが空になった場合は復元を試みる
     if (messages.length === 0 && isProcessingRef.current) {
@@ -725,7 +742,26 @@ export function useChatLogic({
   // 生成中ステータスのメッセージに対してLLM処理を開始する関数
   const resumeLLMGeneration = useCallback(
     async (generatingMessages: (AppMessage & { role: "assistant" })[]) => {
-      if (!roomId || generatingMessages.length === 0) return;
+      console.log("[resumeLLMGeneration] === 関数開始 ===");
+      console.log("[resumeLLMGeneration] roomId:", roomId);
+      console.log(
+        "[resumeLLMGeneration] generatingMessages.length:",
+        generatingMessages.length
+      );
+      console.log(
+        "[resumeLLMGeneration] generatingMessages:",
+        generatingMessages
+      );
+
+      if (!roomId || generatingMessages.length === 0) {
+        console.log("[resumeLLMGeneration] === 早期リターン ===");
+        console.log("[resumeLLMGeneration] roomId:", roomId);
+        console.log(
+          "[resumeLLMGeneration] generatingMessages.length:",
+          generatingMessages.length
+        );
+        return;
+      }
 
       console.log(
         `[resumeLLMGeneration] Starting LLM generation for ${generatingMessages.length} messages`
@@ -736,6 +772,12 @@ export function useChatLogic({
 
       const currentOpenRouterApiKey =
         openRouterApiKey || process.env.OPENROUTER_API_KEY;
+
+      console.log(
+        "[resumeLLMGeneration] currentOpenRouterApiKey:",
+        currentOpenRouterApiKey ? "存在" : "なし"
+      );
+
       if (!currentOpenRouterApiKey) {
         const errorMessage =
           "OpenRouter APIキーが設定されていません。設定モーダルを開いて認証を行ってください。";
@@ -820,6 +862,20 @@ export function useChatLogic({
               system: "あなたは日本語で対応する親切なアシスタントです。",
               headers: customHeaders,
             };
+
+            // === Tools検証用ログ追加（resumeLLMGeneration） ===
+            if (tools && tools.length > 0) {
+              console.log("[Tools Debug - Resume] Current tools state:", tools);
+              console.log(
+                "[Tools Debug - Resume] Current toolFunctions state:",
+                toolFunctions
+              );
+              console.log(
+                "[Tools Debug - Resume] streamOptions before streamText:",
+                streamOptions
+              );
+            }
+            // === ログ追加終了 ===
 
             const result = await streamText(streamOptions);
 
@@ -927,6 +983,8 @@ export function useChatLogic({
       setAbortControllers,
       safeOptimisticUpdate,
       setApiKeyError,
+      tools,
+      toolFunctions,
     ]
   );
 
@@ -1513,31 +1571,47 @@ export function useChatLogic({
 
   // 生成中メッセージの検知と再開処理用の別useEffect
   useEffect(() => {
-    if (!roomId || !initialLoadComplete || isShared) return;
-
     const generatingMessages = messages.filter(
       (msg) => msg.role === "assistant" && msg.ui?.isGenerating === true
     ) as (AppMessage & { role: "assistant" })[];
+
+    // 生成中メッセージがない場合は早期リターン（ログ出力を最小化）
+    if (generatingMessages.length === 0) {
+      return;
+    }
+
+    console.log("[useEffect resumeLLM] === useEffect開始 ===");
+    console.log("[useEffect resumeLLM] roomId:", roomId);
+    console.log(
+      "[useEffect resumeLLM] initialLoadComplete:",
+      initialLoadComplete
+    );
+    console.log("[useEffect resumeLLM] isShared:", isShared);
+
+    if (!roomId || !initialLoadComplete || isShared) {
+      console.log("[useEffect resumeLLM] === 早期リターン ===");
+      return;
+    }
 
     console.log(
       `[useEffect] Checking for generating messages. Found: ${generatingMessages.length}, isGenerating: ${isGenerating}`
     );
 
-    if (generatingMessages.length > 0) {
-      if (!isGenerating) {
+    if (!isGenerating) {
+      console.log(
+        `[useEffect] Found ${generatingMessages.length} generating messages, starting LLM generation`
+      );
+      console.log("[useEffect] === resumeLLMGeneration呼び出し直前 ===");
+      setTimeout(() => {
         console.log(
-          `[useEffect] Found ${generatingMessages.length} generating messages, starting LLM generation`
+          "[useEffect] === setTimeout内でresumeLLMGeneration呼び出し ==="
         );
-        setTimeout(() => {
-          resumeLLMGeneration(generatingMessages);
-        }, 100);
-      } else {
-        console.log(
-          `[useEffect] Generation already in progress for ${generatingMessages.length} messages`
-        );
-      }
+        resumeLLMGeneration(generatingMessages);
+      }, 100);
     } else {
-      console.log("[useEffect] No generating messages found");
+      console.log(
+        `[useEffect] Generation already in progress for ${generatingMessages.length} messages`
+      );
     }
   }, [
     roomId,
@@ -1571,6 +1645,18 @@ export function useChatLogic({
   useEffect(() => {
     if (isProcessingRef.current) return;
     if (!isShared && initialLoadComplete) {
+      // 生成中メッセージがある場合のみログ出力
+      const generatingCount = messages.filter(
+        (msg) => msg.role === "assistant" && msg.ui?.isGenerating === true
+      ).length;
+
+      if (generatingCount > 0) {
+        console.log(
+          "[Storage] Saving messages to history, count:",
+          messages.length
+        );
+      }
+
       if (messages.length > 0) {
         saveMessagesToHistory(messages);
       } else if (messagesBackupRef.current.length > 0) {
@@ -1783,6 +1869,20 @@ export function useChatLogic({
             }),
           },
         };
+
+        // === Tools検証用ログ追加（再生成時） ===
+        if (tools && tools.length > 0) {
+          console.log("[Tools Debug - Regenerate] Current tools state:", tools);
+          console.log(
+            "[Tools Debug - Regenerate] Current toolFunctions state:",
+            toolFunctions
+          );
+          console.log(
+            "[Tools Debug - Regenerate] streamOptions before streamText:",
+            streamOptions
+          );
+        }
+        // === ログ追加終了 ===
 
         const result = await streamText(streamOptions);
 

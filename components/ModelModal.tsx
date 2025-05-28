@@ -26,6 +26,7 @@ interface OpenRouterModel {
 interface ModelCategory {
   name: string;
   description: string;
+  count: number;
   models: string[];
 }
 
@@ -40,6 +41,7 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
   const [categories, setCategories] = useState<Record<string, ModelCategory>>(
     {}
   );
+  const [isManuallyModified, setIsManuallyModified] = useState(false); // 手動変更フラグ
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -70,7 +72,7 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
 
   // カテゴリタブ選択時にそのカテゴリのモデルを送信用モデルに強制適用
   useEffect(() => {
-    if (activeTab !== "models" && categories[activeTab] && AllModels) {
+    if (activeTab !== "カスタム" && categories[activeTab] && AllModels) {
       const category = categories[activeTab];
       const categoryModels: ModelItem[] = [];
 
@@ -199,6 +201,58 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
     setHighlightedIndex(-1);
   }, [searchInput, AllModels, selectedModelIds, activeTab, categories]);
 
+  // 現在選択されているモデルがどのカテゴリと一致するかを判定する関数
+  const getCurrentMatchingCategory = useCallback(() => {
+    if (!models || models.length === 0) return "カスタム";
+
+    const selectedModelIds = models.map((m) => m.id).sort();
+
+    // 各カテゴリと比較（カスタムも含む）
+    for (const [categoryKey, category] of Object.entries(categories)) {
+      const categoryModelIds = [...category.models].sort();
+
+      // 配列の長さと内容が完全に一致するかチェック
+      if (
+        selectedModelIds.length === categoryModelIds.length &&
+        selectedModelIds.every((id, index) => id === categoryModelIds[index])
+      ) {
+        return categoryKey;
+      }
+    }
+
+    return "カスタム"; // どのカテゴリとも一致しない場合はカスタム
+  }, [models, categories]);
+
+  // 現在のタブ状態を動的に決定
+  const currentTabState = useMemo(() => {
+    const matchingCategory = getCurrentMatchingCategory();
+
+    if (matchingCategory && matchingCategory !== "カスタム") {
+      return {
+        key: matchingCategory,
+        isCustom: false,
+        displayLabel: categories[matchingCategory]?.name || matchingCategory,
+      };
+    } else {
+      return {
+        key: "カスタム",
+        isCustom: true,
+        displayLabel: "カスタム",
+      };
+    }
+  }, [getCurrentMatchingCategory, categories]);
+
+  // activeTabを現在の状態に同期（手動変更時のみ）
+  useEffect(() => {
+    if (isManuallyModified) {
+      const matchingCategory = getCurrentMatchingCategory();
+      if (matchingCategory !== activeTab) {
+        setActiveTab(matchingCategory);
+      }
+      setIsManuallyModified(false);
+    }
+  }, [getCurrentMatchingCategory, activeTab, isManuallyModified]);
+
   // モデルの選択/選択解除（送信用モデル）
   const handleToggleModel = useCallback(
     (model: OpenRouterModel) => {
@@ -220,6 +274,9 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
         // モデル選択時に検索入力をクリア
         setSearchInput("");
       }
+
+      // 手動変更フラグを設定
+      setIsManuallyModified(true);
     },
     [models, updateModels]
   );
@@ -295,29 +352,24 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
         (model: ModelItem) => model.id !== modelId
       );
       updateModels(updatedModels);
+
+      // 手動変更フラグを設定
+      setIsManuallyModified(true);
     },
     [models, updateModels]
   );
 
   // タブ設定
   const tabs = useMemo(() => {
-    const baseTabs = [
-      {
-        key: "models",
-        label: "My モデル",
-        count: myModels?.length || 0,
-      },
-    ];
-
-    const categoryTabs = Object.entries(categories).map(([key, category]) => ({
+    // すべてのカテゴリを統一的に処理
+    const allTabs = Object.entries(categories).map(([key, category]) => ({
       key,
       label: category.name,
-      count: category.models?.length || 0, // 配列の個数を動的に取得
-      // タブクリック時はタブ切り替えのみ（モーダルは閉じない）
+      count: key === currentTabState.key ? models?.length || 0 : category.count,
     }));
 
-    return [...baseTabs, ...categoryTabs];
-  }, [myModels, categories]);
+    return allTabs;
+  }, [categories, currentTabState.key, models]);
 
   return (
     <BaseModal
