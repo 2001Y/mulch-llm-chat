@@ -1050,11 +1050,39 @@ export function useChatLogic({
                 ? convertToAISDKTools(extendedTools)
                 : undefined;
 
+            // === 詳細デバッグ開始 ===
+            console.log("[StreamOptions Debug] extendedTools:", extendedTools);
+            console.log(
+              "[StreamOptions Debug] extendedTools.length:",
+              extendedTools?.length || 0
+            );
+            console.log("[StreamOptions Debug] aiSDKTools:", aiSDKTools);
+            console.log(
+              "[StreamOptions Debug] aiSDKTools type:",
+              typeof aiSDKTools
+            );
+            console.log(
+              "[StreamOptions Debug] aiSDKTools keys:",
+              aiSDKTools ? Object.keys(aiSDKTools) : "undefined"
+            );
+            console.log(
+              "[StreamOptions Debug] aiSDKTools length check:",
+              aiSDKTools && Object.keys(aiSDKTools).length > 0
+            );
+
+            const toolsToAdd =
+              aiSDKTools && Object.keys(aiSDKTools).length > 0
+                ? aiSDKTools
+                : undefined;
+            console.log("[StreamOptions Debug] toolsToAdd:", toolsToAdd);
+            // === 詳細デバッグ終了 ===
+
             const streamOptions = {
               model: providerModel,
               messages: historyForApi,
-              system: "あなたは日本語で対応する親切なアシスタントです。",
-              ...(aiSDKTools && aiSDKTools.length > 0 && { tools: aiSDKTools }), // ツールがある場合のみ追加
+              system:
+                "あなたは日本語で対応する親切なアシスタントです。利用可能なツールがある場合は積極的に使用してください。",
+              ...(toolsToAdd && { tools: toolsToAdd }),
               headers: customHeaders,
             };
 
@@ -1069,6 +1097,14 @@ export function useChatLogic({
                 "[Tools Debug - Resume] streamOptions before streamText:",
                 streamOptions
               );
+              console.log(
+                "[Tools Debug - Resume] streamOptions.tools:",
+                streamOptions.tools
+              );
+              console.log(
+                "[Tools Debug - Resume] JSON.stringify(streamOptions):",
+                JSON.stringify(streamOptions, null, 2)
+              );
             }
             // === ログ追加終了 ===
 
@@ -1076,6 +1112,8 @@ export function useChatLogic({
 
             // ストリーミング処理
             for await (const delta of result.fullStream) {
+              console.log(`[Stream Delta] Type: ${delta.type}`, delta);
+
               if (delta.type === "text-delta") {
                 accumulatedText += delta.textDelta;
 
@@ -1106,6 +1144,80 @@ export function useChatLogic({
                       : m
                   )
                 );
+              } else if (delta.type === "tool-call") {
+                // ツール呼び出しの開始
+                accumulatedText += `\n\n**🔧 ツール実行中: ${delta.toolName}**\n`;
+                accumulatedText += `引数:\n\`\`\`json\n${JSON.stringify(
+                  delta.args,
+                  null,
+                  2
+                )}\n\`\`\`\n`;
+
+                // UI更新
+                const toolCallUpdate: AppMessage & {
+                  role: "assistant";
+                  id: string;
+                } = {
+                  id: assistantMessageId,
+                  role: "assistant",
+                  content: accumulatedText,
+                  timestamp: Date.now(),
+                  ui: {
+                    modelId: modelIdForApi,
+                    isGenerating: true,
+                  },
+                };
+
+                safeOptimisticUpdate({
+                  type: "updateLlmResponse",
+                  updatedAssistantMessage: toolCallUpdate,
+                });
+
+                setMessages((prevMsgs) =>
+                  prevMsgs.map((m) =>
+                    m.id === assistantMessageId && m.role === "assistant"
+                      ? toolCallUpdate
+                      : m
+                  )
+                );
+              } else if (delta.type === "tool-result") {
+                // ツール実行結果
+                accumulatedText += `\n**📋 実行結果:**\n\`\`\`json\n${JSON.stringify(
+                  delta.result,
+                  null,
+                  2
+                )}\n\`\`\`\n\n`;
+
+                // UI更新
+                const toolResultUpdate: AppMessage & {
+                  role: "assistant";
+                  id: string;
+                } = {
+                  id: assistantMessageId,
+                  role: "assistant",
+                  content: accumulatedText,
+                  timestamp: Date.now(),
+                  ui: {
+                    modelId: modelIdForApi,
+                    isGenerating: true,
+                  },
+                };
+
+                safeOptimisticUpdate({
+                  type: "updateLlmResponse",
+                  updatedAssistantMessage: toolResultUpdate,
+                });
+
+                setMessages((prevMsgs) =>
+                  prevMsgs.map((m) =>
+                    m.id === assistantMessageId && m.role === "assistant"
+                      ? toolResultUpdate
+                      : m
+                  )
+                );
+              } else if (delta.type === "finish") {
+                // ストリーミング完了
+                console.log(`[Stream] Finished for model: ${modelIdForApi}`);
               }
             }
 
@@ -1806,6 +1918,17 @@ export function useChatLogic({
 
   // ツールリストの初期化ロジック
   useEffect(() => {
+    console.log("[DEBUG useEffect tools] === ENTERING TOOLS EFFECT ===");
+    console.log("[DEBUG useEffect tools] extendedTools:", extendedTools);
+    console.log(
+      "[DEBUG useEffect tools] toolsInitialized.current:",
+      toolsInitialized.current
+    );
+    console.log(
+      "[DEBUG useEffect tools] setExtendedTools function:",
+      typeof setExtendedTools
+    );
+
     // 既に初期化が完了していれば、再度の初期化処理は行わない
     if (toolsInitialized.current) {
       console.log(
@@ -1867,11 +1990,19 @@ export function useChatLogic({
           );
           try {
             // APIからデフォルトツールを取得
+            console.log("[useEffect tools init] Calling fetchDefaults...");
             const defaults = await fetchDefaults();
             console.log(
               "[useEffect tools init] API defaults response:",
               defaults
             );
+
+            if (!defaults || !defaults.tools) {
+              console.error(
+                "[useEffect tools init] Invalid API response - no tools found"
+              );
+              return;
+            }
 
             const defaultExtendedTools = defaults.tools.map((tool: any) => ({
               ...tool,
@@ -1883,6 +2014,7 @@ export function useChatLogic({
               "[useEffect tools init] Processed default tools:",
               defaultExtendedTools
             );
+            console.log("[useEffect tools init] Calling setExtendedTools...");
             setExtendedTools(defaultExtendedTools);
             console.log(
               `[useEffect tools init] Set default extended tools: ${defaultExtendedTools.length} tools`
@@ -1902,6 +2034,7 @@ export function useChatLogic({
       );
     };
 
+    console.log("[DEBUG useEffect tools] Calling initializeTools...");
     initializeTools();
   }, [extendedTools, setExtendedTools]);
 
@@ -2093,12 +2226,11 @@ export function useChatLogic({
         `[useEffect] Found ${generatingMessages.length} generating messages, starting LLM generation`
       );
       console.log("[useEffect] === resumeLLMGeneration呼び出し直前 ===");
-      setTimeout(() => {
-        console.log(
-          "[useEffect] === setTimeout内でresumeLLMGeneration呼び出し ==="
-        );
-        resumeLLMGeneration(generatingMessages);
-      }, 100);
+      console.log("[useEffect] === resumeLLMGeneration直接呼び出し開始 ===");
+      console.log("[useEffect] generatingMessages passed:", generatingMessages);
+
+      // 直接呼び出し
+      resumeLLMGeneration(generatingMessages);
     } else {
       console.log(
         `[useEffect] Generation already in progress for ${generatingMessages.length} messages`
@@ -2386,6 +2518,8 @@ export function useChatLogic({
         const result = await streamText(streamOptions);
 
         for await (const delta of result.fullStream) {
+          console.log(`[Regenerate Stream Delta] Type: ${delta.type}`, delta);
+
           if (delta.type === "text-delta") {
             accumulatedText += delta.textDelta;
             setMessages((prevMsgs) =>
@@ -2402,6 +2536,58 @@ export function useChatLogic({
                     }
                   : m
               )
+            );
+          } else if (delta.type === "tool-call") {
+            // ツール呼び出しの開始
+            accumulatedText += `\n\n**🔧 ツール実行中: ${delta.toolName}**\n`;
+            accumulatedText += `引数:\n\`\`\`json\n${JSON.stringify(
+              delta.args,
+              null,
+              2
+            )}\n\`\`\`\n`;
+
+            setMessages((prevMsgs) =>
+              prevMsgs.map((m) =>
+                m.id === assistantMessageId
+                  ? {
+                      ...m,
+                      content: accumulatedText,
+                      ui: {
+                        ...(m.ui || {}),
+                        isGenerating: true,
+                        modelId: modelIdToRegenerate,
+                      },
+                    }
+                  : m
+              )
+            );
+          } else if (delta.type === "tool-result") {
+            // ツール実行結果
+            accumulatedText += `\n**📋 実行結果:**\n\`\`\`json\n${JSON.stringify(
+              delta.result,
+              null,
+              2
+            )}\n\`\`\`\n\n`;
+
+            setMessages((prevMsgs) =>
+              prevMsgs.map((m) =>
+                m.id === assistantMessageId
+                  ? {
+                      ...m,
+                      content: accumulatedText,
+                      ui: {
+                        ...(m.ui || {}),
+                        isGenerating: true,
+                        modelId: modelIdToRegenerate,
+                      },
+                    }
+                  : m
+              )
+            );
+          } else if (delta.type === "finish") {
+            // ストリーミング完了
+            console.log(
+              `[Regenerate Stream] Finished for model: ${modelIdToRegenerate}`
             );
           }
         }

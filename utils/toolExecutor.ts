@@ -117,35 +117,99 @@ function jsonSchemaToZod(jsonSchema: any): z.ZodTypeAny {
  * @returns AI SDK用のToolSet オブジェクト
  */
 export function convertToAISDKTools(extendedTools: ExtendedTool[]) {
+  console.log("[convertToAISDKTools] === 開始 ===");
+  console.log("[convertToAISDKTools] Input extendedTools:", extendedTools);
+  console.log(
+    "[convertToAISDKTools] extendedTools.length:",
+    extendedTools?.length || 0
+  );
+
   const tools: Record<string, any> = {};
 
-  extendedTools
-    .filter((extTool) => extTool.enabled !== false && extTool.implementation) // 有効で実行コードがあるもののみ
-    .forEach((extTool) => {
-      try {
-        // パラメータをZodスキーマに変換
-        const parameters = jsonSchemaToZod(extTool.function.parameters);
+  if (!extendedTools || !Array.isArray(extendedTools)) {
+    console.warn(
+      "[convertToAISDKTools] Invalid extendedTools input:",
+      extendedTools
+    );
+    return tools;
+  }
 
-        tools[extTool.function.name] = tool({
-          description: extTool.function.description,
-          parameters: parameters,
-          execute: async (args: any) => {
-            // ここで実際の実行を行う
-            const result = await executeExtendedTool(extTool, args);
-            if (result.success) {
-              return result.result;
-            } else {
-              throw new Error(result.error);
-            }
-          },
-        });
-      } catch (error) {
-        console.error(
-          `[convertToAISDKTools] Error converting tool ${extTool.function.name}:`,
-          error
-        );
-      }
+  console.log("[convertToAISDKTools] Processing tools...");
+
+  const validTools = extendedTools.filter((extTool) => {
+    const isEnabled = extTool.enabled !== false;
+    const hasImplementation = !!extTool.implementation;
+
+    console.log(`[convertToAISDKTools] Tool "${extTool.function?.name}":`, {
+      enabled: isEnabled,
+      hasImplementation: hasImplementation,
+      implementation: extTool.implementation?.substring(0, 50) + "...",
     });
+
+    return isEnabled && hasImplementation;
+  });
+
+  console.log(
+    `[convertToAISDKTools] Valid tools count: ${validTools.length}/${extendedTools.length}`
+  );
+
+  validTools.forEach((extTool, index) => {
+    try {
+      console.log(
+        `[convertToAISDKTools] Converting tool ${index + 1}: ${
+          extTool.function.name
+        }`
+      );
+      console.log(
+        `[convertToAISDKTools] Tool parameters:`,
+        extTool.function.parameters
+      );
+
+      // パラメータをZodスキーマに変換
+      const parameters = jsonSchemaToZod(extTool.function.parameters);
+      console.log(
+        `[convertToAISDKTools] Zod schema created for ${extTool.function.name}`
+      );
+
+      tools[extTool.function.name] = tool({
+        description: extTool.function.description,
+        parameters: parameters,
+        execute: async (args: any) => {
+          console.log(
+            `[Tool Execute] ${extTool.function.name} called with:`,
+            args
+          );
+          // ここで実際の実行を行う
+          const result = await executeExtendedTool(extTool, args);
+          console.log(
+            `[Tool Execute] ${extTool.function.name} result:`,
+            result
+          );
+          if (result.success) {
+            return result.result;
+          } else {
+            throw new Error(result.error);
+          }
+        },
+      });
+
+      console.log(
+        `[convertToAISDKTools] Successfully converted: ${extTool.function.name}`
+      );
+    } catch (error) {
+      console.error(
+        `[convertToAISDKTools] Error converting tool ${extTool.function.name}:`,
+        error
+      );
+    }
+  });
+
+  console.log("[convertToAISDKTools] === 完了 ===");
+  console.log(
+    "[convertToAISDKTools] Final tools object keys:",
+    Object.keys(tools)
+  );
+  console.log("[convertToAISDKTools] Final tools object:", tools);
 
   return tools;
 }
