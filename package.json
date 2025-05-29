@@ -37,7 +37,8 @@
     "sonner": "^1.7.1",
     "tiptap-markdown": "^0.8.10",
     "turndown": "^7.2.0",
-    "use-storage-state": "^5.0.0"
+    "use-storage-state": "^5.0.0",
+    "zod": "^3.25.36"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

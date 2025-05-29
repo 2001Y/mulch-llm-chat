@@ -31,8 +31,14 @@ export const storage = {
       return parsed;
     } catch (error) {
       // OpenRouter APIキーの場合、文字列として直接保存されている可能性がある
-      if (key === "openrouter_api_key" && typeof item === "string" && item.length > 0) {
-        console.warn(`[storage.get] ${key}が文字列として保存されています。JSON形式に修正します。`);
+      if (
+        key === "openrouter_api_key" &&
+        typeof item === "string" &&
+        item.length > 0
+      ) {
+        console.warn(
+          `[storage.get] ${key}が文字列として保存されています。JSON形式に修正します。`
+        );
         // 正しい形式で再保存（無限ループを避けるため直接localStorage操作）
         localStorage.setItem(key, JSON.stringify(item));
         return item;
@@ -138,9 +144,28 @@ export default function useStorageState<V = any>(
       initialValue = storage.get(key) as V | undefined;
     }
 
-    return initialValue !== undefined
-      ? initialValue
-      : (defaultValues as any)[key] || undefined; // 通常のキーでのデフォルト値フォールバック
+    // 新しいキーに対する適切なデフォルト値を設定
+    if (initialValue === undefined) {
+      const defaultFromJson = (defaultValues as any)[key];
+      if (defaultFromJson !== undefined) {
+        return defaultFromJson;
+      }
+
+      // キー名に基づいてデフォルト値を推測
+      if (key === "extendedTools" || key === "tools") {
+        return [] as V;
+      }
+      if (key === "selectedModelIds") {
+        return [] as V;
+      }
+      if (key === "toolFunctions") {
+        return {} as V;
+      }
+
+      return undefined;
+    }
+
+    return initialValue;
   });
 
   useEffect(() => {

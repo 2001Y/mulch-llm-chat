@@ -21,9 +21,11 @@ import {
   type MessageContent,
   type ToolCall,
   type ConversationTurn, // ★ ConversationTurn をインポート
+  type ExtendedTool, // 統合ツール型をインポート
 } from "types/chat"; // ★ インポート修正
 export type { AppMessage as Message }; // AppMessage を Message として再エクスポート
 import { toast } from "sonner";
+import { convertToAISDKTools, migrateOldToolsData } from "@/utils/toolExecutor";
 
 // === デバッグ設定 ===
 const DEBUG_LOGS = {
@@ -170,8 +172,9 @@ export function useChatLogic({
   const containerRef = useRef<HTMLDivElement>(null);
   const [AllModels, setAllModels] = useState<ModelItem[]>([]);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-  const [toolFunctions, setToolFunctions] = useStorageState("toolFunctions");
-  const [tools, setTools] = useStorageState<any[]>("tools"); // ツール定義
+  // 統合されたツール管理（tools と toolFunctions を統合）
+  const [extendedTools, setExtendedTools] =
+    useStorageState<ExtendedTool[]>("extendedTools");
 
   // モデルの初期化状態を追跡するためのref
   const modelsInitialized = useRef(false);
@@ -1041,20 +1044,27 @@ export function useChatLogic({
 
             const providerModel = openrouter.chat(modelIdForApi);
 
+            // AI SDK用のツール定義を生成
+            const aiSDKTools =
+              extendedTools && extendedTools.length > 0
+                ? convertToAISDKTools(extendedTools)
+                : undefined;
+
             const streamOptions = {
               model: providerModel,
               messages: historyForApi,
               system: "あなたは日本語で対応する親切なアシスタントです。",
+              ...(aiSDKTools && aiSDKTools.length > 0 && { tools: aiSDKTools }), // ツールがある場合のみ追加
               headers: customHeaders,
             };
 
             // === Tools検証用ログ追加（resumeLLMGeneration） ===
-            if (tools && tools.length > 0) {
-              console.log("[Tools Debug - Resume] Current tools state:", tools);
+            if (extendedTools && extendedTools.length > 0) {
               console.log(
-                "[Tools Debug - Resume] Current toolFunctions state:",
-                toolFunctions
+                "[Tools Debug - Resume] Current extended tools state:",
+                extendedTools
               );
+              console.log("[Tools Debug - Resume] AI SDK tools:", aiSDKTools);
               console.log(
                 "[Tools Debug - Resume] streamOptions before streamText:",
                 streamOptions
@@ -1168,8 +1178,7 @@ export function useChatLogic({
       setAbortControllers,
       safeOptimisticUpdate,
       setApiKeyError,
-      tools,
-      toolFunctions,
+      extendedTools,
     ]
   );
 
@@ -1517,14 +1526,6 @@ export function useChatLogic({
 
   // モデルリストの初期化ロジック（修正版）
   useEffect(() => {
-    // selectedModelIds が undefined (useStorageState がロード中) なら処理しない
-    if (selectedModelIds === undefined) {
-      console.log(
-        "[useEffect models sync] Skipping: selectedModelIds is undefined"
-      );
-      return;
-    }
-
     // AllModelsが空の場合は処理しない（まだロードされていない）
     if (!AllModels || AllModels.length === 0) {
       console.log(
@@ -1545,6 +1546,10 @@ export function useChatLogic({
     const initializeModels = async () => {
       console.log(
         "[useEffect models init] Performing initial model list synchronization."
+      );
+      console.log(
+        "[useEffect models init] Current selectedModelIds state:",
+        selectedModelIds
       );
 
       const currentSelectedIds = selectedModelIds || [];
@@ -1801,12 +1806,6 @@ export function useChatLogic({
 
   // ツールリストの初期化ロジック
   useEffect(() => {
-    // tools が undefined (useStorageState がロード中) なら処理しない
-    if (tools === undefined) {
-      console.log("[useEffect tools sync] Skipping: tools is undefined");
-      return;
-    }
-
     // 既に初期化が完了していれば、再度の初期化処理は行わない
     if (toolsInitialized.current) {
       console.log(
@@ -1820,23 +1819,81 @@ export function useChatLogic({
       console.log(
         "[useEffect tools init] Performing initial tools list synchronization."
       );
+      console.log(
+        "[useEffect tools init] Current extendedTools state:",
+        extendedTools
+      );
 
-      const currentTools = tools || [];
+      const currentTools = extendedTools || [];
 
       if (currentTools.length > 0) {
         console.log(
-          `[useEffect tools init] Using stored tools (count: ${currentTools.length})`
+          `[useEffect tools init] Using stored extended tools (count: ${currentTools.length})`
         );
+        console.log("[useEffect tools init] Stored tools:", currentTools);
       } else {
         console.log(
-          "[useEffect tools init] No stored tools, fetching defaults."
+          "[useEffect tools init] No extended tools found, checking for migration or defaults"
         );
-        // APIからデフォルトツールを取得
-        const defaults = await fetchDefaults();
-        setTools(defaults.tools);
+
+        // 古いデータの移行チェック
+        const oldTools = storage.get("tools");
+        const oldToolFunctions = storage.get("toolFunctions");
+
+        console.log("[useEffect tools init] Old tools:", oldTools);
         console.log(
-          `[useEffect tools init] Set default tools: ${defaults.tools.length} tools`
+          "[useEffect tools init] Old toolFunctions:",
+          oldToolFunctions
         );
+
+        if (oldTools || oldToolFunctions) {
+          console.log(
+            "[useEffect tools init] Migrating old tools data to extended format"
+          );
+          const migratedTools = migrateOldToolsData(oldTools, oldToolFunctions);
+          console.log("[useEffect tools init] Migrated tools:", migratedTools);
+          setExtendedTools(migratedTools);
+
+          // 古いデータを削除
+          storage.remove("tools");
+          storage.remove("toolFunctions");
+
+          console.log(
+            `[useEffect tools init] Migrated ${migratedTools.length} tools from old format`
+          );
+        } else {
+          console.log(
+            "[useEffect tools init] No old tools found, fetching defaults from API."
+          );
+          try {
+            // APIからデフォルトツールを取得
+            const defaults = await fetchDefaults();
+            console.log(
+              "[useEffect tools init] API defaults response:",
+              defaults
+            );
+
+            const defaultExtendedTools = defaults.tools.map((tool: any) => ({
+              ...tool,
+              enabled: true,
+              category: tool.category || "デフォルト",
+            }));
+
+            console.log(
+              "[useEffect tools init] Processed default tools:",
+              defaultExtendedTools
+            );
+            setExtendedTools(defaultExtendedTools);
+            console.log(
+              `[useEffect tools init] Set default extended tools: ${defaultExtendedTools.length} tools`
+            );
+          } catch (error) {
+            console.error(
+              "[useEffect tools init] Error fetching defaults:",
+              error
+            );
+          }
+        }
       }
 
       toolsInitialized.current = true;
@@ -1846,7 +1903,7 @@ export function useChatLogic({
     };
 
     initializeTools();
-  }, [tools, setTools]);
+  }, [extendedTools, setExtendedTools]);
 
   // 初期メッセージ読み込みuseEffect
   useEffect(() => {
@@ -2292,10 +2349,18 @@ export function useChatLogic({
       try {
         const openrouter = createOpenRouter({ apiKey });
         const providerModel = openrouter.chat(modelIdToRegenerate);
+
+        // AI SDK用のツール定義を生成
+        const aiSDKTools =
+          extendedTools && extendedTools.length > 0
+            ? convertToAISDKTools(extendedTools)
+            : undefined;
+
         const streamOptions = {
           model: providerModel,
           messages: historyForApi, // ここはユーザープロンプトを含む履歴
           system: "あなたは日本語で対応する親切なアシスタントです。",
+          ...(aiSDKTools && aiSDKTools.length > 0 && { tools: aiSDKTools }), // ツールがある場合のみ追加
           headers: {
             "X-Title": "Mulch LLM Chat",
             ...(typeof window !== "undefined" && {
@@ -2305,12 +2370,12 @@ export function useChatLogic({
         };
 
         // === Tools検証用ログ追加（再生成時） ===
-        if (tools && tools.length > 0) {
-          console.log("[Tools Debug - Regenerate] Current tools state:", tools);
+        if (extendedTools && extendedTools.length > 0) {
           console.log(
-            "[Tools Debug - Regenerate] Current toolFunctions state:",
-            toolFunctions
+            "[Tools Debug - Regenerate] Current extended tools state:",
+            extendedTools
           );
+          console.log("[Tools Debug - Regenerate] AI SDK tools:", aiSDKTools);
           console.log(
             "[Tools Debug - Regenerate] streamOptions before streamText:",
             streamOptions
@@ -2390,7 +2455,7 @@ export function useChatLogic({
       setError,
       setAbortControllers,
       setApiKeyError,
-      tools,
+      extendedTools,
     ]
   );
 
@@ -2469,8 +2534,8 @@ export function useChatLogic({
     isToolsModalOpen,
     handleOpenToolsModal: () => setIsToolsModalOpen(true),
     handleCloseToolsModal: () => setIsToolsModalOpen(false),
-    tools: tools || [],
-    updateTools: (newTools: any[]) => setTools(newTools),
+    tools: extendedTools || [],
+    updateTools: (newTools: ExtendedTool[]) => setExtendedTools(newTools),
     models: models || [],
     updateModels: safeUpdateModels, // 安全なupdateModels関数を使用
     // カテゴリ関連の新しいAPI

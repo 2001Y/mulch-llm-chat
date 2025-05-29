@@ -12,36 +12,163 @@ export async function GET() {
         {
           type: "function",
           function: {
-            name: "web_search",
-            description: "Search the web for current information",
+            name: "get_weather",
+            description: "指定された場所の天気情報を取得する",
             parameters: {
               type: "object",
               properties: {
-                query: {
+                location: {
                   type: "string",
-                  description: "The search query",
+                  description: "天気を調べたい場所（都市名）",
                 },
               },
-              required: ["query"],
+              required: ["location"],
             },
           },
+          implementation: `function(args) {
+  const location = args.location;
+  
+  // 実際の天気APIとの連携が必要
+  // ここではデモ用の模擬データを返す
+  const weatherData = {
+    location: location,
+    weather: "晴れ",
+    temperature: "25°C",
+    humidity: "60%",
+    windSpeed: "5km/h",
+    forecast: [
+      { time: "今日", condition: "晴れ", temp: "25°C" },
+      { time: "明日", condition: "曇り", temp: "22°C" },
+      { time: "明後日", condition: "雨", temp: "18°C" }
+    ],
+    timestamp: new Date().toISOString(),
+    note: "これはデモ用の模擬天気データです。実際の天気APIとの統合が必要です。"
+  };
+  
+  return weatherData;
+}`,
+          enabled: true,
+          category: "天気",
         },
         {
           type: "function",
           function: {
-            name: "calculate",
-            description: "Perform mathematical calculations",
+            name: "bank_transfer",
+            description: "銀行振込を実行する",
             parameters: {
               type: "object",
               properties: {
-                expression: {
+                amount: {
+                  type: "number",
+                  description: "振込金額（円）",
+                },
+                recipient: {
                   type: "string",
-                  description: "Mathematical expression to evaluate",
+                  description: "振込先名義",
+                },
+                account_number: {
+                  type: "string",
+                  description: "振込先口座番号",
+                },
+                bank_name: {
+                  type: "string",
+                  description: "振込先銀行名",
+                },
+                memo: {
+                  type: "string",
+                  description: "振込メモ（任意）",
                 },
               },
-              required: ["expression"],
+              required: ["amount", "recipient", "account_number", "bank_name"],
             },
           },
+          implementation: `function(args) {
+  const { amount, recipient, account_number, bank_name, memo } = args;
+  
+  // セキュリティチェック
+  if (amount <= 0 || amount > 1000000) {
+    throw new Error("振込金額は1円以上100万円以下で指定してください。");
+  }
+  
+  // 実際の銀行APIとの連携が必要
+  // ここではデモ用の模擬レスポンスを返す
+  const transferId = "TXN" + Date.now();
+  
+  return {
+    transferId: transferId,
+    status: "完了（デモ）",
+    amount: amount,
+    recipient: recipient,
+    accountNumber: account_number,
+    bankName: bank_name,
+    memo: memo || "",
+    processedAt: new Date().toISOString(),
+    fee: Math.ceil(amount * 0.001), // 仮の手数料計算
+    note: "これはデモ用の模擬振込です。実際の銀行APIとの統合が必要です。",
+    warning: "実際の振込は行われていません。"
+  };
+}`,
+          enabled: true,
+          category: "金融",
+        },
+        {
+          type: "function",
+          function: {
+            name: "lookup_transfer_destination",
+            description: "振込先の口座情報を検索・確認する",
+            parameters: {
+              type: "object",
+              properties: {
+                name: {
+                  type: "string",
+                  description: "検索したい名前または会社名",
+                },
+                bank_name: {
+                  type: "string",
+                  description: "銀行名（任意）",
+                },
+              },
+              required: ["name"],
+            },
+          },
+          implementation: `function(args) {
+  const { name, bank_name } = args;
+  
+  // 実際の金融機関データベースとの連携が必要
+  // ここではデモ用の模擬データを返す
+  const mockResults = [
+    {
+      name: name,
+      bankName: bank_name || "みずほ銀行",
+      branchName: "新宿支店",
+      accountType: "普通",
+      accountNumber: "1234567",
+      verified: true,
+      lastUpdated: "2024-01-15"
+    },
+    {
+      name: name + "（別支店）",
+      bankName: bank_name || "三菱UFJ銀行",
+      branchName: "渋谷支店",
+      accountType: "当座",
+      accountNumber: "9876543",
+      verified: false,
+      lastUpdated: "2023-12-20"
+    }
+  ];
+  
+  return {
+    searchQuery: name,
+    searchBank: bank_name || "全銀行",
+    results: mockResults,
+    resultCount: mockResults.length,
+    timestamp: new Date().toISOString(),
+    note: "これはデモ用の模擬検索結果です。実際の金融機関データベースとの統合が必要です。",
+    warning: "実際の口座情報は表示されていません。"
+  };
+}`,
+          enabled: true,
+          category: "金融",
         },
       ],
       // カテゴリ別プリセット

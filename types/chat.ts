@@ -7,6 +7,7 @@ export interface ToolCall {
   };
 }
 
+// 基本的なツール定義（AI SDKとの互換性のため）
 export interface Tool {
   type: string;
   function: {
@@ -14,6 +15,20 @@ export interface Tool {
     description: string;
     parameters: any;
   };
+}
+
+// 拡張されたツール定義（実行コードを含む統合型）
+export interface ExtendedTool extends Tool {
+  implementation?: string; // 実行可能なJavaScriptコード（文字列形式）
+  enabled?: boolean; // ツールの有効/無効状態
+  category?: string; // ツールのカテゴリ（オプション）
+}
+
+// ツール実行結果の型
+export interface ToolExecutionResult {
+  success: boolean;
+  result?: any;
+  error?: string;
 }
 
 export interface MessageUI {
