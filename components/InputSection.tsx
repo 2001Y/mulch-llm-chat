@@ -174,12 +174,13 @@ export default function InputSection({
     tools,
     handleOpenModelModal,
     handleOpenToolsModal,
+    categories,
+    activeCategory,
+    applyCategoryToModels,
+    getCurrentMatchingCategory,
+    getValidCategoryModelCount,
   } = useChatLogicContext();
   const { myModels } = useMyModels();
-  const [activeTab, setActiveTab] = useState<string>("models");
-  const [categories, setCategories] = useState<Record<string, any>>({});
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const sectionRef = useRef<HTMLElement>(null);
   const [isEdited, setIsEdited] = useState(false);
   const params = useParams();
   const roomId = params?.id as string | undefined;
@@ -187,6 +188,8 @@ export default function InputSection({
     roomId ? `chatMessages_${roomId}` : undefined
   );
   const tiptapEditorRef = useRef<EditorHandle>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
 
   // 選択されているモデルの数を取得
   const selectedModelsCount =
@@ -202,143 +205,17 @@ export default function InputSection({
     }
   }, [models, selectedModelsCount]);
 
-  // カテゴリ情報を取得
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        console.log("[InputSection] Fetching categories from /api/defaults");
-        const response = await fetch("/api/defaults");
-        const data = await response.json();
-        if (data.categories) {
-          console.log(
-            "[InputSection] Categories loaded:",
-            Object.keys(data.categories)
-          );
-          setCategories(data.categories);
-
-          // ファーストアクセス時（modelsが空）の場合、デフォルトカテゴリを自動適用
-          if ((!models || models.length === 0) && !roomId) {
-            const defaultCategoryKey = "最高性能"; // デフォルトカテゴリ
-            if (data.categories[defaultCategoryKey]) {
-              console.log(
-                "[InputSection] Auto-applying default category for first access"
-              );
-              // applyCategoryToSendingModelsが定義される前に呼ばれる可能性があるため、
-              // 直接カテゴリモデルを適用する
-              const category = data.categories[defaultCategoryKey];
-              const categoryModels = category.models.map((modelId: string) => ({
-                id: modelId,
-                name: modelId.split("/").pop() || modelId,
-                selected: true,
-              }));
-
-              setTimeout(() => {
-                updateModels(categoryModels);
-                setActiveTab(defaultCategoryKey);
-                console.log(
-                  `[InputSection] Applied default category "${category.name}" with ${categoryModels.length} models`
-                );
-              }, 100);
-            }
-          }
-        } else {
-          console.warn("[InputSection] No categories found in API response");
-        }
-      } catch (error) {
-        console.error("Failed to fetch categories:", error);
-      }
-    };
-
-    fetchCategories();
-  }, []); // 依存配列からmodelsとroomIdを削除（初回のみ実行）
-
-  // 現在選択されているモデルがどのカテゴリと一致するかを判定する関数
-  const getCurrentMatchingCategory = useCallback(() => {
-    if (!models || models.length === 0) return "カスタム";
-
-    const selectedModelIds = models
-      .filter((m) => m.selected)
-      .map((m) => m.id)
-      .sort();
-
-    // 各カテゴリと比較
-    for (const [categoryKey, category] of Object.entries(categories)) {
-      const categoryModelIds = [...category.models].sort();
-
-      // 配列の長さと内容が完全に一致するかチェック
-      if (
-        selectedModelIds.length === categoryModelIds.length &&
-        selectedModelIds.every((id, index) => id === categoryModelIds[index])
-      ) {
-        return categoryKey;
-      }
-    }
-
-    return "カスタム"; // どのカテゴリとも一致しない場合はカスタム
-  }, [models, categories]);
-
-  // activeTabを現在の状態に同期
-  useEffect(() => {
-    const matchingCategory = getCurrentMatchingCategory();
-    if (matchingCategory !== activeTab) {
-      setActiveTab(matchingCategory);
-    }
-  }, [getCurrentMatchingCategory, activeTab]);
-
-  // カテゴリプリセットを送信用モデルに適用する関数（カスタムも含む）
-  const applyCategoryToSendingModels = useCallback(
-    async (categoryKey: string) => {
-      const category = categories[categoryKey];
-      if (!category) {
-        console.warn(`Category "${categoryKey}" not found`);
-        return;
-      }
-
-      try {
-        console.log(
-          `[InputSection] Applying category "${category.name}" (${categoryKey})`
-        );
-
-        // カテゴリのモデルIDリストを直接ローカルストレージに保存
-        const categoryModelIds = category.models;
-
-        // updateModelsを使ってローカルストレージに保存（これが確実な方法）
-        const categoryModels: ModelItem[] = categoryModelIds.map(
-          (modelId: string) => {
-            const foundModel = AllModels?.find((m) => m.id === modelId);
-            return {
-              id: modelId,
-              name: foundModel?.name || modelId.split("/").pop() || modelId,
-              selected: true,
-            };
-          }
-        );
-
-        // updateModelsを呼び出してローカルストレージに保存
-        updateModels(categoryModels);
-
-        console.log(
-          `[InputSection] Applied category "${category.name}" with ${categoryModels.length} models:`,
-          categoryModels.map((m) => m.name)
-        );
-      } catch (error) {
-        console.error("Failed to apply category:", error);
-      }
-    },
-    [categories, AllModels, updateModels]
-  );
-
-  // タブ設定
+  // タブ設定（統一されたカテゴリ状態を使用）
   const inputTabs = useMemo(() => {
     // すべてのカテゴリを統一的に処理
     const allTabs = Object.entries(categories).map(([key, category]) => ({
       key,
       label: category.name,
       count:
-        key === activeTab
+        key === activeCategory
           ? models?.filter((m) => m.selected).length || 0
-          : category.count,
-      onClick: () => applyCategoryToSendingModels(key), // すべてのカテゴリで同じロジック
+          : getValidCategoryModelCount(key),
+      onClick: () => applyCategoryToModels(key), // 統一されたカテゴリ適用関数を使用
       onDoubleClick: handleOpenModelModal, // ダブルクリックでモーダルを開く
     }));
 
@@ -349,10 +226,11 @@ export default function InputSection({
     return allTabs;
   }, [
     categories,
-    applyCategoryToSendingModels,
+    applyCategoryToModels,
     handleOpenModelModal,
-    activeTab,
+    activeCategory,
     models,
+    getValidCategoryModelCount,
   ]);
 
   const isInputEmpty = () => {
@@ -671,8 +549,8 @@ export default function InputSection({
           <div className="tab-navigation-wrapper">
             <TabNavigation
               tabs={inputTabs}
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
+              activeTab={activeCategory}
+              onTabChange={(newTab) => applyCategoryToModels(newTab)}
             />
             <button
               type="button"

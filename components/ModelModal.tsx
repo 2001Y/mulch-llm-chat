@@ -31,77 +31,29 @@ interface ModelCategory {
 }
 
 export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
-  const { models, updateModels, AllModels } = useChatLogicContext();
+  const {
+    models,
+    updateModels,
+    AllModels,
+    categories,
+    activeCategory,
+    applyCategoryToModels,
+    getCurrentMatchingCategory,
+    getValidCategoryModelCount,
+  } = useChatLogicContext();
   const { myModels } = useMyModels();
   const [searchInput, setSearchInput] = useState<string>("");
   const [filteredModels, setFilteredModels] = useState<OpenRouterModel[]>([]);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const [isFocused, setIsFocused] = useState(false); // キーボード操作の有効化に使用
-  const [activeTab, setActiveTab] = useState<string>("models"); // "models" or category name
-  const [categories, setCategories] = useState<Record<string, ModelCategory>>(
-    {}
-  );
-  const [isManuallyModified, setIsManuallyModified] = useState(false); // 手動変更フラグ
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
-
-  // カテゴリ情報を取得
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await fetch("/api/defaults");
-        const data = await response.json();
-        if (data.categories) {
-          setCategories(data.categories);
-        }
-      } catch (error) {
-        console.error("Failed to fetch categories:", error);
-      }
-    };
-
-    if (isOpen) {
-      fetchCategories();
-    }
-  }, [isOpen]);
 
   // 選択されたモデルのIDセット（メモ化して無限ループを防ぐ）
   const selectedModelIds = useMemo(() => {
     return new Set(models?.map((m) => m.id) || []);
   }, [models]);
-
-  // カテゴリタブ選択時にそのカテゴリのモデルを送信用モデルに強制適用
-  useEffect(() => {
-    if (activeTab !== "カスタム" && categories[activeTab] && AllModels) {
-      const category = categories[activeTab];
-      const categoryModels: ModelItem[] = [];
-
-      for (const modelId of category.models) {
-        const foundModel = AllModels.find((m) => m.id === modelId);
-        if (foundModel) {
-          categoryModels.push({
-            id: foundModel.id,
-            name: foundModel.name,
-            selected: true,
-          });
-        } else {
-          // AllModelsにない場合はIDから名前を生成
-          categoryModels.push({
-            id: modelId,
-            name: modelId.split("/").pop() || modelId,
-            selected: true,
-          });
-        }
-      }
-
-      // 送信用モデルリストを更新（既存のモデルを強制上書き）
-      updateModels(categoryModels);
-
-      console.log(
-        `Applied category "${category.name}" with ${categoryModels.length} models to sending models`
-      );
-    }
-  }, [activeTab, categories, AllModels, updateModels]);
 
   // 検索とフィルタリング
   useEffect(() => {
@@ -124,134 +76,43 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
 
     let filtered: OpenRouterModel[] = [];
 
-    if (activeTab === "models") {
-      // Myモデルタブの場合
-      if (searchInput.trim() === "") {
-        // 未入力時は全てのモデルを表示（重複を排除）
-        filtered = AllModels.filter(
-          (model, index, self) =>
-            index === self.findIndex((m) => m.id === model.id)
-        );
-      } else {
-        // 入力がある場合はフィルタリング（重複を排除）
-        const query = searchInput.toLowerCase();
-        filtered = AllModels.filter((model, index, self) => {
-          const isUnique = index === self.findIndex((m) => m.id === model.id);
-          if (!isUnique) return false;
-
-          const modelName = model.name.toLowerCase();
-          const modelId = model.id.toLowerCase();
-          const shortId = model.id.split("/").pop()?.toLowerCase() || "";
-
-          return (
-            modelName.includes(query) ||
-            modelId.includes(query) ||
-            shortId.includes(query)
-          );
-        });
-      }
-
-      // 送信用モデルの選択されたモデルを上部に移動
-      const selectedModels = filtered.filter((model) =>
-        selectedModelIds.has(model.id)
+    // 検索フィルタリング（重複を排除）
+    if (searchInput.trim() === "") {
+      // 未入力時は全てのモデルを表示（重複を排除）
+      filtered = AllModels.filter(
+        (model, index, self) =>
+          index === self.findIndex((m) => m.id === model.id)
       );
-      const unselectedModels = filtered.filter(
-        (model) => !selectedModelIds.has(model.id)
-      );
-
-      setFilteredModels([...selectedModels, ...unselectedModels]);
     } else {
-      // カテゴリタブの場合も全てのモデルを表示（Myモデルと同様）
-      if (searchInput.trim() === "") {
-        // 未入力時は全てのモデルを表示（重複を排除）
-        filtered = AllModels.filter(
-          (model, index, self) =>
-            index === self.findIndex((m) => m.id === model.id)
+      // 入力がある場合はフィルタリング（重複を排除）
+      const query = searchInput.toLowerCase();
+      filtered = AllModels.filter((model, index, self) => {
+        const isUnique = index === self.findIndex((m) => m.id === model.id);
+        if (!isUnique) return false;
+
+        const modelName = model.name.toLowerCase();
+        const modelId = model.id.toLowerCase();
+        const shortId = model.id.split("/").pop()?.toLowerCase() || "";
+
+        return (
+          modelName.includes(query) ||
+          modelId.includes(query) ||
+          shortId.includes(query)
         );
-      } else {
-        // 入力がある場合はフィルタリング（重複を排除）
-        const query = searchInput.toLowerCase();
-        filtered = AllModels.filter((model, index, self) => {
-          const isUnique = index === self.findIndex((m) => m.id === model.id);
-          if (!isUnique) return false;
-
-          const modelName = model.name.toLowerCase();
-          const modelId = model.id.toLowerCase();
-          const shortId = model.id.split("/").pop()?.toLowerCase() || "";
-
-          return (
-            modelName.includes(query) ||
-            modelId.includes(query) ||
-            shortId.includes(query)
-          );
-        });
-      }
-
-      // 送信用モデルの選択されたモデルを上部に移動
-      const selectedModels = filtered.filter((model) =>
-        selectedModelIds.has(model.id)
-      );
-      const unselectedModels = filtered.filter(
-        (model) => !selectedModelIds.has(model.id)
-      );
-
-      setFilteredModels([...selectedModels, ...unselectedModels]);
+      });
     }
 
+    // 送信用モデルの選択されたモデルを上部に移動
+    const selectedModels = filtered.filter((model) =>
+      selectedModelIds.has(model.id)
+    );
+    const unselectedModels = filtered.filter(
+      (model) => !selectedModelIds.has(model.id)
+    );
+
+    setFilteredModels([...selectedModels, ...unselectedModels]);
     setHighlightedIndex(-1);
-  }, [searchInput, AllModels, selectedModelIds, activeTab, categories]);
-
-  // 現在選択されているモデルがどのカテゴリと一致するかを判定する関数
-  const getCurrentMatchingCategory = useCallback(() => {
-    if (!models || models.length === 0) return "カスタム";
-
-    const selectedModelIds = models.map((m) => m.id).sort();
-
-    // 各カテゴリと比較（カスタムも含む）
-    for (const [categoryKey, category] of Object.entries(categories)) {
-      const categoryModelIds = [...category.models].sort();
-
-      // 配列の長さと内容が完全に一致するかチェック
-      if (
-        selectedModelIds.length === categoryModelIds.length &&
-        selectedModelIds.every((id, index) => id === categoryModelIds[index])
-      ) {
-        return categoryKey;
-      }
-    }
-
-    return "カスタム"; // どのカテゴリとも一致しない場合はカスタム
-  }, [models, categories]);
-
-  // 現在のタブ状態を動的に決定
-  const currentTabState = useMemo(() => {
-    const matchingCategory = getCurrentMatchingCategory();
-
-    if (matchingCategory && matchingCategory !== "カスタム") {
-      return {
-        key: matchingCategory,
-        isCustom: false,
-        displayLabel: categories[matchingCategory]?.name || matchingCategory,
-      };
-    } else {
-      return {
-        key: "カスタム",
-        isCustom: true,
-        displayLabel: "カスタム",
-      };
-    }
-  }, [getCurrentMatchingCategory, categories]);
-
-  // activeTabを現在の状態に同期（手動変更時のみ）
-  useEffect(() => {
-    if (isManuallyModified) {
-      const matchingCategory = getCurrentMatchingCategory();
-      if (matchingCategory !== activeTab) {
-        setActiveTab(matchingCategory);
-      }
-      setIsManuallyModified(false);
-    }
-  }, [getCurrentMatchingCategory, activeTab, isManuallyModified]);
+  }, [searchInput, AllModels, selectedModelIds]);
 
   // モデルの選択/選択解除（送信用モデル）
   const handleToggleModel = useCallback(
@@ -274,9 +135,6 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
         // モデル選択時に検索入力をクリア
         setSearchInput("");
       }
-
-      // 手動変更フラグを設定
-      setIsManuallyModified(true);
     },
     [models, updateModels]
   );
@@ -343,7 +201,7 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
         searchInputRef.current?.focus();
       }, 100);
     }
-  }, [isOpen, activeTab]);
+  }, [isOpen, activeCategory]);
 
   // 選択されたモデルを直接削除する関数（送信用モデル）
   const handleDeleteModel = useCallback(
@@ -352,24 +210,24 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
         (model: ModelItem) => model.id !== modelId
       );
       updateModels(updatedModels);
-
-      // 手動変更フラグを設定
-      setIsManuallyModified(true);
     },
     [models, updateModels]
   );
 
-  // タブ設定
+  // タブ設定（統一されたカテゴリ状態を使用）
   const tabs = useMemo(() => {
     // すべてのカテゴリを統一的に処理
     const allTabs = Object.entries(categories).map(([key, category]) => ({
       key,
       label: category.name,
-      count: key === currentTabState.key ? models?.length || 0 : category.count,
+      count:
+        key === activeCategory
+          ? models?.length || 0
+          : getValidCategoryModelCount(key),
     }));
 
     return allTabs;
-  }, [categories, currentTabState.key, models]);
+  }, [categories, activeCategory, models, getValidCategoryModelCount]);
 
   return (
     <BaseModal
@@ -382,8 +240,8 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
         {/* タブナビゲーション */}
         <TabNavigation
           tabs={tabs}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
+          activeTab={activeCategory}
+          onTabChange={applyCategoryToModels}
         />
 
         {/* 共通の検索・モデル選択エリア */}
