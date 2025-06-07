@@ -3,11 +3,6 @@ import { NextResponse } from "next/server";
 export async function GET() {
   try {
     const defaults = {
-      models: [
-        "openai/gpt-4o-mini",
-        "google/gemini-2.0-flash-001",
-        "anthropic/claude-3-5-sonnet-20241022",
-      ],
       tools: [
         {
           type: "function",
@@ -173,15 +168,6 @@ export async function GET() {
       ],
       // カテゴリ別プリセット
       categories: {
-        カスタム: {
-          name: "カスタム",
-          description: "カスタムモデルのデフォルト設定",
-          count: 2,
-          models: [
-            "openai/gpt-4o-mini",
-            "anthropic/claude-3.5-sonnet",
-          ],
-        },
         最高性能: {
           name: "最高性能",
           description: "最新の高性能モデル",
@@ -204,23 +190,9 @@ export async function GET() {
           count: 6,
           models: [
             "anthropic/claude-sonnet-4",
-            "openai/gpt-4o-mini",
+            "openai/gpt-4o",
+            "openai/o3-mini",
             "google/gemini-2.5-flash-preview",
-            "cohere/command-r-plus",
-            "microsoft/phi-4-reasoning:free",
-            "qwen/qwen3-30b-a3b:free",
-          ],
-        },
-        オープンソース: {
-          name: "オープンソース",
-          description: "オープンソースの高性能モデル",
-          count: 5,
-          models: [
-            "meta-llama/llama-4-maverick",
-            "meta-llama/llama-3.3-70b-instruct",
-            "mistralai/mixtral-8x22b-instruct",
-            "cognitivecomputations/dolphin-mixtral-8x22b",
-            "thedrummer/valkyrie-49b-v1",
           ],
         },
         高速: {
@@ -229,10 +201,22 @@ export async function GET() {
           count: 5,
           models: [
             "anthropic/claude-3.5-haiku",
-            "openai/o3-mini",
-            "openai/o1",
+            "openai/gpt-4o-mini",
             "google/gemini-2.0-flash-001",
             "qwen/qwen3-8b:free",
+          ],
+        },
+        オープンソース: {
+          name: "オープンソース",
+          description: "オープンソースの高性能モデル",
+          count: 5,
+          models: [
+            "meta-llama/llama-4-maverick",
+            "qwen/qwen3-235b-a22b",
+            "cohere/command-r-plus",
+            "mistralai/mixtral-8x22b-instruct",
+            "cognitivecomputations/dolphin-mixtral-8x22b",
+            "thedrummer/valkyrie-49b-v1",
           ],
         },
       },

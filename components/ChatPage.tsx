@@ -13,6 +13,7 @@ import ToolsModal from "./ToolsModal";
 import BentoFeatures from "./BentoFeatures";
 import ChatList from "./ChatList";
 import { useChatLogicContext } from "contexts/ChatLogicContext";
+import { logger } from "@/utils/logger";
 
 interface ChatPageProps {
   isSharedView?: boolean;
@@ -100,7 +101,7 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
     }
   }, [roomId, isSharedView]);
 
-  console.log(
+  logger.debug(
     "[DEBUG ChatPage] Rendering. roomId:",
     roomId,
     "isSharedView:",
@@ -113,19 +114,19 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
 
   // メッセージの詳細ログを追加
   if (messages && messages.length > 0) {
-    console.log("[DEBUG ChatPage] Current messages count:", messages.length);
-    console.log(
+    logger.debug("[DEBUG ChatPage] Current messages count:", messages.length);
+    logger.debug(
       "[DEBUG ChatPage] Messages content:",
       JSON.stringify(messages, null, 2)
     );
   } else {
-    console.log("[DEBUG ChatPage] No messages available to display");
+    logger.debug("[DEBUG ChatPage] No messages available to display");
   }
 
   // メッセージがある場合はチャット画面を表示するよう修正
   const isInitialScreen =
     !roomId && !isSharedView && (!messages || messages.length === 0);
-  console.log(
+  logger.debug(
     "[DEBUG ChatPage] isInitialScreen:",
     isInitialScreen,
     "messages.length:",
@@ -134,12 +135,12 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
 
   const handleShare = () => {
     // 共有機能の実装
-    console.log("Share functionality will be implemented here");
+    logger.log("Share functionality will be implemented here");
     // TODO: 共有機能を実装
   };
 
   if (isInitialScreen) {
-    console.log("[DEBUG ChatPage] Rendering initial screen");
+    logger.debug("[DEBUG ChatPage] Rendering initial screen");
     return (
       <>
         <MainHeader onShare={handleShare} />
@@ -183,7 +184,7 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
 
   // roomIdがあるか、メッセージがある場合はチャット画面を表示するよう修正
   if (roomId || isSharedView || (messages && messages.length > 0)) {
-    console.log(
+    logger.debug(
       "[DEBUG ChatPage] Rendering chat screen. Messages count:",
       messages.length
     );
@@ -244,7 +245,7 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
     );
   }
 
-  console.warn("[DEBUG ChatPage] Rendering Fallback - unexpected state");
+  logger.warn("[DEBUG ChatPage] Rendering Fallback - unexpected state");
   return (
     <>
       <MainHeader onShare={handleShare} />

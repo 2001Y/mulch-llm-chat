@@ -16,6 +16,7 @@ import type { ModelItem } from "hooks/useChatLogic";
 import useStorageState from "hooks/useLocalStorage";
 import { useChatLogicContext } from "contexts/ChatLogicContext";
 import { useMyModels } from "hooks/useMyModels";
+import { useModelTabs } from "hooks/useModelTabs";
 import TabNavigation from "./shared/TabNavigation";
 
 interface Props {
@@ -180,6 +181,10 @@ export default function InputSection({
     getCurrentMatchingCategory,
     getValidCategoryModelCount,
   } = useChatLogicContext();
+
+  // モデルAPIの読み込み状態を確認
+  const isModelsReady =
+    AllModels && AllModels.length > 0 && Object.keys(categories).length > 0;
   const { myModels } = useMyModels();
   const [isEdited, setIsEdited] = useState(false);
   const params = useParams();
@@ -205,33 +210,21 @@ export default function InputSection({
     }
   }, [models, selectedModelsCount]);
 
-  // タブ設定（統一されたカテゴリ状態を使用）
-  const inputTabs = useMemo(() => {
-    // すべてのカテゴリを統一的に処理
-    const allTabs = Object.entries(categories).map(([key, category]) => ({
-      key,
-      label: category.name,
-      count:
-        key === activeCategory
-          ? models?.filter((m) => m.selected).length || 0
-          : getValidCategoryModelCount(key),
-      onClick: () => applyCategoryToModels(key), // 統一されたカテゴリ適用関数を使用
-      onDoubleClick: handleOpenModelModal, // ダブルクリックでモーダルを開く
-    }));
-
-    console.log(
-      "[InputSection] Generated tabs:",
-      allTabs.map((t) => ({ key: t.key, label: t.label }))
-    );
-    return allTabs;
-  }, [
+  // タブ設定（共通フックを使用）
+  const baseTabs = useModelTabs({
     categories,
-    applyCategoryToModels,
-    handleOpenModelModal,
     activeCategory,
-    models,
+    models: models || [],
     getValidCategoryModelCount,
-  ]);
+  });
+
+  // onClick処理を追加
+  const inputTabs = useMemo(() => {
+    return baseTabs.map((tab) => ({
+      ...tab,
+      onClick: () => applyCategoryToModels(tab.key),
+    }));
+  }, [baseTabs, applyCategoryToModels]);
 
   const isInputEmpty = () => {
     return !chatInput || chatInput.trim().length === 0;
@@ -544,24 +537,26 @@ export default function InputSection({
       >
         <input type="hidden" name="chatInput" value={chatInput} />
 
-        {/* 控えめなモデル・ツール選択ボタン */}
-        <div className="input-models-tools-container">
-          <div className="tab-navigation-wrapper">
-            <TabNavigation
-              tabs={inputTabs}
-              activeTab={activeCategory}
-              onTabChange={(newTab) => applyCategoryToModels(newTab)}
-            />
-            <button
-              type="button"
-              onClick={handleOpenModelModal}
-              className="model-management-button"
-              title="モデル管理"
-            >
-              ⚙️
-            </button>
+        {/* 控えめなモデル・ツール選択ボタン（モデルAPIが読み込まれてから表示） */}
+        {isModelsReady && (
+          <div className="input-models-tools-container">
+            <div className="tab-navigation-wrapper">
+              <TabNavigation
+                tabs={inputTabs}
+                activeTab={activeCategory}
+                onTabChange={(newTab) => applyCategoryToModels(newTab)}
+              />
+              <button
+                type="button"
+                onClick={handleOpenModelModal}
+                className="model-management-button"
+                title="モデル管理"
+              >
+                ⚙️
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         <MarkdownTipTapEditor
           ref={tiptapEditorRef}

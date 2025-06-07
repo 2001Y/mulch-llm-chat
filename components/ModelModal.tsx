@@ -10,6 +10,7 @@ import ModelList from "./shared/ModelList";
 import TabNavigation from "./shared/TabNavigation";
 import { useChatLogicContext } from "contexts/ChatLogicContext";
 import { useMyModels } from "hooks/useMyModels";
+import { useModelTabs } from "hooks/useModelTabs";
 import type { ModelItem } from "hooks/useChatLogic";
 
 interface ModelModalProps {
@@ -214,20 +215,13 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
     [models, updateModels]
   );
 
-  // タブ設定（統一されたカテゴリ状態を使用）
-  const tabs = useMemo(() => {
-    // すべてのカテゴリを統一的に処理
-    const allTabs = Object.entries(categories).map(([key, category]) => ({
-      key,
-      label: category.name,
-      count:
-        key === activeCategory
-          ? models?.length || 0
-          : getValidCategoryModelCount(key),
-    }));
-
-    return allTabs;
-  }, [categories, activeCategory, models, getValidCategoryModelCount]);
+  // タブ設定（共通フックを使用）
+  const tabs = useModelTabs({
+    categories,
+    activeCategory,
+    models: models || [],
+    getValidCategoryModelCount,
+  });
 
   return (
     <BaseModal

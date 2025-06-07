@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { replaceGlobalConsole } from "@/utils/logger";
 
 export default function ClientOnly() {
   useEffect(() => {
@@ -48,6 +49,9 @@ export default function ClientOnly() {
     document.addEventListener("touchmove", preventTouchMove, {
       passive: false,
     });
+
+    // クライアントサイドでのみグローバルコンソールを置き換え
+    replaceGlobalConsole();
 
     return () => {
       visualViewport?.removeEventListener("resize", handleResize);

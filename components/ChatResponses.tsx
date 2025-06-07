@@ -211,6 +211,34 @@ export default function Responses({
                               </svg>
                             </button>
                           )}
+                          {isLlmGenerating && !readOnly && (
+                            <button
+                              onClick={() => {
+                                if (handleStopAllGeneration) {
+                                  handleStopAllGeneration();
+                                }
+                              }}
+                              className="stop-button"
+                              aria-label="Stop generation"
+                              title="生成を停止"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="currentColor"
+                              >
+                                <rect
+                                  x="6"
+                                  y="6"
+                                  width="12"
+                                  height="12"
+                                  rx="2"
+                                />
+                              </svg>
+                            </button>
+                          )}
                           {!isLlmGenerating && (
                             <button
                               onClick={() => {
