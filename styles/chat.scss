@@ -400,19 +400,21 @@ html {
     }
   }
 
-  // デフォルト（チャット内版）では input-actions を非表示 - 詳細度を上げる
+  // デフォルト（チャット内版）では input-actions と input-models-tools-container を非表示 - 詳細度を上げる
   &:not(.full-input):not(.fixed) {
-    .editor-actions .input-actions {
+    .editor-actions {
       display: none;
       gap: 0.5em;
     }
-    .input-container.chat-input-area {
-      padding: 0 $body-padding;
+    .input-models-tools-container {
+      display: none;
     }
-
-    // チャット内版でフォーカス時のみ input-actions を表示
-    .input-container.chat-input-area:focus-within {
-      .editor-actions .input-actions {
+    // チャット内版でフォーカス時のみ input-actions と input-models-tools-container を表示
+    &:focus-within {
+      .editor-actions {
+        display: flex;
+      }
+      .input-models-tools-container {
         display: flex;
       }
     }
@@ -624,7 +626,8 @@ html {
 
   &.full-input {
     .input-actions,
-    .model-select-area {
+    .model-select-area,
+    .input-models-tools-container {
       display: flex;
 
       .new-thread-button {
@@ -657,7 +660,8 @@ html {
 
   &.focused {
     .input-actions,
-    .model-select-area {
+    .model-select-area,
+    .input-models-tools-container {
       display: flex;
     }
   }

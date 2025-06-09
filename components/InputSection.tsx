@@ -97,15 +97,12 @@ const SubmitButton = ({
                     return "model"; // モデルが読み込まれていない場合のフォールバック
                   }
                   const selectedModel = models.find((model) => model.selected);
-                  if (
-                    !selectedModel ||
-                    typeof selectedModel.name !== "string"
-                  ) {
+                  if (!selectedModel || typeof selectedModel.id !== "string") {
                     return "model"; // 選択されたモデルがない場合のフォールバック
                   }
-                  return selectedModel.name.includes("/")
-                    ? selectedModel.name.split("/")[1]
-                    : selectedModel.name;
+                  return selectedModel.id.includes("/")
+                    ? selectedModel.id.split("/")[1]
+                    : selectedModel.id;
                 })()}
               </code>
               <span className="shortcut">⌘⇧⏎</span>
@@ -180,6 +177,7 @@ export default function InputSection({
     applyCategoryToModels,
     getCurrentMatchingCategory,
     getValidCategoryModelCount,
+    customSelectedModelIds,
   } = useChatLogicContext();
 
   // モデルAPIの読み込み状態を確認
@@ -216,6 +214,8 @@ export default function InputSection({
     activeCategory,
     models: models || [],
     getValidCategoryModelCount,
+    customSelectedModelIds,
+    AllModels,
   });
 
   // onClick処理を追加

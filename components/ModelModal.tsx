@@ -27,7 +27,6 @@ interface OpenRouterModel {
 interface ModelCategory {
   name: string;
   description: string;
-  count: number;
   models: string[];
 }
 
@@ -41,6 +40,7 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
     applyCategoryToModels,
     getCurrentMatchingCategory,
     getValidCategoryModelCount,
+    customSelectedModelIds,
   } = useChatLogicContext();
   const { myModels } = useMyModels();
   const [searchInput, setSearchInput] = useState<string>("");
@@ -221,6 +221,8 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
     activeCategory,
     models: models || [],
     getValidCategoryModelCount,
+    customSelectedModelIds,
+    AllModels,
   });
 
   return (

@@ -4,7 +4,6 @@ import type { ModelItem } from "./useChatLogic";
 interface ModelCategory {
   name: string;
   description: string;
-  count: number;
   models: string[];
 }
 
@@ -13,6 +12,8 @@ interface UseModelTabsProps {
   activeCategory: string;
   models: ModelItem[];
   getValidCategoryModelCount: (categoryKey: string) => number;
+  customSelectedModelIds?: string[];
+  AllModels?: ModelItem[];
 }
 
 export function useModelTabs({
@@ -20,6 +21,8 @@ export function useModelTabs({
   activeCategory,
   models,
   getValidCategoryModelCount,
+  customSelectedModelIds,
+  AllModels,
 }: UseModelTabsProps) {
   const tabs = useMemo(() => {
     // 既定カテゴリを処理
@@ -31,16 +34,58 @@ export function useModelTabs({
         count: getValidCategoryModelCount(key),
       }));
 
-    // カスタムカテゴリを動的に追加（条件: アクティブまたはモデル数が0より大きい）
-    const customCount = models?.filter((m) => m.selected).length || 0;
-    const shouldShowCustom =
-      activeCategory === "カスタム" ||
-      (activeCategory && !categories[activeCategory] && customCount > 0) ||
-      (categories[activeCategory] &&
-        getValidCategoryModelCount(activeCategory) !== customCount);
+    // カスタムカテゴリの表示判定
+    let shouldShowCustom = false;
+    let customCount = 0;
+
+    if (
+      customSelectedModelIds &&
+      customSelectedModelIds.length > 0 &&
+      AllModels
+    ) {
+      // AllModelsに存在するカスタムモデルIDのみをフィルタリング
+      const validCustomIds = customSelectedModelIds.filter((id) =>
+        AllModels.some((m) => m.id === id)
+      );
+
+      if (validCustomIds.length > 0) {
+        // 有効なカスタムモデルIDをソート
+        const sortedCustomIds = [...validCustomIds].sort();
+
+        // デフォルトカテゴリと比較して、同じ内容でないことを確認
+        let isUniqueCustom = true;
+        for (const [categoryKey, category] of Object.entries(categories)) {
+          if (categoryKey === "カスタム") continue;
+
+          const sortedCategoryIds = [...category.models].sort();
+
+          if (
+            sortedCustomIds.length === sortedCategoryIds.length &&
+            sortedCustomIds.every(
+              (id, index) => id === sortedCategoryIds[index]
+            )
+          ) {
+            isUniqueCustom = false;
+            break;
+          }
+        }
+
+        // ユニークなカスタム選択の場合のみ表示
+        if (isUniqueCustom) {
+          shouldShowCustom = true;
+          customCount = validCustomIds.length;
+        }
+      }
+    }
+
+    // アクティブカテゴリがカスタムの場合は常に表示
+    if (activeCategory === "カスタム") {
+      shouldShowCustom = true;
+      customCount = models?.filter((m) => m.selected).length || 0;
+    }
 
     if (shouldShowCustom) {
-      allTabs.push({
+      allTabs.unshift({
         key: "カスタム",
         label: "カスタム",
         count: customCount,
@@ -48,7 +93,14 @@ export function useModelTabs({
     }
 
     return allTabs;
-  }, [categories, activeCategory, models, getValidCategoryModelCount]);
+  }, [
+    categories,
+    activeCategory,
+    models,
+    getValidCategoryModelCount,
+    customSelectedModelIds,
+    AllModels,
+  ]);
 
   return tabs;
 }
