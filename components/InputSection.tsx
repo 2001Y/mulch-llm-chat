@@ -18,6 +18,7 @@ import { useChatLogicContext } from "contexts/ChatLogicContext";
 import { useMyModels } from "hooks/useMyModels";
 import { useModelTabs } from "hooks/useModelTabs";
 import TabNavigation from "./shared/TabNavigation";
+import { useIOsKeyboardHeight } from "react-ios-keyboard-viewport";
 
 interface Props {
   mainInput: boolean;
@@ -193,6 +194,10 @@ export default function InputSection({
   const tiptapEditorRef = useRef<EditorHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
+
+  // iOSキーボード対策: ライブラリのフックを使用
+  const iOsKeyboardHeight = useIOsKeyboardHeight();
+  const isKeyboardVisible = iOsKeyboardHeight > 0;
 
   // 選択されているモデルの数を取得
   const selectedModelsCount =
@@ -534,6 +539,7 @@ export default function InputSection({
           mainInput ? "full-input fixed" : ""
         } ${isEdited ? "edited" : ""}`}
         ref={sectionRef}
+        data-ios-keyboard-visible={isKeyboardVisible}
       >
         <input type="hidden" name="chatInput" value={chatInput} />
 
