@@ -18,6 +18,7 @@ import { useChatLogicContext } from "contexts/ChatLogicContext";
 import { useMyModels } from "hooks/useMyModels";
 import { useModelTabs } from "hooks/useModelTabs";
 import TabNavigation from "./shared/TabNavigation";
+import { useIOSKeyboardFix } from "@/hooks/useIOSKeyboardFix";
 
 interface Props {
   mainInput: boolean;
@@ -193,6 +194,9 @@ export default function InputSection({
   const tiptapEditorRef = useRef<EditorHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
+
+  // iOSキーボード対策のフックを使用
+  const { isKeyboardVisible, keyboardFixStyle } = useIOSKeyboardFix();
 
   // 選択されているモデルの数を取得
   const selectedModelsCount =
@@ -534,6 +538,7 @@ export default function InputSection({
           mainInput ? "full-input fixed" : ""
         } ${isEdited ? "edited" : ""}`}
         ref={sectionRef}
+        data-ios-keyboard-visible={isKeyboardVisible}
       >
         <input type="hidden" name="chatInput" value={chatInput} />
 

@@ -429,6 +429,15 @@ html {
     // .input-models-tools-container のスタイルはmodels.scssに移動済み
   }
 
+  // iOSキーボード表示時はセーフエリアを無効化
+  &[data-ios-keyboard-visible="true"] {
+    &.full-input.fixed {
+      .input-container.chat-input-area {
+        padding-bottom: 0.5em;
+      }
+    }
+  }
+
   .action-button,
   .shortcut-area,
   .model-radio label {
