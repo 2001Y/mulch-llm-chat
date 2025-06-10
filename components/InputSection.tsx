@@ -214,7 +214,10 @@ export default function InputSection({
   useEffect(() => {
     const userAgent = navigator.userAgent;
     const isIOS = /iPhone|iPod/.test(userAgent);
-    const hasVisualViewport = typeof visualViewport !== "undefined";
+    const hasVisualViewport =
+      typeof window !== "undefined" &&
+      typeof window.visualViewport !== "undefined" &&
+      window.visualViewport !== null;
 
     console.log(`[InputSection] Environment check:`);
     console.log(`  - User Agent: ${userAgent}`);
@@ -224,9 +227,9 @@ export default function InputSection({
       `  - Window dimensions: ${window.innerWidth}x${window.innerHeight}`
     );
 
-    if (hasVisualViewport) {
+    if (hasVisualViewport && window.visualViewport) {
       console.log(
-        `  - Visual Viewport dimensions: ${visualViewport.width}x${visualViewport.height}`
+        `  - Visual Viewport dimensions: ${window.visualViewport.width}x${window.visualViewport.height}`
       );
     }
   }, []);
