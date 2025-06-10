@@ -1044,7 +1044,7 @@ html {
   top: 0;
   left: 0;
   width: 100vw;
-  height: 100vh;
+  height: var(--actual-100dvh);
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(5px);
   display: flex;
@@ -1695,7 +1695,7 @@ textarea[data-fieldsizing="content"] {
 .chat-list-container {
   // margin-top: $height_header;
   padding: $body-padding;
-  height: calc(100vh - $height_header - 200px);
+  height: calc(var(--actual-100dvh) - $height_header - 200px);
   overflow-y: auto;
 
   // デスクトップでは非表示

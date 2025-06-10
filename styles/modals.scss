@@ -46,7 +46,7 @@
 
   @media (max-width: 768px) {
     max-width: calc(100vw - 2rem);
-    max-height: calc(100vh - 2rem);
+    max-height: calc(var(--actual-100dvh) - 2rem);
     border-radius: 12px;
   }
 }
@@ -102,7 +102,7 @@
 
   @media (max-width: 768px) {
     padding: 1.5rem;
-    max-height: calc(100vh - 120px);
+    max-height: calc(var(--actual-100dvh) - 120px);
   }
 }
 
