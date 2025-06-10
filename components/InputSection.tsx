@@ -18,7 +18,6 @@ import { useChatLogicContext } from "contexts/ChatLogicContext";
 import { useMyModels } from "hooks/useMyModels";
 import { useModelTabs } from "hooks/useModelTabs";
 import TabNavigation from "./shared/TabNavigation";
-import { useIOsKeyboardHeight } from "react-ios-keyboard-viewport";
 
 interface Props {
   mainInput: boolean;
@@ -150,6 +149,63 @@ const SubmitButton = ({
   }
 };
 
+// 既存のキーボード対応システムを使用するカスタムフック
+const useKeyboardHeight = () => {
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const updateKeyboardState = () => {
+      if (typeof window !== "undefined" && document.body) {
+        // CSSカスタムプロパティからキーボード高さを取得
+        const style = getComputedStyle(document.body);
+        const heightStr = style.getPropertyValue("--keyboardHeight").trim();
+        const height = heightStr ? parseFloat(heightStr.replace("px", "")) : 0;
+
+        // data属性からキーボード表示状態を取得
+        const isVisible =
+          document.body.getAttribute("data-software-keyboard") === "true";
+
+        setKeyboardHeight(height);
+        setIsKeyboardVisible(isVisible);
+      }
+    };
+
+    // 初期状態をチェック
+    updateKeyboardState();
+
+    // MutationObserverでbody要素の属性変更を監視
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (
+          mutation.type === "attributes" &&
+          (mutation.attributeName === "style" ||
+            mutation.attributeName === "data-software-keyboard")
+        ) {
+          updateKeyboardState();
+        }
+      });
+    });
+
+    if (document.body) {
+      observer.observe(document.body, {
+        attributes: true,
+        attributeFilter: ["style", "data-software-keyboard"],
+      });
+    }
+
+    // ウィンドウリサイズイベントも監視（フォールバック）
+    window.addEventListener("resize", updateKeyboardState);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateKeyboardState);
+    };
+  }, []);
+
+  return { keyboardHeight, isKeyboardVisible };
+};
+
 export default function InputSection({
   mainInput,
   chatInput,
@@ -196,8 +252,7 @@ export default function InputSection({
   const sectionRef = useRef<HTMLElement>(null);
 
   // iOSキーボード対策: ライブラリのフックを使用
-  const iOsKeyboardHeight = useIOsKeyboardHeight();
-  const isKeyboardVisible = iOsKeyboardHeight > 0;
+  const { keyboardHeight, isKeyboardVisible } = useKeyboardHeight();
 
   // 選択されているモデルの数を取得
   const selectedModelsCount =
@@ -206,33 +261,9 @@ export default function InputSection({
   // デバッグ用：コンポーネントマウント時の初期状態をログ出力
   useEffect(() => {
     console.log(
-      `[InputSection] Component mounted - iOS Keyboard height: ${iOsKeyboardHeight}px, visible: ${isKeyboardVisible}`
+      `[InputSection] Component mounted - Keyboard height: ${keyboardHeight}px, visible: ${isKeyboardVisible}`
     );
-  }, []); // 空の依存配列でマウント時のみ実行
-
-  // デバッグ用：実行環境とAPI対応状況を確認
-  useEffect(() => {
-    const userAgent = navigator.userAgent;
-    const isIOS = /iPhone|iPod/.test(userAgent);
-    const hasVisualViewport =
-      typeof window !== "undefined" &&
-      typeof window.visualViewport !== "undefined" &&
-      window.visualViewport !== null;
-
-    console.log(`[InputSection] Environment check:`);
-    console.log(`  - User Agent: ${userAgent}`);
-    console.log(`  - Is iOS (iPhone/iPod): ${isIOS}`);
-    console.log(`  - Visual Viewport API available: ${hasVisualViewport}`);
-    console.log(
-      `  - Window dimensions: ${window.innerWidth}x${window.innerHeight}`
-    );
-
-    if (hasVisualViewport && window.visualViewport) {
-      console.log(
-        `  - Visual Viewport dimensions: ${window.visualViewport.width}x${window.visualViewport.height}`
-      );
-    }
-  }, []);
+  }, [keyboardHeight, isKeyboardVisible]); // 依存配列を適切に設定
 
   // デバッグ用：現在選択されているモデルをログ出力
   useEffect(() => {
@@ -244,21 +275,12 @@ export default function InputSection({
     }
   }, [models, selectedModelsCount]);
 
-  // デバッグ用：iOSキーボードの状態をログ出力
+  // デバッグ用：キーボードの状態をログ出力
   useEffect(() => {
     console.log(
-      `[InputSection] iOS Keyboard state changed - visible: ${isKeyboardVisible}, height: ${iOsKeyboardHeight}px`
+      `[InputSection] Keyboard state changed - visible: ${isKeyboardVisible}, height: ${keyboardHeight}px`
     );
-  }, [isKeyboardVisible, iOsKeyboardHeight]);
-
-  // デバッグ用：useIOsKeyboardHeightの戻り値を直接監視
-  useEffect(() => {
-    console.log(
-      `[InputSection] useIOsKeyboardHeight raw value:`,
-      iOsKeyboardHeight,
-      `type: ${typeof iOsKeyboardHeight}`
-    );
-  }, [iOsKeyboardHeight]);
+  }, [isKeyboardVisible, keyboardHeight]);
 
   // タブ設定（共通フックを使用）
   const baseTabs = useModelTabs({
@@ -586,7 +608,6 @@ export default function InputSection({
           mainInput ? "full-input fixed" : ""
         } ${isEdited ? "edited" : ""}`}
         ref={sectionRef}
-        data-ios-keyboard-visible={isKeyboardVisible}
       >
         <input type="hidden" name="chatInput" value={chatInput} />
 

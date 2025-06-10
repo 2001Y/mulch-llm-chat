@@ -425,7 +425,7 @@ html {
     .input-container.chat-input-area {
       border-radius: $border-radius $border-radius 0 0; // 画面下部固定版は下部角丸なし
       padding-bottom: calc(0.8em + env(safe-area-inset-bottom));
-      
+
       // iOS環境でキーボード表示時の処理
       @supports (padding: env(safe-area-inset-bottom)) {
         transition: padding-bottom 0.3s ease;
@@ -434,13 +434,12 @@ html {
     // .input-models-tools-container のスタイルはmodels.scssに移動済み
   }
 
-  // iOSキーボード表示時はセーフエリアを無効化
-  &[data-ios-keyboard-visible="true"] {
-    &.full-input.fixed {
-      .input-container.chat-input-area {
-        // キーボード表示時はセーフエリアを含めない
-        padding-bottom: 0.8em;
-      }
+  // キーボード表示時はセーフエリアを無効化（既存のシステムを使用）
+  // body要素のdata-software-keyboard="true"に基づいてスタイルを適用
+  body[data-software-keyboard="true"] &.full-input.fixed {
+    .input-container.chat-input-area {
+      // キーボード表示時はセーフエリアを含めない
+      padding-bottom: 0.8em;
     }
   }
 

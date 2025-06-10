@@ -33,7 +33,6 @@
     "openai": "^4.77.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-ios-keyboard-viewport": "^0.1.0",
     "sass": "^1.83.0",
     "sonner": "^1.7.1",
     "tiptap-markdown": "^0.8.10",
