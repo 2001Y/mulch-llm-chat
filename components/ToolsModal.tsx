@@ -51,6 +51,16 @@ export default function ToolsModal({ isOpen, onClose }: ToolsModalProps) {
     }
   };
 
+  // ツールの有効/無効を切り替え
+  const handleToggleTool = (index: number) => {
+    const newTools = [...tools];
+    newTools[index] = {
+      ...newTools[index],
+      enabled: !newTools[index].enabled,
+    };
+    updateTools(newTools);
+  };
+
   // ツールの編集保存
   const handleSaveEditTool = (
     index: number,
@@ -117,6 +127,7 @@ export default function ToolsModal({ isOpen, onClose }: ToolsModalProps) {
                   tool={tool}
                   onEdit={() => setEditingToolIndex(index)}
                   onDelete={() => handleDeleteTool(index)}
+                  onToggle={() => handleToggleTool(index)}
                 />
               )}
             </li>
@@ -191,9 +202,10 @@ interface ToolDisplayProps {
   tool: ExtendedTool;
   onEdit: () => void;
   onDelete: () => void;
+  onToggle: () => void;
 }
 
-function ToolDisplay({ tool, onEdit, onDelete }: ToolDisplayProps) {
+function ToolDisplay({ tool, onEdit, onDelete, onToggle }: ToolDisplayProps) {
   return (
     <div className="tool-display">
       <div className="tool-info">
@@ -207,54 +219,20 @@ function ToolDisplay({ tool, onEdit, onDelete }: ToolDisplayProps) {
         {tool.category && (
           <span className="tool-category">カテゴリ: {tool.category}</span>
         )}
-
-        <details className="tool-details">
-          <summary>パラメーター詳細</summary>
-          <pre className="tool-parameters">
-            {JSON.stringify(tool.function.parameters, null, 2)}
-          </pre>
-        </details>
-
-        <details className="tool-details">
-          <summary>実行コード</summary>
-          <pre className="tool-implementation">
-            {tool.implementation || "実行コードが設定されていません"}
-          </pre>
-        </details>
       </div>
       <div className="tool-actions">
-        <button onClick={onEdit} className="edit-button">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-          </svg>
+        <button onClick={onEdit} className="edit-button" title="編集">
+          編集
         </button>
-        <button onClick={onDelete} className="delete-button">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="3,6 5,6 21,6" />
-            <path d="M19,6V20a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6M8,6V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2V6" />
-            <line x1="10" y1="11" x2="10" y2="17" />
-            <line x1="14" y1="11" x2="14" y2="17" />
-          </svg>
+        <button onClick={onDelete} className="delete-button" title="削除">
+          削除
+        </button>
+        <button
+          onClick={onToggle}
+          className={`toggle-button ${tool.enabled !== false ? "enabled" : "disabled"}`}
+          title={tool.enabled !== false ? "無効にする" : "有効にする"}
+        >
+          {tool.enabled !== false ? "有効" : "無効"}
         </button>
       </div>
     </div>
@@ -292,7 +270,7 @@ function ToolEditForm({ tool, onSave, onCancel }: ToolEditFormProps) {
           className="tool-edit-input"
           value={editedDefinition}
           onChange={(e) => setEditedDefinition(e.target.value)}
-          rows={8}
+          rows={12}
         />
       </div>
 
@@ -302,7 +280,7 @@ function ToolEditForm({ tool, onSave, onCancel }: ToolEditFormProps) {
           className="tool-edit-input"
           value={editedImplementation}
           onChange={(e) => setEditedImplementation(e.target.value)}
-          rows={6}
+          rows={8}
         />
       </div>
 
