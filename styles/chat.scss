@@ -31,6 +31,25 @@ body {
     "Segoe UI Symbol";
   color: #fff;
   background: $bg_body;
+
+  // スクロール位置を固定
+  position: relative;
+  scroll-behavior: auto; // スムーズスクロールを無効化
+}
+
+// htmlとbodyのスクロール位置を強制的に0に固定
+html,
+body {
+  scroll-padding: 0;
+  scroll-snap-type: none;
+
+  // iOS Safariで意図しないスクロールを防ぐ
+  @supports (-webkit-touch-callout: none) {
+    position: fixed;
+    width: 100%;
+    top: 0;
+    left: 0;
+  }
 }
 
 button {
@@ -48,6 +67,14 @@ button {
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+}
+
+// iOS Safariでのスクロール防止強化
+html:has(body[data-software-keyboard="true"]) {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 
 :where(button, [type="button"], [type="reset"], [type="submit"]) {
@@ -136,6 +163,8 @@ html {
   //   transform: translateY(calc(50vh - $height_header * 1.5 - 50%));
   //   padding: max(1em, 6vmax) 0;
   // }
+
+  // iOS Safari再描画トリガー（セクションレベル）
 
   button {
     font-size: 12.8px;
@@ -748,9 +777,19 @@ html {
       flex-direction: column;
 
       .scroll_area {
-        min-height: calc(
-          var(--actual-100dvh) - $height_header - $body-padding * 2
-        );
+        // キーボードが表示されていない時のみmin-heightを設定
+        body:not([data-software-keyboard="true"]) & {
+          min-height: calc(
+            var(--actual-100dvh) - $height_header - $body-padding * 2
+          );
+        }
+
+        // キーボード表示時は最小高さを設定しない
+        body[data-software-keyboard="true"] & {
+          min-height: auto;
+          height: 100%; // 親要素に合わせる
+        }
+
         padding-bottom: calc($height_header * 2 + env(safe-area-inset-bottom));
         overflow-y: hidden;
       }
@@ -1053,6 +1092,12 @@ html {
   justify-content: center;
   align-items: flex-end;
   z-index: 1000;
+
+  // キーボード表示時の調整
+  body[data-software-keyboard="true"] & {
+    height: 100%;
+    max-height: var(--actual-100dvh);
+  }
 }
 
 .modal-content {
@@ -2210,6 +2255,12 @@ textarea[data-fieldsizing="content"] {
   z-index: 9999;
   padding: 1rem;
 
+  // キーボード表示時の調整
+  body[data-software-keyboard="true"] & {
+    height: 100%;
+    max-height: var(--actual-100dvh);
+  }
+
   @media (max-width: 768px) {
     align-items: flex-end;
     padding: 0;
@@ -2848,5 +2899,36 @@ textarea[data-fieldsizing="content"] {
   // APIキーエラーバナーの高さ分を考慮
   &:has(~ .api-key-error-banner) {
     padding-top: 4rem; // エラーバナーの高さ分のパディング
+  }
+}
+
+// グローバルなiOS Safari再描画トリガー
+// すべての入力要素に対して適用
+input,
+textarea,
+[contenteditable="true"],
+.ProseMirror {
+  // フォーカス時にGPU層を作成
+  &:focus {
+    // GPU加速を確実にする
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+
+    // バックフェースの可視性を設定（追加の最適化）
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+
+    // パースペクティブを追加（3Dコンテキストの作成）
+    -webkit-perspective: 1000;
+    perspective: 1000;
+  }
+}
+
+// モバイルSafari特有の入力要素スタイル
+@supports (-webkit-touch-callout: none) {
+  input:focus,
+  textarea:focus,
+  [contenteditable="true"]:focus,
+  .ProseMirror:focus {
   }
 }
