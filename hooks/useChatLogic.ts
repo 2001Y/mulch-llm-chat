@@ -1092,7 +1092,7 @@ export function useChatLogic({
                 throw new Error(errorData.error || "プロキシAPIエラー");
               }
 
-              // ストリーミングレスポンスを処理
+              // ストリーミングレスポンスを処理（AI SDK標準形式）
               const reader = response.body?.getReader();
               const decoder = new TextDecoder();
 
@@ -1100,18 +1100,36 @@ export function useChatLogic({
                 throw new Error("レスポンスボディの読み取りに失敗しました");
               }
 
+              let buffer = "";
+              
               while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
 
                 const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split("\n");
-
+                buffer += chunk;
+                
+                // 改行で分割してSSEイベントを処理
+                const lines = buffer.split("\n");
+                buffer = lines.pop() || "";
+                
                 for (const line of lines) {
-                  if (line.startsWith("0:")) {
-                    // テキストデルタ
-                    const content = line.substring(2);
-                    accumulatedText += content;
+                  const trimmedLine = line.trim();
+                  if (trimmedLine === "") continue;
+                  
+                  // "0:"で始まる行はテキストデルタ（AI SDKの形式）
+                  if (trimmedLine.startsWith("0:")) {
+                    const content = trimmedLine.substring(2);
+                    // JSONとしてパースしてみる
+                    try {
+                      const parsed = JSON.parse(content);
+                      if (typeof parsed === "string") {
+                        accumulatedText += parsed;
+                      }
+                    } catch {
+                      // パースできない場合は直接追加
+                      accumulatedText += content;
+                    }
 
                     // UIをリアルタイムで更新
                     const streamingUpdatePayload: AppMessage & {
