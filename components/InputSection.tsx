@@ -213,6 +213,13 @@ export default function InputSection({
     }
   }, [models, selectedModelsCount]);
 
+  // デバッグ用：iOSキーボードの状態をログ出力
+  useEffect(() => {
+    console.log(
+      `[InputSection] iOS Keyboard visible: ${isKeyboardVisible}, height: ${iOsKeyboardHeight}px`
+    );
+  }, [isKeyboardVisible, iOsKeyboardHeight]);
+
   // タブ設定（共通フックを使用）
   const baseTabs = useModelTabs({
     categories,
