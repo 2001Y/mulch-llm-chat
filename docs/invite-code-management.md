@@ -4,11 +4,11 @@
 
 招待コードシステムは、ユーザーがOpenRouterアカウントを持たなくても、事前に設定された招待コードを使用してAIモデルにアクセスできる機能です。
 
-## セキュリティ上の重要事項
+## セキュリティ上の注意事項
 
-- **招待コード管理ファイル (`config/invite-codes.json`) は絶対にGitにコミットしないでください**
-- 本番環境では環境変数や安全な設定管理システムを使用してください
+- **本番環境で使用する場合は、実際のAPIキーを環境変数で管理することを推奨します**
 - APIキーは絶対にクライアント側に露出させないでください
+- 開発・デモ環境用の招待コードと本番環境用の招待コードは分けて管理してください
 
 ## 招待コードの追加・更新
 
@@ -31,27 +31,31 @@
 - ハイフンやアンダースコアを含むことができます
 - 推奨形式: `PURPOSE-RANDOM-123` (例: `DEMO-ACCESS-456`, `TRIAL-USER-789`)
 
-### 3. 本番環境での管理
+### 3. 環境別の管理
 
-本番環境では、以下のような方法で招待コードを管理することを推奨します：
+#### 開発環境
+開発環境では`config/invite-codes.json`に直接記載して問題ありません。
 
-#### 環境変数を使用する場合
+#### 本番環境
+本番環境では、以下のような方法で実際のAPIキーを保護することを推奨します：
 
 ```typescript
 // app/api/invite-code/validate/route.ts の修正例
-const inviteCodes = process.env.INVITE_CODES 
+const devInviteCodes = require("@/config/invite-codes.json").codes;
+const prodInviteCodes = process.env.INVITE_CODES 
   ? JSON.parse(process.env.INVITE_CODES) 
-  : require("@/config/invite-codes.json").codes;
+  : {};
+
+const inviteCodes = {
+  ...devInviteCodes,
+  ...prodInviteCodes // 本番環境の招待コードで上書き
+};
 ```
 
 環境変数の設定例：
 ```bash
-INVITE_CODES='{"DEMO-123":"sk-or-v1-xxx","TRIAL-456":"sk-or-v1-yyy"}'
+INVITE_CODES='{"PROD-123":"sk-or-v1-xxx","PROD-456":"sk-or-v1-yyy"}'
 ```
-
-#### データベースを使用する場合
-
-招待コードとAPIキーのマッピングをデータベースに保存し、動的に管理することも可能です。
 
 ## 使用制限の実装（オプション）
 
@@ -77,10 +81,11 @@ INVITE_CODES='{"DEMO-123":"sk-or-v1-xxx","TRIAL-456":"sk-or-v1-yyy"}'
 
 ## セキュリティベストプラクティス
 
-1. **定期的なAPIキーのローテーション**: 定期的にAPIキーを更新
-2. **アクセスログの監視**: 招待コードの使用状況を監視
-3. **異常検知**: 異常な使用パターンを検出してアラート
-4. **HTTPS必須**: APIエンドポイントへのアクセスは必ずHTTPS経由で
+1. **環境別のAPIキー管理**: 開発用と本番用でAPIキーを分離
+2. **定期的なAPIキーのローテーション**: 定期的にAPIキーを更新
+3. **アクセスログの監視**: 招待コードの使用状況を監視
+4. **異常検知**: 異常な使用パターンを検出してアラート
+5. **HTTPS必須**: APIエンドポイントへのアクセスは必ずHTTPS経由で
 
 ## 今後の拡張案
 
