@@ -32,26 +32,27 @@ export default function SettingsModal() {
   const [inviteCode, setInviteCode] = useState("");
   const [isInviteCodeMode, setIsInviteCodeMode] = useState(false);
   const [isValidatingInviteCode, setIsValidatingInviteCode] = useState(false);
+  const [savedInviteCode, setSavedInviteCode] = useState("");
 
   useEffect(() => {
     setMounted(true);
     // 初期状態を設定
     const openRouterToken = storage.get("openrouter_api_key");
     const githubToken = storage.getGistToken();
-    const savedInviteCode = storage.get("invite_code");
+    const storedInviteCode = storage.get("invite_code");
 
     console.log(
       "[SettingsModal] 初期状態設定 - OpenRouterトークン:",
       openRouterToken
     );
     console.log("[SettingsModal] 初期状態設定 - GitHubトークン:", githubToken);
-    console.log("[SettingsModal] 初期状態設定 - 招待コード:", savedInviteCode);
+    console.log("[SettingsModal] 初期状態設定 - 招待コード:", storedInviteCode);
 
-    setIsOpenRouterLoggedIn(!!openRouterToken || !!savedInviteCode);
+    setIsOpenRouterLoggedIn(!!openRouterToken || !!storedInviteCode);
     setIsGitHubLoggedIn(!!githubToken);
-    setIsInviteCodeMode(!!savedInviteCode);
-    if (savedInviteCode) {
-      setInviteCode(savedInviteCode);
+    setIsInviteCodeMode(!!storedInviteCode);
+    if (storedInviteCode) {
+      setSavedInviteCode(storedInviteCode);
     }
 
     // Safari用: ページ読み込み時に認証完了をチェック
@@ -78,11 +79,14 @@ export default function SettingsModal() {
   useEffect(() => {
     const handleTokenChange = () => {
       const token = storage.get("openrouter_api_key");
-      const savedInviteCode = storage.get("invite_code");
+      const storedInviteCode = storage.get("invite_code");
       console.log("[SettingsModal] tokenChangeイベント受信 - トークン:", token);
-      console.log("[SettingsModal] tokenChangeイベント受信 - 招待コード:", savedInviteCode);
-      setIsOpenRouterLoggedIn(!!token || !!savedInviteCode);
-      setIsInviteCodeMode(!!savedInviteCode);
+      console.log("[SettingsModal] tokenChangeイベント受信 - 招待コード:", storedInviteCode);
+      setIsOpenRouterLoggedIn(!!token || !!storedInviteCode);
+      setIsInviteCodeMode(!!storedInviteCode);
+      if (storedInviteCode) {
+        setSavedInviteCode(storedInviteCode);
+      }
     };
 
     const handleStorageChange = () => {
@@ -125,6 +129,7 @@ export default function SettingsModal() {
         storage.remove("invite_code");
         setIsInviteCodeMode(false);
         setInviteCode("");
+        setSavedInviteCode("");
 
         console.log(
           "[SettingsModal] 保存後のローカルストレージ状態:",
@@ -219,6 +224,7 @@ export default function SettingsModal() {
       storage.remove("openrouter_api_key"); // 通常のAPIキーを削除
       setIsInviteCodeMode(true);
       setIsOpenRouterLoggedIn(true);
+      setSavedInviteCode(inviteCode);
       
       window.dispatchEvent(new Event("tokenChange"));
 
@@ -337,6 +343,7 @@ export default function SettingsModal() {
     storage.remove("invite_code");
     setIsInviteCodeMode(false);
     setInviteCode("");
+    setSavedInviteCode("");
     window.dispatchEvent(new Event("tokenChange"));
     window.location.reload();
   };
@@ -431,7 +438,7 @@ export default function SettingsModal() {
                 ステータス:{" "}
                 {isOpenRouterLoggedIn ? (
                   <span style={{ color: "#00ff00" }}>
-                    ✓ {isInviteCodeMode ? "招待コードで認証済み" : "認証済み"}
+                    ✓ {isInviteCodeMode ? `${savedInviteCode} で認証済み` : "認証済み"}
                   </span>
                 ) : (
                   <span style={{ color: "#ff6b6b" }}>未認証</span>
@@ -452,70 +459,53 @@ export default function SettingsModal() {
                   ログアウト
                 </button>
               ) : (
-                <button
-                  onClick={handleOpenRouterLogin}
-                  className="login-button add-button"
-                  disabled={isOpenRouterLoading}
-                >
-                  {isOpenRouterLoading ? "認証中..." : "OpenRouterでログイン"}
-                </button>
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+                  <button
+                    onClick={handleOpenRouterLogin}
+                    className="login-button add-button"
+                    disabled={isOpenRouterLoading}
+                  >
+                    {isOpenRouterLoading ? "認証中..." : "OpenRouterでログイン"}
+                  </button>
+                  
+                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                    <span style={{ color: "rgba(255, 255, 255, 0.6)" }}>または</span>
+                    <input
+                      type="text"
+                      placeholder="招待コード"
+                      value={inviteCode}
+                      onChange={(e) => setInviteCode(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter") {
+                          handleValidateInviteCode();
+                        }
+                      }}
+                      disabled={isValidatingInviteCode}
+                      style={{
+                        padding: "0.5rem 1rem",
+                        backgroundColor: "rgba(255, 255, 255, 0.05)",
+                        border: "1px solid rgba(255, 255, 255, 0.12)",
+                        borderRadius: "8px",
+                        color: "#fff",
+                        fontSize: "0.9rem",
+                        width: "150px",
+                      }}
+                    />
+                    <button
+                      onClick={handleValidateInviteCode}
+                      className="add-button"
+                      disabled={isValidatingInviteCode || !inviteCode.trim()}
+                      style={{
+                        padding: "0.5rem 1rem",
+                      }}
+                    >
+                      {isValidatingInviteCode ? "検証中..." : "使用"}
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>
-        </div>
-
-        {/* Invite Code Section */}
-        <div className="invite-code-section settings-input-area" style={{ marginTop: "1rem" }}>
-          <div className="invite-code-header" style={{ marginBottom: "0.5rem" }}>
-            <h5 style={{ color: "rgba(255, 255, 255, 0.9)", margin: 0 }}>
-              または招待コードを使用
-            </h5>
-          </div>
-          <div className="invite-code-input-group" style={{ display: "flex", gap: "0.5rem" }}>
-            <input
-              type="text"
-              placeholder="招待コードを入力"
-              value={inviteCode}
-              onChange={(e) => setInviteCode(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === "Enter") {
-                  handleValidateInviteCode();
-                }
-              }}
-              disabled={isInviteCodeMode || isValidatingInviteCode}
-              style={{
-                flex: 1,
-                padding: "0.5rem 1rem",
-                backgroundColor: "rgba(255, 255, 255, 0.05)",
-                border: "1px solid rgba(255, 255, 255, 0.12)",
-                borderRadius: "8px",
-                color: "#fff",
-                fontSize: "0.9rem",
-              }}
-            />
-            {!isInviteCodeMode && (
-              <button
-                onClick={handleValidateInviteCode}
-                className="add-button"
-                disabled={isValidatingInviteCode || !inviteCode.trim()}
-                style={{
-                  padding: "0.5rem 1.5rem",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {isValidatingInviteCode ? "検証中..." : "検証"}
-              </button>
-            )}
-          </div>
-          {isInviteCodeMode && (
-            <p style={{ 
-              color: "rgba(255, 255, 255, 0.7)", 
-              fontSize: "0.8rem", 
-              marginTop: "0.5rem" 
-            }}>
-              招待コード「{inviteCode}」で認証されています
-            </p>
-          )}
         </div>
 
         {/* GitHub Gist Authentication */}

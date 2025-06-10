@@ -64,8 +64,27 @@ export async function POST(request: NextRequest) {
     // OpenRouterにストリーミングリクエストを送信
     const result = await streamText(streamOptions);
 
-    // ストリームをそのまま返す
-    return result.toTextStreamResponse();
+    // textStreamを直接変換してレスポンスを作成
+    const stream = result.textStream;
+    const encoder = new TextEncoder();
+    
+    const transformedStream = new ReadableStream({
+      async start(controller) {
+        for await (const chunk of stream) {
+          // AI SDKのtextStreamフォーマット（"0:チャンク"）に変換
+          const encoded = encoder.encode(`0:${JSON.stringify(chunk)}\n`);
+          controller.enqueue(encoded);
+        }
+        controller.close();
+      }
+    });
+
+    return new Response(transformedStream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Transfer-Encoding": "chunked",
+      },
+    });
   } catch (error: any) {
     console.error("[OpenRouter Proxy] Error:", error);
 
