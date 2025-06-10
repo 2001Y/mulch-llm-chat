@@ -136,19 +136,26 @@ export function useChatLogic({
   const [isModelSelectorSlideoutOpen, setIsModelSelectorSlideoutOpen] =
     useState(false);
   const [isToolsModalOpen, setIsToolsModalOpen] = useState(false);
-  const [selectedModelIds, setSelectedModelIds] =
-    useStorageState<string[]>("selectedModels");
-  // カスタムカテゴリ用の別ストレージ
-  const [customSelectedModelIds, setCustomSelectedModelIds] = useStorageState<
+
+  // 新しいシンプルな状態管理
+  // activeCategory: 現在選択されているカテゴリ名をローカルストレージに保存
+  const [storedActiveCategory, setStoredActiveCategory] =
+    useStorageState<string>("activeCategory");
+  // customCategoryModels: カスタムカテゴリ選択時のモデルIDリスト
+  const [customCategoryModels, setCustomCategoryModels] = useStorageState<
     string[]
-  >("customSelectedModels");
+  >("customCategoryModels");
+
   const [models, setModels] = useState<ModelItem[]>([]);
 
   // カテゴリ状態管理を追加
   const [categories, setCategories] = useState<Record<string, ModelCategory>>(
     {}
   );
-  const [activeCategory, setActiveCategory] = useState<string>("");
+  // メモリ内のアクティブカテゴリ（初期値はストレージから）
+  const [activeCategory, setActiveCategory] = useState<string>(
+    storedActiveCategory || "最高性能"
+  );
 
   const [chatInput, setChatInput] = useState<string>("");
 
@@ -284,116 +291,96 @@ export function useChatLogic({
   // 2. 1つでもモデルを追加/削除すると、どのデフォルトカテゴリとも一致しなくなる
   // 3. その結果「カスタム」が返され、自動的にカスタムカテゴリとして扱われる
   // → つまり、デフォルトカテゴリを編集しようとした瞬間にカスタムカテゴリになる
-  const getCurrentMatchingCategory = useCallback(() => {
-    if (!models || models.length === 0) {
-      // モデルが0件の場合、カスタムカテゴリも0件なので最高性能カテゴリを返す
-      return "最高性能";
-    }
-
-    const selectedModelIds = models
-      .filter((m) => m.selected)
-      .map((m) => m.id)
-      .sort();
-
-    // 各カテゴリと比較（カスタム以外）
-    for (const [categoryKey, category] of Object.entries(categories)) {
-      if (categoryKey === "カスタム") continue; // カスタムはスキップ
-
-      const categoryModelIds = [...category.models].sort();
-
-      // 配列の長さと内容が完全に一致するかチェック
-      if (
-        selectedModelIds.length === categoryModelIds.length &&
-        selectedModelIds.every((id, index) => id === categoryModelIds[index])
-      ) {
-        return categoryKey; // デフォルトカテゴリと完全一致
+  const getCurrentMatchingCategory = useCallback(
+    (currentModels: ModelItem[]) => {
+      if (!currentModels || currentModels.length === 0) {
+        // モデルが0件の場合、カスタムカテゴリも0件なので最高性能カテゴリを返す
+        return "最高性能";
       }
-    }
 
-    return "カスタム"; // どのデフォルトカテゴリとも一致しない場合はカスタム
-  }, [models, categories]);
+      const selectedModelIds = currentModels
+        .filter((m) => m.selected)
+        .map((m) => m.id)
+        .sort();
+
+      // AllModelsがまだ読み込まれていない場合は、正確な判定ができないためカスタムを返す
+      if (!AllModels || AllModels.length === 0) {
+        return "カスタム";
+      }
+
+      // 各カテゴリと比較（カスタム以外）
+      for (const [categoryKey, category] of Object.entries(categories)) {
+        if (categoryKey === "カスタム") continue; // カスタムはスキップ
+
+        // ★ 修正：カテゴリのモデルリストをAllModelsに存在するものでフィルタリング
+        const validCategoryModelIds = category.models
+          .filter((modelId) => AllModels.some((m) => m.id === modelId))
+          .sort();
+
+        // 配列の長さと内容が完全に一致するかチェック
+        if (
+          selectedModelIds.length === validCategoryModelIds.length &&
+          selectedModelIds.every(
+            (id, index) => id === validCategoryModelIds[index]
+          )
+        ) {
+          return categoryKey; // デフォルトカテゴリと完全一致
+        }
+      }
+
+      return "カスタム"; // どのデフォルトカテゴリとも一致しない場合はカスタム
+    },
+    [categories, AllModels]
+  );
 
   // カテゴリプリセットを送信用モデルに適用する関数（カスタムカテゴリ対応）
   const applyCategoryToModels = useCallback(
     async (categoryKey: string) => {
-      // カスタムカテゴリの特別処理
-      if (categoryKey === "カスタム") {
-        console.log(
-          "[applyCategoryToModels] Custom category - loading from customSelectedModels"
-        );
-
-        // カスタムで保存されたモデルIDを読み込む
-        if (customSelectedModelIds && customSelectedModelIds.length > 0) {
-          // AllModelsに存在するIDのみをフィルタリング
-          const validCustomIds = customSelectedModelIds.filter((id) =>
-            AllModels?.some((m) => m.id === id)
-          );
-
-          // 有効なカスタムモデルを適用
-          const customModels: ModelItem[] = validCustomIds.map((modelId) => {
-            const foundModel = AllModels?.find((m) => m.id === modelId);
-            return {
-              id: modelId,
-              name: foundModel?.name || modelId.split("/").pop() || modelId,
-              selected: true,
-            };
-          });
-
-          setModels(customModels);
-          setSelectedModelIds(validCustomIds);
-        }
-
-        setActiveCategory(categoryKey);
-        return;
-      }
-
-      const category = categories[categoryKey];
-      if (!category) {
-        console.warn(`Category "${categoryKey}" not found`);
-        return;
-      }
-
       // 無限ループを防ぐフラグを設定
       isUpdatingFromCategory.current = true;
 
       try {
         console.log(
-          `[useChatLogic] Applying category "${category.name}" (${categoryKey})`
+          `[applyCategoryToModels] Applying category: ${categoryKey}`
         );
 
-        // 既にアクティブなカテゴリの場合でも、現在のモデル選択と一致しない場合は再適用
-        if (categoryKey === activeCategory) {
-          const currentMatchingCategory = getCurrentMatchingCategory();
-          if (currentMatchingCategory === categoryKey) {
-            console.log(
-              "[applyCategoryToModels] Already active category with matching models - no action needed"
-            );
+        let modelIds: string[] = [];
+
+        // カスタムカテゴリの場合
+        if (categoryKey === "カスタム") {
+          modelIds = customCategoryModels || [];
+          if (modelIds.length === 0) {
+            console.warn("[applyCategoryToModels] No custom models saved");
             return;
           }
-          console.log(
-            "[applyCategoryToModels] Active category but models don't match - reapplying"
-          );
+        } else {
+          // デフォルトカテゴリの場合
+          const category = categories[categoryKey];
+          if (!category) {
+            console.warn(`Category "${categoryKey}" not found`);
+            return;
+          }
+          modelIds = category.models;
         }
 
-        // 既定カテゴリの場合は定義されたモデルを適用
-        const categoryModelIds = category.models;
-        const validCategoryModelIds = categoryModelIds.filter((modelId) => {
+        // AllModelsに存在するモデルのみをフィルタリング
+        const validModelIds = modelIds.filter((modelId) => {
           const isValid = AllModels?.some((m) => m.id === modelId);
           if (!isValid) {
             console.warn(
-              `[applyCategoryToModels] Category contains invalid model ID: ${modelId}`
+              `[applyCategoryToModels] Invalid model ID: ${modelId}`
             );
           }
           return isValid;
         });
 
-        if (validCategoryModelIds.length === 0) {
+        if (validModelIds.length === 0) {
           console.warn("[applyCategoryToModels] No valid models in category");
           return;
         }
 
-        // カテゴリに定義されたモデルを適用
-        const categoryModels: ModelItem[] = validCategoryModelIds.map(
+        // モデルを適用
+        const categoryModels: ModelItem[] = validModelIds.map(
           (modelId: string) => {
             const foundModel = AllModels?.find((m) => m.id === modelId);
             return {
@@ -404,16 +391,15 @@ export function useChatLogic({
           }
         );
 
-        // モデルとカテゴリを同時に更新
+        // モデルとカテゴリを更新
         setModels(categoryModels);
         setActiveCategory(categoryKey);
 
-        // 選択されたIDのみをローカルストレージに保存
-        const selectedIds = categoryModels.map((m) => m.id);
-        setSelectedModelIds(selectedIds);
+        // カスタムカテゴリ以外を選択してもカスタムカテゴリのデータは保持する
+        // （カスタムカテゴリのタブを残すため）
 
         console.log(
-          `[applyCategoryToModels] Applied category "${category.name}" with ${categoryModels.length} models`
+          `[applyCategoryToModels] Applied ${categoryModels.length} models from category "${categoryKey}"`
         );
       } catch (error) {
         console.error("Failed to apply category:", error);
@@ -427,11 +413,9 @@ export function useChatLogic({
     [
       categories,
       AllModels,
-      setSelectedModelIds,
       setActiveCategory,
-      getCurrentMatchingCategory,
-      activeCategory,
-      customSelectedModelIds,
+      customCategoryModels,
+      setCustomCategoryModels,
     ]
   );
 
@@ -1586,15 +1570,33 @@ export function useChatLogic({
       setModels(newModels);
 
       // 選択されたIDのみをローカルストレージに保存
-      setSelectedModelIds([modelId]);
+      setCustomCategoryModels([modelId]);
     },
-    [models, setSelectedModelIds, AllModels]
+    [models, setCustomCategoryModels, AllModels]
   );
 
   // カテゴリ情報の初期読み込み
   useEffect(() => {
     loadCategories();
   }, [loadCategories]);
+
+  // アクティブカテゴリが変更されたらローカルストレージに保存
+  useEffect(() => {
+    if (activeCategory && activeCategory !== storedActiveCategory) {
+      console.log(
+        `[useEffect] Saving activeCategory to storage: ${activeCategory}`
+      );
+      setStoredActiveCategory(activeCategory);
+    }
+  }, [activeCategory, storedActiveCategory, setStoredActiveCategory]);
+
+  // 新しいシンプルなモデル取得ロジック
+  const getSelectedModelIds = useCallback(() => {
+    if (activeCategory === "カスタム") {
+      return customCategoryModels || [];
+    }
+    return categories[activeCategory]?.models || [];
+  }, [activeCategory, categories, customCategoryModels]);
 
   useEffect(() => {
     const loadOpenRouterModels = async () => {
@@ -1649,23 +1651,23 @@ export function useChatLogic({
         );
 
         // カスタム選択のクリーンアップ
-        if (customSelectedModelIds && customSelectedModelIds.length > 0) {
-          const validCustomIds = customSelectedModelIds.filter((id) =>
+        if (customCategoryModels && customCategoryModels.length > 0) {
+          const validCustomIds = customCategoryModels.filter((id) =>
             uniqueModels.some((m) => m.id === id)
           );
 
-          if (validCustomIds.length !== customSelectedModelIds.length) {
+          if (validCustomIds.length !== customCategoryModels.length) {
             console.log(
               "[useEffect loadOpenRouterModels] Cleaning up invalid custom model IDs:",
-              customSelectedModelIds.length - validCustomIds.length
+              customCategoryModels.length - validCustomIds.length
             );
 
             if (validCustomIds.length === 0) {
               // 有効なカスタムIDがない場合は削除
-              setCustomSelectedModelIds([]);
+              setCustomCategoryModels([]);
             } else {
               // 有効なIDのみを保存
-              setCustomSelectedModelIds(validCustomIds);
+              setCustomCategoryModels(validCustomIds);
             }
           }
         }
@@ -1702,64 +1704,63 @@ export function useChatLogic({
     // --- カテゴリベースの初期化処理 ---
     const initializeModels = async () => {
       console.log(
-        "[useEffect models init] Performing category-based model initialization."
+        "[initializeModels] Starting model initialization with new simplified state"
       );
 
-      const currentSelectedIds = selectedModelIds || [];
-
-      if (currentSelectedIds.length > 0) {
+      // アクティブカテゴリが既に設定されている場合はそれを適用
+      if (activeCategory && categories[activeCategory]) {
         console.log(
-          `[useEffect models init] Using stored selected model IDs (count: ${currentSelectedIds.length})`
+          `[initializeModels] Applying saved active category: ${activeCategory}`
+        );
+        await applyCategoryToModels(activeCategory);
+        modelsInitialized.current = true;
+        return;
+      }
+
+      // アクティブカテゴリが「カスタム」でカスタムモデルがある場合
+      if (
+        activeCategory === "カスタム" &&
+        customCategoryModels &&
+        customCategoryModels.length > 0
+      ) {
+        console.log(
+          `[initializeModels] Loading custom category with ${customCategoryModels.length} models`
         );
 
-        // AllModelsに存在しないモデルIDを除外
-        const validSelectedIds = currentSelectedIds.filter((modelId) => {
-          const isValid = AllModels.some((m) => m.id === modelId);
-          if (!isValid) {
-            console.warn(
-              `[useEffect models init] Removing invalid model ID from storage: ${modelId}`
-            );
-          }
-          return isValid;
-        });
+        // AllModelsに存在するモデルのみをフィルタリング
+        const validCustomIds = customCategoryModels.filter((id) =>
+          AllModels.some((m) => m.id === id)
+        );
 
-        if (validSelectedIds.length !== currentSelectedIds.length) {
-          console.log(
-            `[useEffect models init] Cleaned up ${
-              currentSelectedIds.length - validSelectedIds.length
-            } invalid model IDs`
-          );
-          setSelectedModelIds(validSelectedIds);
-        }
-
-        if (validSelectedIds.length > 0) {
-          // 有効な既存選択がある場合はそれを使用
-          const newModelList: ModelItem[] = validSelectedIds.map((modelId) => {
-            const openRouterModel = AllModels.find((m) => m.id === modelId);
+        if (validCustomIds.length > 0) {
+          const customModels: ModelItem[] = validCustomIds.map((modelId) => {
+            const foundModel = AllModels.find((m) => m.id === modelId);
             return {
               id: modelId,
-              name: openRouterModel?.name || modelId,
+              name: foundModel?.name || modelId.split("/").pop() || modelId,
               selected: true,
             };
           });
 
-          setModels(newModelList);
-          const matchingCategory = getCurrentMatchingCategory();
-          setActiveCategory(matchingCategory);
+          setModels(customModels);
           modelsInitialized.current = true;
 
-          console.log(
-            `[useEffect models init] Used existing models: ${validSelectedIds.join(
-              ", "
-            )}`
-          );
+          // 無効なIDがあった場合はクリーンアップ
+          if (validCustomIds.length !== customCategoryModels.length) {
+            console.log(
+              `[initializeModels] Cleaning up ${
+                customCategoryModels.length - validCustomIds.length
+              } invalid custom model IDs`
+            );
+            setCustomCategoryModels(validCustomIds);
+          }
           return;
         }
       }
 
-      // 保存されたモデルがない、または無効な場合はデフォルトカテゴリを適用
+      // デフォルトカテゴリを適用
       console.log(
-        "[useEffect models init] No valid stored models, applying default category: 最高性能"
+        "[initializeModels] No valid saved state, applying default category: 最高性能"
       );
 
       // 最高性能カテゴリを適用（フラグをセットして無限ループを防ぐ）
@@ -1773,19 +1774,18 @@ export function useChatLogic({
         }, 100);
       }
 
-      console.log(
-        "[useEffect models init] Category-based initialization complete."
-      );
+      console.log("[initializeModels] Model initialization complete");
     };
 
     initializeModels();
   }, [
-    selectedModelIds,
-    setSelectedModelIds,
+    customCategoryModels,
+    setCustomCategoryModels,
     AllModels,
     categories,
     applyCategoryToModels,
     getCurrentMatchingCategory,
+    activeCategory,
   ]);
 
   // ローカルストレージのモデル項目が変更されるたびに無効なモデルIDをクリーンアップ
@@ -1795,7 +1795,7 @@ export function useChatLogic({
       !modelsInitialized.current ||
       !AllModels ||
       AllModels.length === 0 ||
-      !selectedModelIds
+      !customCategoryModels
     ) {
       return;
     }
@@ -1810,7 +1810,7 @@ export function useChatLogic({
             "[useEffect cleanup] Delayed cleanup after category change"
           );
           // 遅延クリーンアップを実行（再帰的にuseEffectをトリガー）
-          setSelectedModelIds([...selectedModelIds]);
+          setCustomCategoryModels([...customCategoryModels]);
         }
       }, 200);
       return;
@@ -1821,7 +1821,7 @@ export function useChatLogic({
     );
 
     // AllModelsに存在しないモデルIDを検出
-    const invalidModelIds = selectedModelIds.filter((modelId) => {
+    const invalidModelIds = customCategoryModels.filter((modelId) => {
       const isValid = AllModels.some((m) => m.id === modelId);
       if (!isValid) {
         console.warn(`[useEffect cleanup] Found invalid model ID: ${modelId}`);
@@ -1831,7 +1831,7 @@ export function useChatLogic({
 
     // 無効なモデルIDがある場合はクリーンアップ
     if (invalidModelIds.length > 0) {
-      const validSelectedIds = selectedModelIds.filter((modelId) =>
+      const validSelectedIds = customCategoryModels.filter((modelId) =>
         AllModels.some((m) => m.id === modelId)
       );
 
@@ -1845,7 +1845,7 @@ export function useChatLogic({
       if (validSelectedIds.length === 0) {
         console.log("[useEffect cleanup] No valid models remaining");
         // 空配列を設定
-        setSelectedModelIds([]);
+        setCustomCategoryModels([]);
         setModels([]);
 
         // カスタムカテゴリの場合は最高性能に切り替え
@@ -1854,14 +1854,14 @@ export function useChatLogic({
             "[useEffect cleanup] Switching from custom to default category"
           );
           // カスタム選択を削除
-          setCustomSelectedModelIds([]);
+          setCustomCategoryModels([]);
           setTimeout(() => {
             applyCategoryToModels("最高性能");
           }, 100);
         } else {
           // その他のカテゴリの場合はカテゴリを同期
           setTimeout(() => {
-            const matchingCategory = getCurrentMatchingCategory();
+            const matchingCategory = getCurrentMatchingCategory(models);
             setActiveCategory(matchingCategory);
           }, 100);
         }
@@ -1869,7 +1869,7 @@ export function useChatLogic({
       }
 
       // ローカルストレージを更新
-      setSelectedModelIds(validSelectedIds);
+      setCustomCategoryModels(validSelectedIds);
 
       // modelsステートも更新
       const updatedModels: ModelItem[] = validSelectedIds.map((modelId) => {
@@ -1885,7 +1885,7 @@ export function useChatLogic({
 
       // カテゴリも同期
       setTimeout(() => {
-        const matchingCategory = getCurrentMatchingCategory();
+        const matchingCategory = getCurrentMatchingCategory(models);
         setActiveCategory(matchingCategory);
       }, 50);
 
@@ -1896,14 +1896,13 @@ export function useChatLogic({
       );
     }
   }, [
-    selectedModelIds,
+    customCategoryModels,
     AllModels,
     modelsInitialized.current,
-    setSelectedModelIds,
+    setCustomCategoryModels,
     getCurrentMatchingCategory,
     applyCategoryToModels,
     activeCategory,
-    setCustomSelectedModelIds,
   ]);
 
   // updateModels関数も修正して、無効なモデルIDを自動的に除外
@@ -1926,60 +1925,38 @@ export function useChatLogic({
         return isValid;
       });
 
-      // 有効なモデルがない場合の処理
-      if (validModels.length === 0) {
-        console.log("[updateModels] No models selected");
-        setModels([]);
-        setSelectedModelIds([]);
-
-        // カスタムカテゴリの場合は最高性能に切り替え
-        if (activeCategory === "カスタム") {
-          console.log(
-            "[updateModels] Switching from custom to default category"
-          );
-          // カスタム選択を削除
-          setCustomSelectedModelIds([]);
-          setTimeout(() => {
-            applyCategoryToModels("最高性能");
-          }, 50);
-        } else {
-          // その他のカテゴリの場合はカテゴリを同期
-          setTimeout(() => {
-            const matchingCategory = getCurrentMatchingCategory();
-            setActiveCategory(matchingCategory);
-          }, 50);
-        }
-        return;
-      }
-
+      // 状態を更新
       setModels(validModels);
-      // 選択されたIDのみをローカルストレージに保存
       const selectedIds = validModels
         .filter((m) => m.selected)
         .map((m) => m.id);
-      setSelectedModelIds(selectedIds);
 
-      // カテゴリも同期（少し遅延させて無限ループを防ぐ）
-      setTimeout(() => {
-        const matchingCategory = getCurrentMatchingCategory();
-        setActiveCategory(matchingCategory);
-      }, 50);
+      // 新しいシンプルなロジック：カテゴリ判定
+      const matchingCategory = getCurrentMatchingCategory(validModels);
+      setActiveCategory(matchingCategory);
 
-      if (validModels.length !== newModels.length) {
+      if (matchingCategory === "カスタム") {
+        // カスタムカテゴリの場合のみ保存
+        console.log("[safeUpdateModels] Saving custom model selection");
+        setCustomCategoryModels(selectedIds);
+      } else {
+        // デフォルトカテゴリに一致した場合はカスタム選択をクリア
         console.log(
-          `[updateModels] Filtered ${
-            newModels.length - validModels.length
-          } invalid models`
+          `[safeUpdateModels] Selection matches category "${matchingCategory}", clearing custom selection`
         );
+        setCustomCategoryModels([]);
+      }
+
+      if (validModels.length === 0) {
+        console.log("[updateModels] No models selected, applying default");
+        setTimeout(() => applyCategoryToModels("最高性能"), 50);
       }
     },
     [
       AllModels,
-      setSelectedModelIds,
+      setCustomCategoryModels,
       getCurrentMatchingCategory,
       applyCategoryToModels,
-      activeCategory,
-      setCustomSelectedModelIds,
     ]
   );
 
@@ -2763,79 +2740,11 @@ export function useChatLogic({
     if (isUpdatingFromCategory.current) {
       return;
     }
-
-    const matchingCategory = getCurrentMatchingCategory();
+    const matchingCategory = getCurrentMatchingCategory(models);
     if (matchingCategory !== activeCategory) {
-      console.log(
-        `[useChatLogic] Syncing activeCategory from "${activeCategory}" to "${matchingCategory}"`
-      );
       setActiveCategory(matchingCategory);
     }
-
-    // カスタムカテゴリの保存・削除処理
-    // ★ 重要: カテゴリ切り替え中は保存処理をスキップ
-    // （カテゴリ切り替え中は一時的に不整合な状態になるため）
-    if (models && AllModels && !isUpdatingFromCategory.current) {
-      const currentSelectedIds = models
-        .filter((m) => m.selected)
-        .map((m) => m.id);
-
-      // AllModelsに存在する有効なIDのみをフィルタリング
-      const validSelectedIds = currentSelectedIds.filter((id) =>
-        AllModels.some((m) => m.id === id)
-      );
-
-      // ★ 重要な条件:
-      // 1. 現在の選択がカスタム（どのデフォルトカテゴリとも一致しない）
-      // 2. かつ、現在のactiveCategoryもカスタム
-      // → この両方が成立する場合のみカスタム選択として保存
-      //
-      // ※ 重複モデルについて:
-      // デフォルトカテゴリ間でモデルの重複があっても問題ありません。
-      // getCurrentMatchingCategory()は完全一致で判定するため、
-      // 選択されたモデルセット全体が一致する場合のみデフォルトカテゴリと判定されます。
-      if (
-        matchingCategory === "カスタム" &&
-        activeCategory === "カスタム" &&
-        validSelectedIds.length > 0
-      ) {
-        // カスタムカテゴリの場合は有効なIDのみを保存
-        const sortedValidIds = [...validSelectedIds].sort();
-        const savedCustomIds = (customSelectedModelIds || []).sort();
-
-        // 現在の選択が保存されたカスタムと異なる場合は更新
-        if (
-          sortedValidIds.length !== savedCustomIds.length ||
-          !sortedValidIds.every((id, index) => id === savedCustomIds[index])
-        ) {
-          console.log(
-            "[useChatLogic] Saving valid custom selection:",
-            sortedValidIds
-          );
-          setCustomSelectedModelIds(sortedValidIds);
-        }
-      } else if (
-        matchingCategory !== "カスタム" &&
-        activeCategory !== "カスタム"
-      ) {
-        // デフォルトカテゴリと一致し、かつカスタムカテゴリでない場合は、カスタム選択を削除
-        if (customSelectedModelIds && customSelectedModelIds.length > 0) {
-          console.log(
-            "[useChatLogic] Clearing custom selection - matches default category:",
-            matchingCategory
-          );
-          setCustomSelectedModelIds([]);
-        }
-      }
-    }
-  }, [
-    getCurrentMatchingCategory,
-    activeCategory,
-    models,
-    customSelectedModelIds,
-    setCustomSelectedModelIds,
-    AllModels,
-  ]);
+  }, [models, activeCategory, getCurrentMatchingCategory]);
 
   return {
     isModalOpen,
@@ -2862,6 +2771,7 @@ export function useChatLogic({
     applyCategoryToModels,
     getCurrentMatchingCategory,
     getValidCategoryModelCount,
+    getSelectedModelIds, // 新しく追加
     chatInput,
     setChatInput,
     messages: optimisticMessages,
@@ -2886,10 +2796,8 @@ export function useChatLogic({
     saveMessagesToHistory,
     loadMessages,
     regenerateAssistantResponse,
-    selectedModelIds: selectedModelIds || [],
-    setSelectedModelIds,
-    customSelectedModelIds: customSelectedModelIds || [],
-    setCustomSelectedModelIds,
+    customCategoryModels: customCategoryModels || [],
+    setCustomCategoryModels,
     resumeLLMGeneration,
     getCurrentChatInfo,
   };

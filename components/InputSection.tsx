@@ -166,7 +166,6 @@ export default function InputSection({
     selectSingleModel,
     handleSend: originalHandleSend,
     isGenerating: contextIsGenerating,
-    setSelectedModelIds,
     updateModels,
     models,
     tools,
@@ -177,7 +176,8 @@ export default function InputSection({
     applyCategoryToModels,
     getCurrentMatchingCategory,
     getValidCategoryModelCount,
-    customSelectedModelIds,
+    customCategoryModels,
+    getSelectedModelIds,
   } = useChatLogicContext();
 
   // モデルAPIの読み込み状態を確認
@@ -214,7 +214,7 @@ export default function InputSection({
     activeCategory,
     models: models || [],
     getValidCategoryModelCount,
-    customSelectedModelIds,
+    customCategoryModels,
     AllModels,
   });
 

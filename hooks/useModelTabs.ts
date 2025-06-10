@@ -12,7 +12,7 @@ interface UseModelTabsProps {
   activeCategory: string;
   models: ModelItem[];
   getValidCategoryModelCount: (categoryKey: string) => number;
-  customSelectedModelIds?: string[];
+  customCategoryModels?: string[];
   AllModels?: ModelItem[];
 }
 
@@ -21,7 +21,7 @@ export function useModelTabs({
   activeCategory,
   models,
   getValidCategoryModelCount,
-  customSelectedModelIds,
+  customCategoryModels,
   AllModels,
 }: UseModelTabsProps) {
   const tabs = useMemo(() => {
@@ -38,13 +38,10 @@ export function useModelTabs({
     let shouldShowCustom = false;
     let customCount = 0;
 
-    if (
-      customSelectedModelIds &&
-      customSelectedModelIds.length > 0 &&
-      AllModels
-    ) {
+    // カスタムカテゴリのモデルが保存されている場合
+    if (customCategoryModels && customCategoryModels.length > 0 && AllModels) {
       // AllModelsに存在するカスタムモデルIDのみをフィルタリング
-      const validCustomIds = customSelectedModelIds.filter((id) =>
+      const validCustomIds = customCategoryModels.filter((id) =>
         AllModels.some((m) => m.id === id)
       );
 
@@ -57,7 +54,11 @@ export function useModelTabs({
         for (const [categoryKey, category] of Object.entries(categories)) {
           if (categoryKey === "カスタム") continue;
 
-          const sortedCategoryIds = [...category.models].sort();
+          // カテゴリのモデルIDのうち、AllModelsに存在するものだけを取得
+          const validCategoryIds = category.models.filter((id) =>
+            AllModels.some((m) => m.id === id)
+          );
+          const sortedCategoryIds = [...validCategoryIds].sort();
 
           if (
             sortedCustomIds.length === sortedCategoryIds.length &&
@@ -98,7 +99,7 @@ export function useModelTabs({
     activeCategory,
     models,
     getValidCategoryModelCount,
-    customSelectedModelIds,
+    customCategoryModels,
     AllModels,
   ]);
 

@@ -1,4 +1,6 @@
 {
+  "activeCategory": "最高性能",
+  "customCategoryModels": [],
   "models": {
     "login": [
       {

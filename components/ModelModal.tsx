@@ -40,7 +40,8 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
     applyCategoryToModels,
     getCurrentMatchingCategory,
     getValidCategoryModelCount,
-    customSelectedModelIds,
+    customCategoryModels,
+    getSelectedModelIds,
   } = useChatLogicContext();
   const { myModels } = useMyModels();
   const [searchInput, setSearchInput] = useState<string>("");
@@ -221,7 +222,7 @@ export default function ModelModal({ isOpen, onClose }: ModelModalProps) {
     activeCategory,
     models: models || [],
     getValidCategoryModelCount,
-    customSelectedModelIds,
+    customCategoryModels,
     AllModels,
   });
 

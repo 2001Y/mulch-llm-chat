@@ -1679,7 +1679,7 @@ textarea[data-fieldsizing="content"] {
 }
 
 .chat-list-container {
-  margin-top: $height_header;
+  // margin-top: $height_header;
   padding: $body-padding;
   height: calc(100vh - $height_header - 200px);
   overflow-y: auto;
