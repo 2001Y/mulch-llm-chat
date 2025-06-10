@@ -27,21 +27,32 @@ export default function SettingsModal() {
   const [authError, setAuthError] = useState("");
   const [isOpenRouterLoggedIn, setIsOpenRouterLoggedIn] = useState(false);
   const [isGitHubLoggedIn, setIsGitHubLoggedIn] = useState(false);
+  
+  // 招待コード関連の状態
+  const [inviteCode, setInviteCode] = useState("");
+  const [isInviteCodeMode, setIsInviteCodeMode] = useState(false);
+  const [isValidatingInviteCode, setIsValidatingInviteCode] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     // 初期状態を設定
     const openRouterToken = storage.get("openrouter_api_key");
     const githubToken = storage.getGistToken();
+    const savedInviteCode = storage.get("invite_code");
 
     console.log(
       "[SettingsModal] 初期状態設定 - OpenRouterトークン:",
       openRouterToken
     );
     console.log("[SettingsModal] 初期状態設定 - GitHubトークン:", githubToken);
+    console.log("[SettingsModal] 初期状態設定 - 招待コード:", savedInviteCode);
 
-    setIsOpenRouterLoggedIn(!!openRouterToken);
+    setIsOpenRouterLoggedIn(!!openRouterToken || !!savedInviteCode);
     setIsGitHubLoggedIn(!!githubToken);
+    setIsInviteCodeMode(!!savedInviteCode);
+    if (savedInviteCode) {
+      setInviteCode(savedInviteCode);
+    }
 
     // Safari用: ページ読み込み時に認証完了をチェック
     const urlParams = new URLSearchParams(window.location.search);
@@ -67,8 +78,11 @@ export default function SettingsModal() {
   useEffect(() => {
     const handleTokenChange = () => {
       const token = storage.get("openrouter_api_key");
+      const savedInviteCode = storage.get("invite_code");
       console.log("[SettingsModal] tokenChangeイベント受信 - トークン:", token);
-      setIsOpenRouterLoggedIn(!!token);
+      console.log("[SettingsModal] tokenChangeイベント受信 - 招待コード:", savedInviteCode);
+      setIsOpenRouterLoggedIn(!!token || !!savedInviteCode);
+      setIsInviteCodeMode(!!savedInviteCode);
     };
 
     const handleStorageChange = () => {
@@ -106,6 +120,11 @@ export default function SettingsModal() {
         );
 
         storage.set("openrouter_api_key", token);
+        
+        // 招待コードモードを解除
+        storage.remove("invite_code");
+        setIsInviteCodeMode(false);
+        setInviteCode("");
 
         console.log(
           "[SettingsModal] 保存後のローカルストレージ状態:",
@@ -169,6 +188,56 @@ export default function SettingsModal() {
       window.removeEventListener("message", handleAuthMessage);
     };
   }, []);
+
+  // 招待コードの検証処理
+  const handleValidateInviteCode = async () => {
+    if (!inviteCode.trim()) {
+      toast.error("招待コードを入力してください");
+      return;
+    }
+
+    setIsValidatingInviteCode(true);
+    setAuthError("");
+
+    try {
+      const response = await fetch("/api/invite-code/validate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ code: inviteCode }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "招待コードの検証に失敗しました");
+      }
+
+      // 検証成功
+      storage.set("invite_code", inviteCode);
+      storage.remove("openrouter_api_key"); // 通常のAPIキーを削除
+      setIsInviteCodeMode(true);
+      setIsOpenRouterLoggedIn(true);
+      
+      window.dispatchEvent(new Event("tokenChange"));
+
+      toast.success("招待コード認証成功", {
+        description: "招待コードが検証されました。AIモデルが利用可能になりました。",
+        duration: 4000,
+      });
+
+    } catch (error: any) {
+      console.error("[SettingsModal] 招待コード検証エラー:", error);
+      setAuthError(error.message);
+      toast.error("招待コード検証エラー", {
+        description: error.message,
+        duration: 5000,
+      });
+    } finally {
+      setIsValidatingInviteCode(false);
+    }
+  };
 
   // OpenRouter ログイン処理
   const handleOpenRouterLogin = () => {
@@ -265,6 +334,9 @@ export default function SettingsModal() {
   // OpenRouter ログアウト処理
   const handleOpenRouterLogout = () => {
     storage.remove("openrouter_api_key");
+    storage.remove("invite_code");
+    setIsInviteCodeMode(false);
+    setInviteCode("");
     window.dispatchEvent(new Event("tokenChange"));
     window.location.reload();
   };
@@ -358,7 +430,9 @@ export default function SettingsModal() {
               <div className="auth-status">
                 ステータス:{" "}
                 {isOpenRouterLoggedIn ? (
-                  <span style={{ color: "#00ff00" }}>✓ 認証済み</span>
+                  <span style={{ color: "#00ff00" }}>
+                    ✓ {isInviteCodeMode ? "招待コードで認証済み" : "認証済み"}
+                  </span>
                 ) : (
                   <span style={{ color: "#ff6b6b" }}>未認証</span>
                 )}
@@ -390,8 +464,62 @@ export default function SettingsModal() {
           </div>
         </div>
 
+        {/* Invite Code Section */}
+        <div className="invite-code-section settings-input-area" style={{ marginTop: "1rem" }}>
+          <div className="invite-code-header" style={{ marginBottom: "0.5rem" }}>
+            <h5 style={{ color: "rgba(255, 255, 255, 0.9)", margin: 0 }}>
+              または招待コードを使用
+            </h5>
+          </div>
+          <div className="invite-code-input-group" style={{ display: "flex", gap: "0.5rem" }}>
+            <input
+              type="text"
+              placeholder="招待コードを入力"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === "Enter") {
+                  handleValidateInviteCode();
+                }
+              }}
+              disabled={isInviteCodeMode || isValidatingInviteCode}
+              style={{
+                flex: 1,
+                padding: "0.5rem 1rem",
+                backgroundColor: "rgba(255, 255, 255, 0.05)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                borderRadius: "8px",
+                color: "#fff",
+                fontSize: "0.9rem",
+              }}
+            />
+            {!isInviteCodeMode && (
+              <button
+                onClick={handleValidateInviteCode}
+                className="add-button"
+                disabled={isValidatingInviteCode || !inviteCode.trim()}
+                style={{
+                  padding: "0.5rem 1.5rem",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {isValidatingInviteCode ? "検証中..." : "検証"}
+              </button>
+            )}
+          </div>
+          {isInviteCodeMode && (
+            <p style={{ 
+              color: "rgba(255, 255, 255, 0.7)", 
+              fontSize: "0.8rem", 
+              marginTop: "0.5rem" 
+            }}>
+              招待コード「{inviteCode}」で認証されています
+            </p>
+          )}
+        </div>
+
         {/* GitHub Gist Authentication */}
-        <div className="auth-section settings-input-area">
+        <div className="auth-section settings-input-area" style={{ marginTop: "2rem" }}>
           <div className="auth-item">
             <div className="auth-info">
               <h4>GitHub Gist</h4>
