@@ -48,11 +48,13 @@ export default function ToolsModal({ isOpen, onClose }: ToolsModalProps) {
     if (confirm("このツールを削除しますか？")) {
       const newTools = tools.filter((_, i) => i !== index);
       updateTools(newTools);
+      setEditingToolIndex(null);
     }
   };
 
   // ツールの有効/無効を切り替え
-  const handleToggleTool = (index: number) => {
+  const handleToggleTool = (index: number, event: React.MouseEvent) => {
+    event.stopPropagation(); // カードのクリックイベントを止める
     const newTools = [...tools];
     newTools[index] = {
       ...newTools[index],
@@ -121,13 +123,13 @@ export default function ToolsModal({ isOpen, onClose }: ToolsModalProps) {
                     )
                   }
                   onCancel={() => setEditingToolIndex(null)}
+                  onDelete={() => handleDeleteTool(index)}
                 />
               ) : (
                 <ToolDisplay
                   tool={tool}
-                  onEdit={() => setEditingToolIndex(index)}
-                  onDelete={() => handleDeleteTool(index)}
-                  onToggle={() => handleToggleTool(index)}
+                  onCardClick={() => setEditingToolIndex(index)}
+                  onToggle={(e) => handleToggleTool(index, e)}
                 />
               )}
             </li>
@@ -157,8 +159,7 @@ export default function ToolsModal({ isOpen, onClose }: ToolsModalProps) {
       },
       "required": ["location"]
     }
-  },
-  "category": "天気"
+  }
 }`}
               value={newToolDefinition}
               onChange={(e) => setNewToolDefinition(e.target.value)}
@@ -200,14 +201,13 @@ function(args) {
 
 interface ToolDisplayProps {
   tool: ExtendedTool;
-  onEdit: () => void;
-  onDelete: () => void;
-  onToggle: () => void;
+  onCardClick: () => void;
+  onToggle: (e: React.MouseEvent) => void;
 }
 
-function ToolDisplay({ tool, onEdit, onDelete, onToggle }: ToolDisplayProps) {
+function ToolDisplay({ tool, onCardClick, onToggle }: ToolDisplayProps) {
   return (
-    <div className="tool-display">
+    <div className="tool-display" onClick={onCardClick}>
       <div className="tool-info">
         <h4 className="tool-name">
           {tool.function.name}
@@ -216,24 +216,26 @@ function ToolDisplay({ tool, onEdit, onDelete, onToggle }: ToolDisplayProps) {
           )}
         </h4>
         <p className="tool-description">{tool.function.description}</p>
-        {tool.category && (
-          <span className="tool-category">カテゴリ: {tool.category}</span>
-        )}
+        <svg
+          className="edit-indicator"
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="m9 18 6-6-6-6" />
+        </svg>
       </div>
       <div className="tool-actions">
-        <button onClick={onEdit} className="edit-button" title="編集">
-          編集
-        </button>
-        <button onClick={onDelete} className="delete-button" title="削除">
-          削除
-        </button>
-        <button
-          onClick={onToggle}
-          className={`toggle-button ${tool.enabled !== false ? "enabled" : "disabled"}`}
-          title={tool.enabled !== false ? "無効にする" : "有効にする"}
-        >
-          {tool.enabled !== false ? "有効" : "無効"}
-        </button>
+        <label className="toggle-switch" onClick={onToggle}>
+          <input type="checkbox" checked={tool.enabled !== false} readOnly />
+          <span className="toggle-slider"></span>
+        </label>
       </div>
     </div>
   );
@@ -243,16 +245,16 @@ interface ToolEditFormProps {
   tool: ExtendedTool;
   onSave: (editedDefinition: string, editedImplementation: string) => void;
   onCancel: () => void;
+  onDelete: () => void;
 }
 
-function ToolEditForm({ tool, onSave, onCancel }: ToolEditFormProps) {
+function ToolEditForm({ tool, onSave, onCancel, onDelete }: ToolEditFormProps) {
   const [editedDefinition, setEditedDefinition] = useState(
     JSON.stringify(
       {
         type: tool.type,
         function: tool.function,
         enabled: tool.enabled,
-        category: tool.category,
       },
       null,
       2
@@ -293,6 +295,12 @@ function ToolEditForm({ tool, onSave, onCancel }: ToolEditFormProps) {
         </button>
         <button onClick={onCancel} className="cancel-button">
           キャンセル
+        </button>
+      </div>
+
+      <div className="tool-delete-section">
+        <button onClick={onDelete} className="delete-button">
+          このツールを削除
         </button>
       </div>
     </div>
