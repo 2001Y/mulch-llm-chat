@@ -203,6 +203,34 @@ export default function InputSection({
   const selectedModelsCount =
     models?.filter((model) => model.selected).length || 0;
 
+  // デバッグ用：コンポーネントマウント時の初期状態をログ出力
+  useEffect(() => {
+    console.log(
+      `[InputSection] Component mounted - iOS Keyboard height: ${iOsKeyboardHeight}px, visible: ${isKeyboardVisible}`
+    );
+  }, []); // 空の依存配列でマウント時のみ実行
+
+  // デバッグ用：実行環境とAPI対応状況を確認
+  useEffect(() => {
+    const userAgent = navigator.userAgent;
+    const isIOS = /iPhone|iPod/.test(userAgent);
+    const hasVisualViewport = typeof visualViewport !== "undefined";
+
+    console.log(`[InputSection] Environment check:`);
+    console.log(`  - User Agent: ${userAgent}`);
+    console.log(`  - Is iOS (iPhone/iPod): ${isIOS}`);
+    console.log(`  - Visual Viewport API available: ${hasVisualViewport}`);
+    console.log(
+      `  - Window dimensions: ${window.innerWidth}x${window.innerHeight}`
+    );
+
+    if (hasVisualViewport) {
+      console.log(
+        `  - Visual Viewport dimensions: ${visualViewport.width}x${visualViewport.height}`
+      );
+    }
+  }, []);
+
   // デバッグ用：現在選択されているモデルをログ出力
   useEffect(() => {
     if (models && models.length > 0) {
@@ -216,9 +244,18 @@ export default function InputSection({
   // デバッグ用：iOSキーボードの状態をログ出力
   useEffect(() => {
     console.log(
-      `[InputSection] iOS Keyboard visible: ${isKeyboardVisible}, height: ${iOsKeyboardHeight}px`
+      `[InputSection] iOS Keyboard state changed - visible: ${isKeyboardVisible}, height: ${iOsKeyboardHeight}px`
     );
   }, [isKeyboardVisible, iOsKeyboardHeight]);
+
+  // デバッグ用：useIOsKeyboardHeightの戻り値を直接監視
+  useEffect(() => {
+    console.log(
+      `[InputSection] useIOsKeyboardHeight raw value:`,
+      iOsKeyboardHeight,
+      `type: ${typeof iOsKeyboardHeight}`
+    );
+  }, [iOsKeyboardHeight]);
 
   // タブ設定（共通フックを使用）
   const baseTabs = useModelTabs({
