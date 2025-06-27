@@ -423,29 +423,28 @@ export function useChatLogic({
   const getApiKeyForRegeneration = () => {
     const currentOpenRouterApiKey =
       openRouterApiKey || process.env.OPENROUTER_API_KEY;
-    const inviteCode = storage.get("invite_code");
-    
-    if (!currentOpenRouterApiKey && !inviteCode) {
+
+    if (!currentOpenRouterApiKey) {
       const errorMessage =
-        "OpenRouter APIキーまたは招待コードが設定されていません。設定モーダルを開いて認証を行ってください。";
+        "OpenRouter APIキーが設定されていません。設定モーダルを開いて認証を行ってください。";
       setApiKeyError(errorMessage);
       console.error(
-        "[API Key Check] OpenRouter API Key and invite code are missing. Opening settings modal."
+        "[API Key Check] OpenRouter API Key is missing. Opening settings modal."
       );
 
       // トースト通知でユーザーに分かりやすく伝える
       toast.error("認証が必要です", {
         description:
-          "再生成にはOpenRouterでの認証または招待コードが必要です。設定画面を開きました。",
+          "再生成にはOpenRouterでの認証が必要です。設定画面を開きました。",
         duration: 5000,
       });
 
-      // 認証がない場合は自動で設定モーダルを開く
       setIsModalOpen(true);
       return null;
     }
-    setApiKeyError(null); // エラーがなければクリア
-    return currentOpenRouterApiKey || "invite_code_mode"; // 招待コードモードの場合は特別な値を返す
+
+    setApiKeyError(null);
+    return currentOpenRouterApiKey;
   };
 
   // ★ saveMessagesToHistory の宣言を正しい位置に配置
@@ -741,19 +740,18 @@ export function useChatLogic({
 
       const currentOpenRouterApiKey =
         openRouterApiKey || process.env.OPENROUTER_API_KEY;
-      const inviteCode = storage.get("invite_code");
-      
-      if (!currentOpenRouterApiKey && !inviteCode) {
+
+      if (!currentOpenRouterApiKey) {
         const errorMessage =
-          "OpenRouter APIキーまたは招待コードが設定されていません。設定モーダルを開いて認証を行ってください。";
+          "OpenRouter APIキーが設定されていません。設定モーダルを開いて認証を行ってください。";
         setApiKeyError(errorMessage);
         console.error(
-          "[handleSend] OpenRouter API Key and invite code are missing. Opening settings modal."
+          "[handleSend] OpenRouter API Key is missing. Opening settings modal."
         );
 
         // トースト通知でユーザーに分かりやすく伝える
         toast.error("認証が必要です", {
-          description: "OpenRouterでの認証または招待コードが必要です。設定画面を開きました。",
+          description: "OpenRouterでの認証が必要です。設定画面を開きました。",
           duration: 5000,
         });
 
@@ -985,23 +983,18 @@ export function useChatLogic({
       // OpenRouter API Key（または招待コード）のチェック
       const currentOpenRouterApiKey =
         openRouterApiKey || process.env.OPENROUTER_API_KEY;
-      const inviteCode = storage.get("invite_code");
 
       console.log(
         "[resumeLLMGeneration] OpenRouter API Key:",
         currentOpenRouterApiKey ? "存在" : "なし"
       );
-      console.log(
-        "[resumeLLMGeneration] 招待コード:",
-        inviteCode ? "存在" : "なし"
-      );
 
-      if (!currentOpenRouterApiKey && !inviteCode) {
+      if (!currentOpenRouterApiKey) {
         const errorMessage =
-          "OpenRouter APIキーまたは招待コードが設定されていません。設定モーダルを開いて認証を行ってください。";
+          "OpenRouter APIキーが設定されていません。設定モーダルを開いて認証を行ってください。";
         setApiKeyError(errorMessage);
         console.error(
-          "[resumeLLMGeneration] OpenRouter API Key and invite code are missing. Opening settings modal."
+          "[resumeLLMGeneration] OpenRouter API Key is missing. Opening settings modal."
         );
 
         // トースト通知でユーザーに分かりやすく伝える
@@ -1051,372 +1044,97 @@ export function useChatLogic({
           [assistantMessageId]: controller,
         }));
 
-        // 非同期でLLM処理を実行
+        // === ストリーミング開始 ===
         (async () => {
           let accumulatedText = "";
 
           try {
-            console.log(
-              `[resumeLLMGeneration] Processing model: ${modelIdForApi}`
-            );
+            console.log(`[Stream] start model=${modelIdForApi}`);
 
-            // 招待コードモードの場合はプロキシAPIを使用
-            if (inviteCode) {
-              console.log("[resumeLLMGeneration] Using invite code proxy API");
-              
-              // AI SDK用のツール定義を生成
-              const aiSDKTools =
-                extendedTools && extendedTools.length > 0
-                  ? convertToAISDKTools(extendedTools)
-                  : undefined;
+            const openrouter = createOpenRouter({
+              apiKey: currentOpenRouterApiKey,
+            });
+            const providerModel = openrouter.chat(modelIdForApi);
 
-              const requestBody = {
-                inviteCode: inviteCode,
-                model: modelIdForApi,
-                messages: historyForApi,
-                system: "あなたは日本語で対応する親切なアシスタントです。利用可能なツールがある場合は積極的に使用してください。",
-                ...(aiSDKTools && Object.keys(aiSDKTools).length > 0 && { tools: aiSDKTools }),
-              };
+            const aiSDKTools =
+              extendedTools && extendedTools.length > 0
+                ? convertToAISDKTools(extendedTools)
+                : undefined;
 
-              const response = await fetch("/api/openrouter/chat", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify(requestBody),
-                signal: controller.signal,
-              });
-
-              if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || "プロキシAPIエラー");
-              }
-
-              // ストリーミングレスポンスを処理（AI SDK標準形式）
-              const reader = response.body?.getReader();
-              const decoder = new TextDecoder();
-
-              if (!reader) {
-                throw new Error("レスポンスボディの読み取りに失敗しました");
-              }
-
-              let buffer = "";
-              
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                const chunk = decoder.decode(value, { stream: true });
-                buffer += chunk;
-                
-                // 改行で分割してSSEイベントを処理
-                const lines = buffer.split("\n");
-                buffer = lines.pop() || "";
-                
-                for (const line of lines) {
-                  const trimmedLine = line.trim();
-                  if (trimmedLine === "") continue;
-                  
-                  // "0:"で始まる行はテキストデルタ（AI SDKの形式）
-                  if (trimmedLine.startsWith("0:")) {
-                    const content = trimmedLine.substring(2);
-                    // JSONとしてパースしてみる
-                    try {
-                      const parsed = JSON.parse(content);
-                      if (typeof parsed === "string") {
-                        accumulatedText += parsed;
-                      }
-                    } catch {
-                      // パースできない場合は直接追加
-                      accumulatedText += content;
-                    }
-
-                    // UIをリアルタイムで更新
-                    const streamingUpdatePayload: AppMessage & {
-                      role: "assistant";
-                      id: string;
-                    } = {
-                      id: assistantMessageId,
-                      role: "assistant",
-                      content: accumulatedText,
-                      timestamp: Date.now(),
-                      ui: {
-                        modelId: modelIdForApi,
-                        isGenerating: true,
-                      },
-                    };
-
-                    safeOptimisticUpdate({
-                      type: "updateLlmResponse",
-                      updatedAssistantMessage: streamingUpdatePayload,
-                    });
-
-                    setMessages((prevMsgs) =>
-                      prevMsgs.map((m) =>
-                        m.id === assistantMessageId && m.role === "assistant"
-                          ? streamingUpdatePayload
-                          : m
-                      )
-                    );
-                  }
-                }
-              }
-
-              console.log(
-                `[resumeLLMGeneration] Completed for model: ${modelIdForApi} (proxy mode)`
-              );
-            } else {
-              // 通常のOpenRouter直接アクセスモード
-              console.log("[resumeLLMGeneration] Using direct OpenRouter access");
-              
-              const customHeaders: Record<string, string> = {
+            const streamOptions = {
+              model: providerModel,
+              messages: historyForApi,
+              system:
+                "あなたは日本語で対応する親切なアシスタントです。利用可能なツールがある場合は積極的に使用してください。",
+              ...(aiSDKTools && { tools: aiSDKTools }),
+              headers: {
                 "X-Title": "Mulch LLM Chat",
-              };
+                ...(typeof window !== "undefined" && {
+                  "HTTP-Referer": window.location.origin,
+                }),
+              },
+            };
 
-              if (typeof window !== "undefined") {
-                customHeaders["HTTP-Referer"] = window.location.origin;
-              }
+            const result = await streamText(streamOptions);
 
-              const openrouter = createOpenRouter({
-                apiKey: currentOpenRouterApiKey,
-              });
+            for await (const delta of result.fullStream) {
+              if (delta.type === "text-delta") {
+                accumulatedText += delta.textDelta;
 
-              const providerModel = openrouter.chat(modelIdForApi);
-
-              // AI SDK用のツール定義を生成
-              const aiSDKTools =
-                extendedTools && extendedTools.length > 0
-                  ? convertToAISDKTools(extendedTools)
-                  : undefined;
-
-              // === 詳細デバッグ開始 ===
-              console.log("[StreamOptions Debug] extendedTools:", extendedTools);
-              console.log(
-                "[StreamOptions Debug] extendedTools.length:",
-                extendedTools?.length || 0
-              );
-              console.log("[StreamOptions Debug] aiSDKTools:", aiSDKTools);
-              console.log(
-                "[StreamOptions Debug] aiSDKTools type:",
-                typeof aiSDKTools
-              );
-              console.log(
-                "[StreamOptions Debug] aiSDKTools keys:",
-                aiSDKTools ? Object.keys(aiSDKTools) : "undefined"
-              );
-              console.log(
-                "[StreamOptions Debug] aiSDKTools length check:",
-                aiSDKTools && Object.keys(aiSDKTools).length > 0
-              );
-
-              const toolsToAdd =
-                aiSDKTools && Object.keys(aiSDKTools).length > 0
-                  ? aiSDKTools
-                  : undefined;
-              console.log("[StreamOptions Debug] toolsToAdd:", toolsToAdd);
-              // === 詳細デバッグ終了 ===
-
-              const streamOptions = {
-                model: providerModel,
-                messages: historyForApi,
-                system:
-                  "あなたは日本語で対応する親切なアシスタントです。利用可能なツールがある場合は積極的に使用してください。",
-                ...(toolsToAdd && { tools: toolsToAdd }),
-                headers: customHeaders,
-              };
-
-              // === Tools検証用ログ追加（resumeLLMGeneration） ===
-              if (extendedTools && extendedTools.length > 0) {
-                console.log(
-                  "[Tools Debug - Resume] Current extended tools state:",
-                  extendedTools
-                );
-                console.log("[Tools Debug - Resume] AI SDK tools:", aiSDKTools);
-                console.log(
-                  "[Tools Debug - Resume] streamOptions before streamText:",
-                  streamOptions
-                );
-                console.log(
-                  "[Tools Debug - Resume] streamOptions.tools:",
-                  streamOptions.tools
-                );
-                console.log(
-                  "[Tools Debug - Resume] JSON.stringify(streamOptions):",
-                  JSON.stringify(streamOptions, null, 2)
-                );
-              }
-              // === ログ追加終了 ===
-
-              const result = await streamText(streamOptions);
-
-              // ストリーミング処理
-              for await (const delta of result.fullStream) {
-                console.log(`[Stream Delta] Type: ${delta.type}`, delta);
-
-                if (delta.type === "text-delta") {
-                  accumulatedText += delta.textDelta;
-
-                  // UIをリアルタイムで更新
-                  const streamingUpdatePayload: AppMessage & {
-                    role: "assistant";
-                    id: string;
-                  } = {
+                const payload: AppMessage & { role: "assistant"; id: string } =
+                  {
                     id: assistantMessageId,
                     role: "assistant",
                     content: accumulatedText,
                     timestamp: Date.now(),
-                    ui: {
-                      modelId: modelIdForApi,
-                      isGenerating: true,
-                    },
+                    ui: { modelId: modelIdForApi, isGenerating: true },
                   };
 
-                  safeOptimisticUpdate({
-                    type: "updateLlmResponse",
-                    updatedAssistantMessage: streamingUpdatePayload,
-                  });
-
-                  setMessages((prevMsgs) =>
-                    prevMsgs.map((m) =>
-                      m.id === assistantMessageId && m.role === "assistant"
-                        ? streamingUpdatePayload
-                        : m
-                    )
-                  );
-                } else if (delta.type === "tool-call") {
-                  // ツール呼び出しの開始
-                  accumulatedText += `\n\n**🔧 ツール実行中: ${delta.toolName}**\n`;
-                  accumulatedText += `引数:\n\`\`\`json\n${JSON.stringify(
-                    delta.args,
-                    null,
-                    2
-                  )}\n\`\`\`\n`;
-
-                  // UI更新
-                  const toolCallUpdate: AppMessage & {
-                    role: "assistant";
-                    id: string;
-                  } = {
-                    id: assistantMessageId,
-                    role: "assistant",
-                    content: accumulatedText,
-                    timestamp: Date.now(),
-                    ui: {
-                      modelId: modelIdForApi,
-                      isGenerating: true,
-                    },
-                  };
-
-                  safeOptimisticUpdate({
-                    type: "updateLlmResponse",
-                    updatedAssistantMessage: toolCallUpdate,
-                  });
-
-                  setMessages((prevMsgs) =>
-                    prevMsgs.map((m) =>
-                      m.id === assistantMessageId && m.role === "assistant"
-                        ? toolCallUpdate
-                        : m
-                    )
-                  );
-                } else if (delta.type === "tool-result") {
-                  // ツール実行結果
-                  accumulatedText += `\n**📋 実行結果:**\n\`\`\`json\n${JSON.stringify(
-                    delta.result,
-                    null,
-                    2
-                  )}\n\`\`\`\n\n`;
-
-                  // UI更新
-                  const toolResultUpdate: AppMessage & {
-                    role: "assistant";
-                    id: string;
-                  } = {
-                    id: assistantMessageId,
-                    role: "assistant",
-                    content: accumulatedText,
-                    timestamp: Date.now(),
-                    ui: {
-                      modelId: modelIdForApi,
-                      isGenerating: true,
-                    },
-                  };
-
-                  safeOptimisticUpdate({
-                    type: "updateLlmResponse",
-                    updatedAssistantMessage: toolResultUpdate,
-                  });
-
-                  setMessages((prevMsgs) =>
-                    prevMsgs.map((m) =>
-                      m.id === assistantMessageId && m.role === "assistant"
-                        ? toolResultUpdate
-                        : m
-                    )
-                  );
-                } else if (delta.type === "finish") {
-                  // ストリーミング完了
-                  console.log(`[Stream] Finished for model: ${modelIdForApi}`);
-                }
+                safeOptimisticUpdate({
+                  type: "updateLlmResponse",
+                  updatedAssistantMessage: payload,
+                });
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMessageId && m.role === "assistant"
+                      ? payload
+                      : m
+                  )
+                );
               }
-
-              console.log(
-                `[resumeLLMGeneration] Completed for model: ${modelIdForApi}`
-              );
             }
           } catch (err: any) {
-            if (err.name === "AbortError") {
-              console.log(
-                `[resumeLLMGeneration] Request aborted for model: ${modelIdForApi}`
-              );
-              accumulatedText += "\n(ストリーミングがキャンセルされました)";
-            } else {
-              console.error(
-                `[resumeLLMGeneration] Error for model ${modelIdForApi}:`,
-                err
-              );
-              accumulatedText += `\n(エラー: ${err.message})`;
-            }
+            console.error(`[Stream Error] model=${modelIdForApi}`, err);
+            accumulatedText += `\n(エラー: ${err.message})`;
           } finally {
-            // 最終メッセージを保存
-            const finalAssistantMessage: AppMessage & {
-              role: "assistant";
-              id: string;
-            } = {
+            const finalMsg: AppMessage & { role: "assistant"; id: string } = {
               id: assistantMessageId,
               role: "assistant",
               content: accumulatedText,
               timestamp: Date.now(),
-              ui: {
-                modelId: modelIdForApi,
-                isGenerating: false,
-              },
+              ui: { modelId: modelIdForApi, isGenerating: false },
             };
 
             safeOptimisticUpdate({
               type: "updateLlmResponse",
-              updatedAssistantMessage: finalAssistantMessage,
+              updatedAssistantMessage: finalMsg,
             });
-
-            setMessages((prevMsgs) =>
-              prevMsgs.map((m) => {
-                if (m.id === assistantMessageId && m.role === "assistant") {
-                  return finalAssistantMessage;
-                }
-                return m;
-              })
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantMessageId && m.role === "assistant"
+                  ? finalMsg
+                  : m
+              )
             );
 
-            // 生成完了状態を更新
             setAbortControllers((prev) => {
-              const newControllers = { ...prev };
-              delete newControllers[assistantMessageId];
-
-              if (Object.keys(newControllers).length === 0) {
+              const nc = { ...prev };
+              delete nc[assistantMessageId];
+              if (Object.keys(nc).length === 0) {
                 setIsGenerating(false);
                 isProcessingRef.current = false;
               }
-              return newControllers;
+              return nc;
             });
           }
         })();
@@ -2851,6 +2569,14 @@ export function useChatLogic({
       setActiveCategory(matchingCategory);
     }
   }, [models, activeCategory, getCurrentMatchingCategory]);
+
+  // isGenerating 状態と abortControllers を監視するuseEffect
+  useEffect(() => {
+    console.debug(
+      `[DEBUG useChatLogic] isGenerating changed: ${isGenerating}. Remaining controllers:`,
+      Object.keys(abortControllers)
+    );
+  }, [isGenerating, abortControllers]);
 
   return {
     isModalOpen,

@@ -54,12 +54,14 @@ export default function ToolsModal({ isOpen, onClose }: ToolsModalProps) {
 
   // ツールの有効/無効を切り替え
   const handleToggleTool = (index: number, event: React.MouseEvent) => {
+    console.log("Toggle clicked for tool index:", index);
     event.stopPropagation(); // カードのクリックイベントを止める
     const newTools = [...tools];
     newTools[index] = {
       ...newTools[index],
       enabled: !newTools[index].enabled,
     };
+    console.log("Tool enabled state changed to:", !tools[index].enabled);
     updateTools(newTools);
   };
 
@@ -209,12 +211,7 @@ function ToolDisplay({ tool, onCardClick, onToggle }: ToolDisplayProps) {
   return (
     <div className="tool-display" onClick={onCardClick}>
       <div className="tool-info">
-        <h4 className="tool-name">
-          {tool.function.name}
-          {tool.enabled === false && (
-            <span className="disabled-badge">無効</span>
-          )}
-        </h4>
+        <h4 className="tool-name">{tool.function.name}</h4>
         <p className="tool-description">{tool.function.description}</p>
         <svg
           className="edit-indicator"
@@ -232,10 +229,10 @@ function ToolDisplay({ tool, onCardClick, onToggle }: ToolDisplayProps) {
         </svg>
       </div>
       <div className="tool-actions">
-        <label className="toggle-switch" onClick={onToggle}>
+        <div className="toggle-switch" onClick={onToggle}>
           <input type="checkbox" checked={tool.enabled !== false} readOnly />
           <span className="toggle-slider"></span>
-        </label>
+        </div>
       </div>
     </div>
   );

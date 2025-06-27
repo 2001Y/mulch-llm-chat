@@ -26,11 +26,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 有効な招待コードの場合、成功レスポンスを返す
-    // APIキーは返さない（セキュリティのため）
+    // 有効な招待コードの場合、対応するAPIキーを取得して返す
+    const apiKey =
+      inviteCodes.codes[
+        Object.keys(inviteCodes.codes).find(
+          (validCode) => validCode.toUpperCase() === normalizedCode
+        ) as keyof typeof inviteCodes.codes
+      ];
+
     return NextResponse.json({
       success: true,
       message: "招待コードが検証されました",
+      apiKey,
     });
   } catch (error) {
     console.error("[Invite Code Validation] Error:", error);

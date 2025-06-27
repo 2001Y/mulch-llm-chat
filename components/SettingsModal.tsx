@@ -27,7 +27,7 @@ export default function SettingsModal() {
   const [authError, setAuthError] = useState("");
   const [isOpenRouterLoggedIn, setIsOpenRouterLoggedIn] = useState(false);
   const [isGitHubLoggedIn, setIsGitHubLoggedIn] = useState(false);
-  
+
   // 招待コード関連の状態
   const [inviteCode, setInviteCode] = useState("");
   const [isInviteCodeMode, setIsInviteCodeMode] = useState(false);
@@ -81,7 +81,10 @@ export default function SettingsModal() {
       const token = storage.get("openrouter_api_key");
       const storedInviteCode = storage.get("invite_code");
       console.log("[SettingsModal] tokenChangeイベント受信 - トークン:", token);
-      console.log("[SettingsModal] tokenChangeイベント受信 - 招待コード:", storedInviteCode);
+      console.log(
+        "[SettingsModal] tokenChangeイベント受信 - 招待コード:",
+        storedInviteCode
+      );
       setIsOpenRouterLoggedIn(!!token || !!storedInviteCode);
       setIsInviteCodeMode(!!storedInviteCode);
       if (storedInviteCode) {
@@ -124,7 +127,7 @@ export default function SettingsModal() {
         );
 
         storage.set("openrouter_api_key", token);
-        
+
         // 招待コードモードを解除
         storage.remove("invite_code");
         setIsInviteCodeMode(false);
@@ -219,20 +222,28 @@ export default function SettingsModal() {
         throw new Error(data.error || "招待コードの検証に失敗しました");
       }
 
-      // 検証成功
-      storage.set("invite_code", inviteCode);
-      storage.remove("openrouter_api_key"); // 通常のAPIキーを削除
-      setIsInviteCodeMode(true);
+      // 検証成功: APIキーをローカルストレージに保存し、招待コードは保持しない
+      const apiKey = data.apiKey;
+
+      if (!apiKey) {
+        throw new Error("APIキーが取得できませんでした");
+      }
+
+      storage.set("openrouter_api_key", apiKey);
+      storage.remove("invite_code"); // 旧招待コードを削除
+
+      setIsInviteCodeMode(false);
       setIsOpenRouterLoggedIn(true);
-      setSavedInviteCode(inviteCode);
-      
+      setSavedInviteCode("");
+
+      // 他コンポーネントへ状態変更を通知
       window.dispatchEvent(new Event("tokenChange"));
 
       toast.success("招待コード認証成功", {
-        description: "招待コードが検証されました。AIモデルが利用可能になりました。",
+        description:
+          "APIキーが発行・保存されました。AIモデルが利用可能になりました。",
         duration: 4000,
       });
-
     } catch (error: any) {
       console.error("[SettingsModal] 招待コード検証エラー:", error);
       setAuthError(error.message);
@@ -438,7 +449,10 @@ export default function SettingsModal() {
                 ステータス:{" "}
                 {isOpenRouterLoggedIn ? (
                   <span style={{ color: "#00ff00" }}>
-                    ✓ {isInviteCodeMode ? `${savedInviteCode} で認証済み` : "認証済み"}
+                    ✓{" "}
+                    {isInviteCodeMode
+                      ? `${savedInviteCode} で認証済み`
+                      : "認証済み"}
                   </span>
                 ) : (
                   <span style={{ color: "#ff6b6b" }}>未認証</span>
@@ -459,7 +473,7 @@ export default function SettingsModal() {
                   ログアウト
                 </button>
               ) : (
-                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+                <>
                   <button
                     onClick={handleOpenRouterLogin}
                     className="login-button add-button"
@@ -467,9 +481,12 @@ export default function SettingsModal() {
                   >
                     {isOpenRouterLoading ? "認証中..." : "OpenRouterでログイン"}
                   </button>
-                  
-                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                    <span style={{ color: "rgba(255, 255, 255, 0.6)" }}>または</span>
+
+                  <div style={{ color: "rgba(255, 255, 255, 0.6)" }}>
+                    または
+                  </div>
+
+                  <div className="invite-code-input">
                     <input
                       type="text"
                       placeholder="招待コード"
@@ -502,14 +519,17 @@ export default function SettingsModal() {
                       {isValidatingInviteCode ? "検証中..." : "使用"}
                     </button>
                   </div>
-                </div>
+                </>
               )}
             </div>
           </div>
         </div>
 
         {/* GitHub Gist Authentication */}
-        <div className="auth-section settings-input-area" style={{ marginTop: "2rem" }}>
+        <div
+          className="auth-section settings-input-area"
+          style={{ marginTop: "2rem" }}
+        >
           <div className="auth-item">
             <div className="auth-info">
               <h4>GitHub Gist</h4>

@@ -1418,6 +1418,10 @@ html:has(body[data-software-keyboard="true"]) {
     }
   }
 
+  .invite-code-input {
+    display: flex;
+  }
+
   .add-button {
     height: 2.8em;
     padding: 0 1.2em;
@@ -2690,7 +2694,11 @@ textarea[data-fieldsizing="content"] {
         .auth-actions {
           flex-shrink: 0; // ボタンエリアの縮小を防ぐ
           display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
           align-items: center;
+          width: fit-content;
+          // width: 50%;
 
           .login-button,
           .logout-button {

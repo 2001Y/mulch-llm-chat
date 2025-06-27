@@ -428,6 +428,10 @@
           border-color: rgba(255, 255, 255, 0.15);
         }
 
+        .tool-edit-form {
+          width: 100%;
+        }
+
         .tool-display {
           display: flex;
           justify-content: space-between;
@@ -437,18 +441,7 @@
           position: relative;
           padding-right: 3.5rem;
           transition: all 0.2s ease;
-
-          &:hover {
-            background: rgba(255, 255, 255, 0.08);
-            margin: 0 -1rem;
-            padding-left: 1rem;
-            padding-right: 4.5rem;
-
-            .edit-indicator {
-              opacity: 1;
-              transform: translateX(0);
-            }
-          }
+          width: 100%;
 
           .tool-info {
             flex: 1;
@@ -485,7 +478,7 @@
             right: 0;
             top: 50%;
             transform: translateY(-50%);
-            z-index: 1;
+            z-index: 10;
 
             // iOS style toggle switch
             .toggle-switch {
@@ -494,11 +487,16 @@
               width: 51px;
               height: 31px;
               cursor: pointer;
+              pointer-events: all;
+              padding: 5px;
+              margin: -5px;
+              user-select: none;
 
               input {
                 opacity: 0;
                 width: 0;
                 height: 0;
+                pointer-events: none;
               }
 
               .toggle-slider {
@@ -536,18 +534,6 @@
                 }
               }
             }
-          }
-
-          .disabled-badge {
-            display: inline-block;
-            margin-left: 0.5rem;
-            padding: 0.1rem 0.4rem;
-            background: rgba(255, 59, 48, 0.2);
-            border: 1px solid rgba(255, 59, 48, 0.3);
-            border-radius: 4px;
-            color: rgba(255, 59, 48, 0.9);
-            font-size: 0.75rem;
-            font-weight: 500;
           }
         }
 

@@ -127,6 +127,19 @@ export default function Responses({
     });
   }
 
+  // メッセージ内容の詳細ログを追加（assistantメッセージのみ）
+  useEffect(() => {
+    messages.forEach((msg) => {
+      if (msg.role === "assistant") {
+        console.debug(
+          `[DEBUG ChatResponses] AssistantMsg id=${msg.id}, len=${
+            (msg.content as string | undefined)?.length || 0
+          }, isGenerating=${msg.ui?.isGenerating}`
+        );
+      }
+    });
+  }, [messages]);
+
   return (
     <>
       {groupedMessages.map((group, groupIndex) => {

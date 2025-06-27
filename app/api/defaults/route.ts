@@ -217,11 +217,6 @@ export async function GET() {
             "openai/gpt-4o-mini",
             "google/gemini-2.5-flash-preview",
             "x-ai/grok-3-mini-beta",
-            "groq/deepseek-r1-distill-llama-70b",
-            "groq/llama-4-maverick-17b-128e-instruct",
-            "groq/qwen-qwq-32b",
-            "groq/gemma2-9b-it",
-            "groq/mistral-saba-24b",
           ],
         },
         オープンソース: {
