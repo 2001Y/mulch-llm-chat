@@ -1075,9 +1075,17 @@ export function useChatLogic({
               },
             };
 
+            console.debug(
+              `[resumeLLMGeneration] streamText() へリクエスト送信: model=${modelIdForApi}`,
+              streamOptions
+            );
             const result = await streamText(streamOptions);
 
-            for await (const delta of result.fullStream) {
+            for await (const rawChunk of result.fullStream) {
+              // フルストリームのチャンクは { part, partialOutput } 形式の場合があるため、
+              // part が存在する場合はそちらを優先的に参照する
+              const delta: any = (rawChunk as any).part ?? rawChunk;
+
               if (delta.type === "text-delta") {
                 accumulatedText += delta.textDelta;
 
@@ -1105,7 +1113,28 @@ export function useChatLogic({
             }
           } catch (err: any) {
             console.error(`[Stream Error] model=${modelIdForApi}`, err);
-            accumulatedText += `\n(エラー: ${err.message})`;
+
+            // HTTP ステータスが取れる場合は抽出 (fetch レスポンス or error オブジェクト)
+            const status = err?.response?.status || err?.status;
+            const isAuthError =
+              status === 401 || /401/.test(err?.message || "");
+
+            if (isAuthError) {
+              console.warn(
+                "[Stream Error] 401 Unauthorized を検出 – API キーを確認してください"
+              );
+              setApiKeyError(
+                "OpenRouter APIキーが無効、またはアクセス権がありません (401)。設定を確認してください。"
+              );
+            } else {
+              setError(
+                `モデル ${modelIdForApi} でエラーが発生しました: ${
+                  err.message || status
+                }`
+              );
+            }
+
+            accumulatedText += `\n(エラー: ${err.message || status})`;
           } finally {
             const finalMsg: AppMessage & { role: "assistant"; id: string } = {
               id: assistantMessageId,
@@ -2385,8 +2414,10 @@ export function useChatLogic({
 
         const result = await streamText(streamOptions);
 
-        for await (const delta of result.fullStream) {
-          console.log(`[Regenerate Stream Delta] Type: ${delta.type}`, delta);
+        for await (const rawChunk of result.fullStream) {
+          // フルストリームのチャンクは { part, partialOutput } 形式の場合があるため、
+          // part が存在する場合はそちらを優先的に参照する
+          const delta: any = (rawChunk as any).part ?? rawChunk;
 
           if (delta.type === "text-delta") {
             accumulatedText += delta.textDelta;
@@ -2468,10 +2499,26 @@ export function useChatLogic({
             `Error during regeneration for ${assistantMessageId}:`,
             err
           );
-          accumulatedText += `\n(エラー: ${err.message})`;
-          setError(
-            `モデル ${modelIdToRegenerate} での再生成エラー: ${err.message}`
-          );
+
+          const status = err?.response?.status || err?.status;
+          const isAuthError = status === 401 || /401/.test(err?.message || "");
+
+          if (isAuthError) {
+            console.warn(
+              "[Regenerate] 401 Unauthorized を検出 – API キーを確認してください"
+            );
+            setApiKeyError(
+              "OpenRouter APIキーが無効、またはアクセス権がありません (401)。設定を確認してください。"
+            );
+          } else {
+            setError(
+              `モデル ${modelIdToRegenerate} での再生成エラー: ${
+                err.message || status
+              }`
+            );
+          }
+
+          accumulatedText += `\n(エラー: ${err.message || status})`;
         }
       } finally {
         setMessages((prevMsgs) =>
