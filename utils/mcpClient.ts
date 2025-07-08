@@ -6,17 +6,48 @@
   - 他モジュールはこのクライアントを import して `invoke` などのSDKメソッドを利用してください。
 */
 
-// TypeScript 型がまだ提供されていない環境でのコンパイルエラーを防ぐ
+// MCP SDK の Client クラスを使用
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import { createClient } from "@modelcontextprotocol/typescript-sdk";
+import { Client } from "@modelcontextprotocol/sdk/client";
 
-// サーバーURL と トークンはビルド時/実行時に設定する
-const SERVER_URL =
-  process.env.NEXT_PUBLIC_MCP_SERVER ?? "https://your-mcp-server.example.com";
-const MCP_TOKEN = process.env.NEXT_PUBLIC_MCP_TOKEN;
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp";
 
-export const mcpClient = createClient({
-  server: SERVER_URL,
-  auth: MCP_TOKEN ? { bearer: MCP_TOKEN } : undefined,
-});
+// create singleton client helper
+function createMcpClient() {
+  // デフォルトで利用可能な公開MCPサーバー(AWS News MCP)
+  // NEXT_PUBLIC_MCP_SERVER が未設定の場合はこのエンドポイントを利用する
+  const SERVER_URL =
+    process.env.NEXT_PUBLIC_MCP_SERVER ??
+    "https://demo.mcp.run/echo/streamableHttp"; // 公式デモサーバー（CORS許可済み）
+  const MCP_TOKEN = process.env.NEXT_PUBLIC_MCP_TOKEN;
+
+  // initialize client
+  const client = new Client({ name: "mulch-client", version: "0.1.0" });
+
+  const transport = new StreamableHTTPClientTransport(new URL(SERVER_URL), {
+    headers: MCP_TOKEN ? { Authorization: `Bearer ${MCP_TOKEN}` } : undefined,
+  });
+
+  // connect lazily when first used
+  let isConnected = false;
+
+  async function ensureConnected() {
+    if (!isConnected) {
+      await client.connect(transport);
+      isConnected = true;
+    }
+  }
+
+  return {
+    async invoke(toolName: string, args: any) {
+      await ensureConnected();
+      const result = await client.callTool({ name: toolName, arguments: args });
+      return result;
+    },
+  };
+}
+
+export const mcpClient = createMcpClient();

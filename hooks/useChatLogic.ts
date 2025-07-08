@@ -657,25 +657,29 @@ export function useChatLogic({
       return;
     }
 
-    // メッセージがあり、処理中でない場合またはメッセージ数が増えた場合はバックアップを更新
+    // --- バックアップ & 履歴保存 ---
     if (messages.length > 0) {
-      // 最後のメッセージの時間を確認して、古いバックアップを上書きしないようにする
-      const lastMessageTime = messages[messages.length - 1]?.timestamp || 0;
+      const anyGenerating = messages.some(
+        (msg) => msg.role === "assistant" && msg.ui?.isGenerating === true
+      );
 
-      if (
-        !isProcessingRef.current ||
-        lastMessageTime > lastValidMessagesTimestampRef.current
-      ) {
-        console.log(
-          `[useEffect messages] 最新メッセージをバックアップ: role=${
-            messages[messages.length - 1].role
-          }, id=${
-            messages[messages.length - 1].id
-          }, timestamp=${lastMessageTime}`
-        );
+      // 生成が完了した（全メッセージ isGenerating=false）か、処理中でない場合のみバックアップ
+      if (!anyGenerating) {
+        const lastMessageTime = messages[messages.length - 1]?.timestamp || 0;
 
-        messagesBackupRef.current = [...messages];
-        lastValidMessagesTimestampRef.current = lastMessageTime;
+        if (lastMessageTime > lastValidMessagesTimestampRef.current) {
+          console.log(
+            `[useEffect messages] バックアップ＆履歴保存: id=${
+              messages[messages.length - 1].id
+            }, timestamp=${lastMessageTime}`
+          );
+
+          messagesBackupRef.current = [...messages];
+          lastValidMessagesTimestampRef.current = lastMessageTime;
+
+          // ローカルストレージへ保存
+          saveMessagesToHistory(messages);
+        }
       }
     }
   }, [messages, addOptimisticMessage]);
@@ -1024,10 +1028,23 @@ export function useChatLogic({
           content: msg.content as string,
         }));
 
-      setIsGenerating(true);
+      console.debug("[State] setIsGenerating(true) ─ start stream");
+      setIsGenerating(true); // 全体的な生成中フラグも立てる
 
       // 各生成中メッセージに対してLLM処理を開始
       for (const placeholder of generatingMessages) {
+        // --- 多重呼び出し防止ガード ---
+        if ((placeholder.ui as any)?.toolInvoked) {
+          console.log(
+            `[resumeLLMGeneration] Skip already invoked ${placeholder.id}`
+          );
+          continue;
+        }
+        placeholder.ui = {
+          ...(placeholder.ui || {}),
+          toolInvoked: true,
+        } as any;
+
         const assistantMessageId = placeholder.id;
         const modelIdForApi = placeholder.ui?.modelId;
 
@@ -1061,12 +1078,18 @@ export function useChatLogic({
                 ? convertToAISDKTools(extendedTools)
                 : undefined;
 
-            const streamOptions = {
+            // === 追加デバッグ: ツールセット確認 ===
+            console.log(
+              `[ToolDebug] aiSDKTools keys:`,
+              aiSDKTools ? Object.keys(aiSDKTools) : []
+            );
+
+            const streamOptions: any = {
               model: providerModel,
-              messages: historyForApi,
-              system:
-                "あなたは日本語で対応する親切なアシスタントです。利用可能なツールがある場合は積極的に使用してください。",
-              ...(aiSDKTools && { tools: aiSDKTools }),
+              messages: historyForApi, // ここはユーザープロンプトを含む履歴
+              system: "あなたは日本語で対応する親切なアシスタントです。",
+              ...(aiSDKTools &&
+                Object.keys(aiSDKTools).length > 0 && { tools: aiSDKTools }),
               headers: {
                 "X-Title": "Mulch LLM Chat",
                 ...(typeof window !== "undefined" && {
@@ -1074,6 +1097,9 @@ export function useChatLogic({
                 }),
               },
             };
+            if (aiSDKTools && Object.keys(aiSDKTools).length > 0) {
+              streamOptions.tool_choice = "auto";
+            }
 
             console.debug(
               `[resumeLLMGeneration] streamText() へリクエスト送信: model=${modelIdForApi}`,
@@ -1084,8 +1110,10 @@ export function useChatLogic({
             for await (const rawChunk of result.fullStream) {
               // フルストリームのチャンクは { part, partialOutput } 形式の場合があるため、
               // part が存在する場合はそちらを優先的に参照する
+              console.debug("[RAW chunk]", rawChunk);
               const delta: any = (rawChunk as any).part ?? rawChunk;
 
+              console.debug("[Stream delta]", delta.type, delta);
               if (delta.type === "text-delta") {
                 accumulatedText += delta.textDelta;
 
@@ -1110,6 +1138,80 @@ export function useChatLogic({
                   )
                 );
               }
+              // ----- ツール呼び出し -----
+              else if (
+                delta.type === "tool-call" ||
+                delta.type === "toolCall"
+              ) {
+                const jsonStr = JSON.stringify(
+                  delta.args ?? delta.arguments ?? {},
+                  null,
+                  2
+                );
+                accumulatedText += `\n\n**🔧 tool-call**\n\`\`\`json\n${jsonStr}\n\`\`\`\n`;
+
+                const payload: AppMessage & { role: "assistant"; id: string } =
+                  {
+                    id: assistantMessageId,
+                    role: "assistant",
+                    content: accumulatedText,
+                    timestamp: Date.now(),
+                    ui: { modelId: modelIdForApi, isGenerating: true },
+                  };
+
+                safeOptimisticUpdate({
+                  type: "updateLlmResponse",
+                  updatedAssistantMessage: payload,
+                });
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMessageId && m.role === "assistant"
+                      ? payload
+                      : m
+                  )
+                );
+              }
+              // ----- ツール結果 -----
+              else if (
+                delta.type === "tool-result" ||
+                delta.type === "toolResult"
+              ) {
+                const jsonStr = JSON.stringify(
+                  delta.result ?? delta.toolResult ?? {},
+                  null,
+                  2
+                );
+                accumulatedText += `\n\n**✅ tool-result**\n\`\`\`json\n${jsonStr}\n\`\`\`\n`;
+
+                const payload: AppMessage & { role: "assistant"; id: string } =
+                  {
+                    id: assistantMessageId,
+                    role: "assistant",
+                    content: accumulatedText,
+                    timestamp: Date.now(),
+                    ui: { modelId: modelIdForApi, isGenerating: true },
+                  };
+
+                safeOptimisticUpdate({
+                  type: "updateLlmResponse",
+                  updatedAssistantMessage: payload,
+                });
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMessageId && m.role === "assistant"
+                      ? payload
+                      : m
+                  )
+                );
+              } else if (delta.type === "finish") {
+                // ストリーミング完了
+                console.log(
+                  `[Regenerate Stream] Finished for model: ${modelIdForApi}`
+                );
+                console.debug(
+                  "[State] setIsGenerating(false) ─ finish stream (pending)"
+                );
+              }
             }
           } catch (err: any) {
             console.error(`[Stream Error] model=${modelIdForApi}`, err);
@@ -1126,6 +1228,14 @@ export function useChatLogic({
               setApiKeyError(
                 "OpenRouter APIキーが無効、またはアクセス権がありません (401)。設定を確認してください。"
               );
+              // --- 追加: 無効なAPIキーを検出した場合の処理 ---
+              // ローカルストレージからAPIキーおよび招待コードを削除し、全コンポーネントへ通知
+              storage.remove("openrouter_api_key");
+              setOpenRouterApiKey(undefined);
+              window.dispatchEvent(new Event("tokenChange"));
+              // 設定モーダルを自動で開く
+              setIsModalOpen(true);
+              // --- 追加ここまで ---
               accumulatedText =
                 "🔒 認証エラー: OpenRouter APIキーが無効、またはアクセス権がありません (401)。設定画面でキーを確認してください。";
             } else {
@@ -1163,6 +1273,9 @@ export function useChatLogic({
               const nc = { ...prev };
               delete nc[assistantMessageId];
               if (Object.keys(nc).length === 0) {
+                console.debug(
+                  "[State] setIsGenerating(false) ─ finish stream (pending)"
+                );
                 setIsGenerating(false);
                 isProcessingRef.current = false;
               }
@@ -2353,6 +2466,7 @@ export function useChatLogic({
             : {}),
         }));
 
+      console.debug("[State] setIsGenerating(true) ─ start stream");
       setIsGenerating(true); // 全体的な生成中フラグも立てる
       // 対象のアシスタントメッセージのisGeneratingをtrueに更新
       setMessages((prevMsgs) =>
@@ -2388,11 +2502,12 @@ export function useChatLogic({
             ? convertToAISDKTools(extendedTools)
             : undefined;
 
-        const streamOptions = {
+        const streamOptions: any = {
           model: providerModel,
           messages: historyForApi, // ここはユーザープロンプトを含む履歴
           system: "あなたは日本語で対応する親切なアシスタントです。",
-          ...(aiSDKTools && aiSDKTools.length > 0 && { tools: aiSDKTools }), // ツールがある場合のみ追加
+          ...(aiSDKTools &&
+            Object.keys(aiSDKTools).length > 0 && { tools: aiSDKTools }),
           headers: {
             "X-Title": "Mulch LLM Chat",
             ...(typeof window !== "undefined" && {
@@ -2400,6 +2515,9 @@ export function useChatLogic({
             }),
           },
         };
+        if (aiSDKTools && Object.keys(aiSDKTools).length > 0) {
+          streamOptions.tool_choice = "auto";
+        }
 
         // === Tools検証用ログ追加（再生成時） ===
         if (extendedTools && extendedTools.length > 0) {
@@ -2420,8 +2538,9 @@ export function useChatLogic({
         for await (const rawChunk of result.fullStream) {
           // フルストリームのチャンクは { part, partialOutput } 形式の場合があるため、
           // part が存在する場合はそちらを優先的に参照する
+          console.debug("[RAW chunk]", rawChunk);
           const delta: any = (rawChunk as any).part ?? rawChunk;
-
+          console.debug("[Stream delta]", delta.type, delta);
           if (delta.type === "text-delta") {
             accumulatedText += delta.textDelta;
             setMessages((prevMsgs) =>
@@ -2439,50 +2558,60 @@ export function useChatLogic({
                   : m
               )
             );
-          } else if (delta.type === "tool-call") {
-            // ツール呼び出しの開始
-            accumulatedText += `\n\n**🔧 ツール実行中: ${delta.toolName}**\n`;
-            accumulatedText += `引数:\n\`\`\`json\n${JSON.stringify(
-              delta.args,
+          } else if (delta.type === "tool-call" || delta.type === "toolCall") {
+            const jsonStr = JSON.stringify(
+              delta.args ?? delta.arguments ?? {},
               null,
               2
-            )}\n\`\`\`\n`;
+            );
+            accumulatedText += `\n\n**🔧 tool-call**\n\`\`\`json\n${jsonStr}\n\`\`\`\n`;
 
-            setMessages((prevMsgs) =>
-              prevMsgs.map((m) =>
-                m.id === assistantMessageId
-                  ? {
-                      ...m,
-                      content: accumulatedText,
-                      ui: {
-                        ...(m.ui || {}),
-                        isGenerating: true,
-                        modelId: modelIdToRegenerate,
-                      },
-                    }
+            const payload: AppMessage & { role: "assistant"; id: string } = {
+              id: assistantMessageId,
+              role: "assistant",
+              content: accumulatedText,
+              timestamp: Date.now(),
+              ui: { modelId: modelIdToRegenerate, isGenerating: true },
+            };
+
+            safeOptimisticUpdate({
+              type: "updateLlmResponse",
+              updatedAssistantMessage: payload,
+            });
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantMessageId && m.role === "assistant"
+                  ? payload
                   : m
               )
             );
-          } else if (delta.type === "tool-result") {
-            // ツール実行結果
-            accumulatedText += `\n**📋 実行結果:**\n\`\`\`json\n${JSON.stringify(
-              delta.result,
+          } else if (
+            delta.type === "tool-result" ||
+            delta.type === "toolResult"
+          ) {
+            const jsonStr = JSON.stringify(
+              delta.result ?? delta.toolResult ?? {},
               null,
               2
-            )}\n\`\`\`\n\n`;
+            );
+            accumulatedText += `\n\n**✅ tool-result**\n\`\`\`json\n${jsonStr}\n\`\`\`\n`;
 
-            setMessages((prevMsgs) =>
-              prevMsgs.map((m) =>
-                m.id === assistantMessageId
-                  ? {
-                      ...m,
-                      content: accumulatedText,
-                      ui: {
-                        ...(m.ui || {}),
-                        isGenerating: true,
-                        modelId: modelIdToRegenerate,
-                      },
-                    }
+            const payload: AppMessage & { role: "assistant"; id: string } = {
+              id: assistantMessageId,
+              role: "assistant",
+              content: accumulatedText,
+              timestamp: Date.now(),
+              ui: { modelId: modelIdToRegenerate, isGenerating: true },
+            };
+
+            safeOptimisticUpdate({
+              type: "updateLlmResponse",
+              updatedAssistantMessage: payload,
+            });
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantMessageId && m.role === "assistant"
+                  ? payload
                   : m
               )
             );
@@ -2490,6 +2619,9 @@ export function useChatLogic({
             // ストリーミング完了
             console.log(
               `[Regenerate Stream] Finished for model: ${modelIdToRegenerate}`
+            );
+            console.debug(
+              "[State] setIsGenerating(false) ─ finish stream (pending)"
             );
           }
         }
@@ -2513,6 +2645,14 @@ export function useChatLogic({
             setApiKeyError(
               "OpenRouter APIキーが無効、またはアクセス権がありません (401)。設定を確認してください。"
             );
+            // --- 追加: 無効なAPIキーを検出した場合の処理 ---
+            // ローカルストレージからAPIキーおよび招待コードを削除し、全コンポーネントへ通知
+            storage.remove("openrouter_api_key");
+            setOpenRouterApiKey(undefined);
+            window.dispatchEvent(new Event("tokenChange"));
+            // 設定モーダルを自動で開く
+            setIsModalOpen(true);
+            // --- 追加ここまで ---
             accumulatedText =
               "🔒 認証エラー: OpenRouter APIキーが無効、またはアクセス権がありません (401)。設定画面でキーを確認してください。";
           } else {
@@ -2548,6 +2688,9 @@ export function useChatLogic({
           delete newControllers[assistantMessageId];
           // 他に生成中のものがなければ全体のisGeneratingをfalseに
           if (Object.keys(newControllers).length === 0) {
+            console.debug(
+              "[State] setIsGenerating(false) ─ all controllers done"
+            );
             setIsGenerating(false);
             isProcessingRef.current = false;
           }

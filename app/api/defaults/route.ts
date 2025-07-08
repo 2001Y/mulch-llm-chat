@@ -165,6 +165,25 @@ export async function GET() {
           enabled: true,
           category: "金融",
         },
+        {
+          type: "function",
+          function: {
+            name: "echo",
+            description: "送られた message をそのまま返す公式デモMCPツール",
+            parameters: {
+              type: "object",
+              properties: {
+                message: {
+                  type: "string",
+                  description: "エコーしたい文字列",
+                },
+              },
+              required: ["message"],
+            },
+          },
+          enabled: true,
+          category: "MCP",
+        },
       ],
       // カテゴリ別プリセット
       categories: {

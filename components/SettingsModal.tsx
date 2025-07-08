@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import BaseModal from "./BaseModal";
-import useStorageState from "hooks/useLocalStorage";
 import { useChatLogicContext } from "contexts/ChatLogicContext";
 import { storage } from "hooks/useLocalStorage";
 import { toast } from "sonner";
@@ -30,30 +29,22 @@ export default function SettingsModal() {
 
   // 招待コード関連の状態
   const [inviteCode, setInviteCode] = useState("");
-  const [isInviteCodeMode, setIsInviteCodeMode] = useState(false);
   const [isValidatingInviteCode, setIsValidatingInviteCode] = useState(false);
-  const [savedInviteCode, setSavedInviteCode] = useState("");
 
   useEffect(() => {
     setMounted(true);
     // 初期状態を設定
     const openRouterToken = storage.get("openrouter_api_key");
     const githubToken = storage.getGistToken();
-    const storedInviteCode = storage.get("invite_code");
 
     console.log(
       "[SettingsModal] 初期状態設定 - OpenRouterトークン:",
       openRouterToken
     );
     console.log("[SettingsModal] 初期状態設定 - GitHubトークン:", githubToken);
-    console.log("[SettingsModal] 初期状態設定 - 招待コード:", storedInviteCode);
 
-    setIsOpenRouterLoggedIn(!!openRouterToken || !!storedInviteCode);
+    setIsOpenRouterLoggedIn(!!openRouterToken);
     setIsGitHubLoggedIn(!!githubToken);
-    setIsInviteCodeMode(!!storedInviteCode);
-    if (storedInviteCode) {
-      setSavedInviteCode(storedInviteCode);
-    }
 
     // Safari用: ページ読み込み時に認証完了をチェック
     const urlParams = new URLSearchParams(window.location.search);
@@ -79,17 +70,8 @@ export default function SettingsModal() {
   useEffect(() => {
     const handleTokenChange = () => {
       const token = storage.get("openrouter_api_key");
-      const storedInviteCode = storage.get("invite_code");
       console.log("[SettingsModal] tokenChangeイベント受信 - トークン:", token);
-      console.log(
-        "[SettingsModal] tokenChangeイベント受信 - 招待コード:",
-        storedInviteCode
-      );
-      setIsOpenRouterLoggedIn(!!token || !!storedInviteCode);
-      setIsInviteCodeMode(!!storedInviteCode);
-      if (storedInviteCode) {
-        setSavedInviteCode(storedInviteCode);
-      }
+      setIsOpenRouterLoggedIn(!!token);
     };
 
     const handleStorageChange = () => {
@@ -128,11 +110,8 @@ export default function SettingsModal() {
 
         storage.set("openrouter_api_key", token);
 
-        // 招待コードモードを解除
-        storage.remove("invite_code");
-        setIsInviteCodeMode(false);
+        // 招待コード由来かどうかは気にせず、APIキー保存のみ
         setInviteCode("");
-        setSavedInviteCode("");
 
         console.log(
           "[SettingsModal] 保存後のローカルストレージ状態:",
@@ -230,11 +209,8 @@ export default function SettingsModal() {
       }
 
       storage.set("openrouter_api_key", apiKey);
-      storage.remove("invite_code"); // 旧招待コードを削除
 
-      setIsInviteCodeMode(false);
-      setIsOpenRouterLoggedIn(true);
-      setSavedInviteCode("");
+      setInviteCode("");
 
       // 他コンポーネントへ状態変更を通知
       window.dispatchEvent(new Event("tokenChange"));
@@ -351,10 +327,7 @@ export default function SettingsModal() {
   // OpenRouter ログアウト処理
   const handleOpenRouterLogout = () => {
     storage.remove("openrouter_api_key");
-    storage.remove("invite_code");
-    setIsInviteCodeMode(false);
     setInviteCode("");
-    setSavedInviteCode("");
     window.dispatchEvent(new Event("tokenChange"));
     window.location.reload();
   };
@@ -448,12 +421,7 @@ export default function SettingsModal() {
               <div className="auth-status">
                 ステータス:{" "}
                 {isOpenRouterLoggedIn ? (
-                  <span style={{ color: "#00ff00" }}>
-                    ✓{" "}
-                    {isInviteCodeMode
-                      ? `${savedInviteCode} で認証済み`
-                      : "認証済み"}
-                  </span>
+                  <span style={{ color: "#00ff00" }}>✓ 認証済み</span>
                 ) : (
                   <span style={{ color: "#ff6b6b" }}>未認証</span>
                 )}

@@ -7,7 +7,6 @@ import styles from "@/styles/ChatList.module.scss";
 import { useChats } from "hooks/useLocalStorage";
 import { storage } from "hooks/useLocalStorage";
 import { navigateWithTransition } from "@/utils/navigation";
-import GistConnectionModal from "./GistConnectionModal";
 import ChatItemContent from "./ChatItemContent";
 import ShareChatModal from "./ShareChatModal";
 import {
@@ -33,7 +32,6 @@ export default function ChatList({ onRequestShare }: ChatListProps) {
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const { chatIds } = useChats();
-  const [showGistModal, setShowGistModal] = useState<boolean>(false);
   const [shareStatus, setShareStatus] = useState<ShareStatus | null>(null);
   const [isShareModalOpen, setShareModalOpen] = useState(false);
   const [currentChatIdForShare, setCurrentChatIdForShare] = useState<
@@ -52,7 +50,6 @@ export default function ChatList({ onRequestShare }: ChatListProps) {
         console.log("GitHub OAuth成功 (postMessage):");
         storage.set("gistToken", token);
         storage.set("gistOAuthSuccess", "true");
-        setShowGistModal(false);
         alert("GitHubアカウントとの連携に成功しました。");
 
         if (selectedChatForSharing) {
@@ -65,7 +62,6 @@ export default function ChatList({ onRequestShare }: ChatListProps) {
       } else if (type === "github_oauth_error") {
         console.error("GitHub OAuthエラー (postMessage):", error);
         alert(`GitHub連携エラー: ${error || "不明なエラー"}`);
-        setShowGistModal(false);
       }
     };
 
@@ -145,8 +141,7 @@ export default function ChatList({ onRequestShare }: ChatListProps) {
 
     const gistToken = storage.getGistToken();
     if (!gistToken) {
-      setSelectedChatForSharing(chatId);
-      setShowGistModal(true);
+      alert("GitHub連携が必要です。設定画面から連携してください。");
       return;
     }
 
@@ -171,17 +166,6 @@ export default function ChatList({ onRequestShare }: ChatListProps) {
     setCurrentChatIdForShare(chatId);
     setShareModalOpen(true);
     setActiveMenu(null);
-  };
-
-  const handleGistConnectSuccess = () => {
-    setShowGistModal(false);
-    if (selectedChatForSharing) {
-      console.log(
-        "OAuth成功後、再度共有処理を実行します。",
-        selectedChatForSharing
-      );
-      openShareModal(selectedChatForSharing);
-    }
   };
 
   const handlePublish = async () => {
@@ -300,12 +284,6 @@ export default function ChatList({ onRequestShare }: ChatListProps) {
           </Link>
         ))}
       </div>
-      {showGistModal && (
-        <GistConnectionModal
-          closeModal={() => setShowGistModal(false)}
-          onSuccess={handleGistConnectSuccess}
-        />
-      )}
 
       {/* シェアモーダル */}
       {isShareModalOpen && shareStatus && (

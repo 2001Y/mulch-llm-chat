@@ -1,4 +1,7 @@
-import React, { useEffect, useRef } from "react";
+"use client";
+import React from "react";
+// @ts-ignore - vaul の型が未インストールの場合は一時的に無視
+import { Drawer } from "vaul";
 
 interface BaseModalProps {
   isOpen: boolean;
@@ -8,6 +11,7 @@ interface BaseModalProps {
   className?: string;
 }
 
+// Vaul Drawer をモーダル用途でラップ
 export default function BaseModal({
   isOpen,
   onClose,
@@ -15,59 +19,47 @@ export default function BaseModal({
   children,
   className = "",
 }: BaseModalProps) {
-  const modalRef = useRef<HTMLDivElement>(null);
-
-  // ESCキーで閉じる
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && isOpen) {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener("keydown", handleKeyDown);
-      // モーダルが開いたときに背景のスクロールを無効化
-      document.body.style.overflow = "hidden";
-    }
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "";
-    };
-  }, [isOpen, onClose]);
-
-  // 背景クリックで閉じる
-  const handleBackdropClick = (event: React.MouseEvent) => {
-    if (event.target === event.currentTarget) {
-      onClose();
-    }
-  };
-
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <div
-      className={`modal-backdrop ${className}`}
-      onClick={handleBackdropClick}
-      ref={modalRef}
+    <Drawer.Root
+      open={isOpen}
+      onOpenChange={(open: boolean) => {
+        if (!open) onClose();
+      }}
     >
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 className="modal-title">{title}</h2>
-          <button
-            type="button"
-            className="modal-close-button"
-            onClick={onClose}
-            aria-label="Close modal"
-          >
-            ×
-          </button>
-        </div>
-        <div className="modal-body">{children}</div>
-      </div>
-    </div>
+      <Drawer.Portal>
+        {/* Overlay */}
+        <Drawer.Overlay className={`modal-backdrop ${className}`} />
+
+        {/* Content */}
+        <Drawer.Content
+          className="modal-content"
+          // モーダル中央固定にするため、既存スタイルを流用
+          // Vaul は bottom からの Drawer 表示がデフォルトだが、モーダルとして中央表示する
+          style={{
+            position: "fixed",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            maxHeight: "90vh",
+            overflowY: "auto",
+            zIndex: 1001,
+          }}
+        >
+          <div className="modal-header">
+            <h2 className="modal-title">{title}</h2>
+            <Drawer.Close asChild>
+              <button
+                type="button"
+                className="modal-close-button"
+                aria-label="Close modal"
+              >
+                ×
+              </button>
+            </Drawer.Close>
+          </div>
+          <div className="modal-body">{children}</div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
   );
 }

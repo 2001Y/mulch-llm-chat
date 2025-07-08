@@ -10,7 +10,6 @@ import ModelModal from "./ModelModal";
 import ModelSelectorSlideout from "./ModelSelectorSlideout";
 import ToolsModal from "./ToolsModal";
 import ShareChatModal from "./ShareChatModal";
-import GistConnectionModal from "./GistConnectionModal";
 import {
   getShareStatus,
   publishChat,
@@ -55,7 +54,6 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
     null
   );
   const [isShareModalOpen, setShareModalOpen] = React.useState(false);
-  const [showGistModal, setShowGistModal] = React.useState(false);
 
   const openShareModal = async (targetChatId?: string) => {
     const chatId = targetChatId || roomId || "default";
@@ -80,14 +78,12 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
       if (type === "github_oauth_success" && token) {
         storage.set("gistToken", token);
         storage.set("gistOAuthSuccess", "true");
-        setShowGistModal(false);
         alert(
           "GitHubアカウントとの連携に成功しました。再度シェアを実行してください。"
         );
       } else if (type === "github_oauth_error") {
         console.error("GitHub OAuthエラー (postMessage):", error);
         alert(`GitHub連携エラー: ${error || "不明なエラー"}`);
-        setShowGistModal(false);
       }
     };
 
@@ -99,7 +95,8 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
   const handleShare = () => {
     const gistToken = storage.getGistToken();
     if (!gistToken) {
-      setShowGistModal(true);
+      // GitHub 未連携 → 設定モーダルを開き連携を促す
+      handleOpenModal();
       return;
     }
     openShareModal();
@@ -269,15 +266,7 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
           onClose={handleCloseModelSelectorSlideout}
         />
         <ToolsModal isOpen={isToolsModalOpen} onClose={handleCloseToolsModal} />
-        {showGistModal && (
-          <GistConnectionModal
-            closeModal={() => setShowGistModal(false)}
-            onSuccess={() => {
-              setShowGistModal(false);
-              openShareModal();
-            }}
-          />
-        )}
+
         {/* シェアモーダル */}
         {isShareModalOpen && shareStatus && (
           <ShareChatModal
@@ -353,15 +342,7 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
           onClose={handleCloseModelSelectorSlideout}
         />
         <ToolsModal isOpen={isToolsModalOpen} onClose={handleCloseToolsModal} />
-        {showGistModal && (
-          <GistConnectionModal
-            closeModal={() => setShowGistModal(false)}
-            onSuccess={() => {
-              setShowGistModal(false);
-              openShareModal();
-            }}
-          />
-        )}
+
         {/* シェアモーダル */}
         {isShareModalOpen && shareStatus && (
           <ShareChatModal

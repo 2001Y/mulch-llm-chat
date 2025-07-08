@@ -24,10 +24,16 @@ export async function executeExtendedTool(
 
     // MCP カテゴリはリモート実行のため implementation が不要
     if (tool.category === "MCP") {
+      console.debug(
+        `[MCP] Invoking remote tool ${tool.function.name} with`,
+        args
+      );
       try {
         const result = await mcpClient.invoke(tool.function.name, args);
+        console.debug(`[MCP] Result for ${tool.function.name}:`, result);
         return { success: true, result };
       } catch (error: any) {
+        console.error(`[MCP] Error invoking ${tool.function.name}:`, error);
         return { success: false, error: error?.message || "MCP実行エラー" };
       }
     }
@@ -193,17 +199,26 @@ export function convertToAISDKTools(extendedTools: ExtendedTool[]) {
             `[Tool Execute] ${extTool.function.name} called with:`,
             args
           );
-          // ここで実際の実行を行う
-          const result = await executeExtendedTool(extTool, args);
-          console.log(
-            `[Tool Execute] ${extTool.function.name} result:`,
-            result
-          );
-          if (result.success) {
-            return result.result;
-          } else {
-            throw new Error(result.error);
+
+          const execResult = await executeExtendedTool(extTool, args);
+
+          // 成功時
+          if (execResult.success) {
+            console.log(
+              `[Tool Execute] ${extTool.function.name} success:`,
+              execResult.result
+            );
+            return execResult.result;
           }
+
+          // 失敗時：例外を投げずエラー内容を返却して LLM / UI へ伝搬させる
+          console.error(
+            `[Tool Execute] ${extTool.function.name} error:`,
+            execResult.error
+          );
+          return {
+            error: execResult.error ?? "Unknown tool execution error",
+          };
         },
       });
 

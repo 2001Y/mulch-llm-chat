@@ -23,7 +23,23 @@ import tippy, {
 } from "tippy.js"; // ★ tippy.js をインポート
 import MentionList, { MentionListProps } from "./MentionList"; // ★ MentionListProps もインポート
 import Placeholder from "@tiptap/extension-placeholder"; // ★ Placeholder拡張をインポート
+import ToolJsonBlock from "./editorExtensions/ToolJsonBlock";
 import "highlight.js/styles/a11y-dark.css"; // ★ CSSを直接インポートに戻す
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import { common, createLowlight } from "lowlight";
+const lowlight = createLowlight(common);
+
+// CodeBlockLowlight の NodeType 名を "codeBlock" に上書きして Markdown 拡張と同期させる
+// これにより tiptap-markdown のシリアライザが内容を欠落させる問題を回避
+// 型互換のため as any キャスト
+// prettier-ignore
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+const CodeBlock = (CodeBlockLowlight as any).extend({ name: "codeBlock" });
 
 interface ModelMentionItemForSuggestion {
   id: string; // モデルのフルID (例: openai/gpt-4o)
@@ -79,20 +95,24 @@ export const MarkdownTipTapEditor = forwardRef<
   ) => {
     const editor = useEditor({
       extensions: [
-        StarterKit.configure({
-          // StarterKitに含まれるMarkdown関連の拡張機能を無効化する場合があるため注意
-          // heading: { levels: [1, 2, 3] },
-        }),
-        Markdown.configure({
-          // tiptap-markdown 拡張の設定
-          html: true, // HTMLタグを許可するか (TiptapはHTMLも扱えるため、Markdown変換時に影響)
+        // 先に ToolJsonBlock を置き CodeBlock より高優先に
+        ToolJsonBlock,
+        StarterKit.configure({ codeBlock: false }),
+        CodeBlock.configure({ lowlight }),
+        // 型未定義プロパティ回避のため any キャスト
+        (Markdown as any).configure({
+          codeBlock: {
+            languageMatcher: (info: string | null) => {
+              if (info?.trim().startsWith("tooljson")) return "toolJson"; // NodeType name
+              return "codeBlock";
+            },
+          },
+          html: true,
           tightLists: true,
           tightListClass: "tight",
           bulletListMarker: "-",
-          linkify: true, // URLのようなテキストを自動でリンク化
-          breaks: true, // Markdown内の改行を<br>タグに変換
-          // transformPastedText: true, // Markdownをペーストした際に解釈する
-          // transformCopiedText: true, // コピー時にMarkdownとして取得する
+          linkify: true,
+          breaks: true,
         }),
         Image.configure({
           inline: false,
@@ -265,11 +285,33 @@ export const MarkdownTipTapEditor = forwardRef<
           "Current value prop from parent:",
           value
         );
+        // ドキュメント構造をデバッグ
+        console.debug(
+          "[MarkdownTipTapEditor] current doc JSON",
+          editor.getJSON()
+        );
+        console.debug("[MarkdownTipTapEditor] JSON block presence:", {
+          valueIncludesJson: value?.includes("```json") ?? false,
+          currentIncludesJson: currentMarkdown.includes("```json"),
+          valueLength: value?.length ?? 0,
+          currentLength: currentMarkdown.length,
+        });
         if (value !== currentMarkdown) {
-          console.log(
-            "[MarkdownTipTapEditor] onChange called because value and currentMarkdown differ."
-          );
-          onChange(currentMarkdown);
+          // ❶ 大幅短縮（≒内容欠落）が発生した場合はスキップして警告
+          if (currentMarkdown.length < value.length * 0.6) {
+            console.warn(
+              "[MarkdownTipTapEditor] Detected suspicious markdown shrink. Skip onChange.",
+              {
+                prevLen: value.length,
+                newLen: currentMarkdown.length,
+              }
+            );
+          } else {
+            console.log(
+              "[MarkdownTipTapEditor] onChange called because value and currentMarkdown differ."
+            );
+            onChange(currentMarkdown);
+          }
         } else {
           console.log(
             "[MarkdownTipTapEditor] onChange skipped because value and currentMarkdown are the same."

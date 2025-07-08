@@ -279,6 +279,14 @@ export default function Responses({
                         <MarkdownTipTapEditor
                           value={(response.content as string) || ""}
                           onChange={(newMarkdown) => {
+                            console.debug(
+                              "[ChatResponses] onChange assistant",
+                              {
+                                id: response.id,
+                                snippet: newMarkdown.slice(0, 120),
+                                length: newMarkdown.length,
+                              }
+                            );
                             if (response.id) {
                               updateAssistantMessageContent(
                                 response.id,
