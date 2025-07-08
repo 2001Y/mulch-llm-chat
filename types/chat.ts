@@ -21,7 +21,13 @@ export interface Tool {
 export interface ExtendedTool extends Tool {
   implementation?: string; // 実行可能なJavaScriptコード（文字列形式）
   enabled?: boolean; // ツールの有効/無効状態
-  category?: string; // ツールのカテゴリ（オプション）
+  /**
+   * ツールのカテゴリを明示的に指定します。
+   * - "Tool": 従来のローカル実装型ツール(Function Calling)
+   * - "MCP": Model Context Protocol(MCP) 経由でリモート実行されるツール
+   *  上記以外の文字列も許可しますが、省略時は "Tool" として扱われます。
+   */
+  category?: "Tool" | "MCP" | string;
 }
 
 // ツール実行結果の型

@@ -682,7 +682,8 @@ export default function InputSection({
               onClick={handleOpenToolsModal}
               className="action-button input-tools-button"
             >
-              {tools?.filter(tool => tool.enabled !== false).length || 0} Tools
+              {tools?.filter((tool) => tool.enabled !== false).length || 0}{" "}
+              Tools/MCP
             </button>
 
             {isGenerating ? (

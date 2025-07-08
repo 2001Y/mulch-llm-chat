@@ -1,6 +1,7 @@
 import { ExtendedTool, ToolExecutionResult } from "../types/chat";
 import { tool } from "ai";
 import { z } from "zod";
+import { mcpClient } from "./mcpClient";
 
 /**
  * 統合されたツールを実行する関数
@@ -21,7 +22,17 @@ export async function executeExtendedTool(
       };
     }
 
-    // 実行コードが設定されていない場合
+    // MCP カテゴリはリモート実行のため implementation が不要
+    if (tool.category === "MCP") {
+      try {
+        const result = await mcpClient.invoke(tool.function.name, args);
+        return { success: true, result };
+      } catch (error: any) {
+        return { success: false, error: error?.message || "MCP実行エラー" };
+      }
+    }
+
+    // カテゴリが Tool or その他の場合はローカル実行を要求
     if (!tool.implementation) {
       return {
         success: false,
@@ -138,15 +149,18 @@ export function convertToAISDKTools(extendedTools: ExtendedTool[]) {
 
   const validTools = extendedTools.filter((extTool) => {
     const isEnabled = extTool.enabled !== false;
+    const isMcp = extTool.category === "MCP";
     const hasImplementation = !!extTool.implementation;
 
     console.log(`[convertToAISDKTools] Tool "${extTool.function?.name}":`, {
       enabled: isEnabled,
-      hasImplementation: hasImplementation,
+      isMcp,
+      hasImplementation,
       implementation: extTool.implementation?.substring(0, 50) + "...",
     });
 
-    return isEnabled && hasImplementation;
+    // MCP カテゴリは implementation が不要
+    return isEnabled && (isMcp || hasImplementation);
   });
 
   console.log(

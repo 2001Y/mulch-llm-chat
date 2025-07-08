@@ -11,36 +11,18 @@ interface ToolsModalProps {
 export default function ToolsModal({ isOpen, onClose }: ToolsModalProps) {
   const { tools, updateTools } = useChatLogicContext();
   const [editingToolIndex, setEditingToolIndex] = useState<number | null>(null);
-  const [newToolDefinition, setNewToolDefinition] = useState("");
-  const [newToolImplementation, setNewToolImplementation] = useState("");
 
-  // ツールの追加
-  const handleAddTool = () => {
-    if (!newToolDefinition.trim()) return;
+  // 二重モーダル制御
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [addCategory, setAddCategory] = useState<"Tool" | "MCP">("Tool");
 
-    try {
-      const toolData = JSON.parse(newToolDefinition);
-      if (toolData.type && toolData.function) {
-        const newTool: ExtendedTool = {
-          type: toolData.type,
-          function: {
-            name: toolData.function.name,
-            description: toolData.function.description,
-            parameters: toolData.function.parameters,
-          },
-          implementation: newToolImplementation.trim() || undefined,
-          enabled: true,
-          category: toolData.category || "カスタム",
-        };
-        updateTools([...tools, newTool]);
-        setNewToolDefinition("");
-        setNewToolImplementation("");
-      } else {
-        alert("ツール定義が不正です。typeとfunctionが必要です。");
-      }
-    } catch (error) {
-      alert("JSON形式が不正です。");
-    }
+  // 既存のツールを Tools と MCP に分類
+  const toolList = tools.filter((t) => t.category !== "MCP");
+  const mcpList = tools.filter((t) => t.category === "MCP");
+
+  // 新規追加モーダル で作成されたツールを追加
+  const handleAddNewTool = (newTool: ExtendedTool) => {
+    updateTools([...tools, newTool]);
   };
 
   // ツールの削除
@@ -100,7 +82,7 @@ export default function ToolsModal({ isOpen, onClose }: ToolsModalProps) {
     <BaseModal
       isOpen={isOpen}
       onClose={onClose}
-      title="カスタムツール管理"
+      title="カスタム Tools/MCP 管理"
       className="tools-modal"
     >
       <div className="tools-modal-content">
@@ -112,90 +94,96 @@ export default function ToolsModal({ isOpen, onClose }: ToolsModalProps) {
         {/* ツール一覧 */}
         <h3>登録済みツール</h3>
         <ul className="tools-list">
-          {tools.map((tool, index) => (
-            <li key={index}>
-              {editingToolIndex === index ? (
-                <ToolEditForm
-                  tool={tool}
-                  onSave={(editedDefinition, editedImplementation) =>
-                    handleSaveEditTool(
-                      index,
-                      editedDefinition,
-                      editedImplementation
-                    )
-                  }
-                  onCancel={() => setEditingToolIndex(null)}
-                  onDelete={() => handleDeleteTool(index)}
-                />
-              ) : (
-                <ToolDisplay
-                  tool={tool}
-                  onCardClick={() => setEditingToolIndex(index)}
-                  onToggle={(e) => handleToggleTool(index, e)}
-                />
-              )}
-            </li>
-          ))}
+          {toolList.map((tool) => {
+            const originalIndex = tools.indexOf(tool);
+            return (
+              <li key={`tool-${originalIndex}`}>
+                {editingToolIndex === originalIndex ? (
+                  <ToolEditForm
+                    tool={tool}
+                    onSave={(editedDefinition, editedImplementation) =>
+                      handleSaveEditTool(
+                        originalIndex,
+                        editedDefinition,
+                        editedImplementation
+                      )
+                    }
+                    onCancel={() => setEditingToolIndex(null)}
+                    onDelete={() => handleDeleteTool(originalIndex)}
+                  />
+                ) : (
+                  <ToolDisplay
+                    tool={tool}
+                    onCardClick={() => setEditingToolIndex(originalIndex)}
+                    onToggle={(e) => handleToggleTool(originalIndex, e)}
+                  />
+                )}
+              </li>
+            );
+          })}
         </ul>
 
-        {/* 新しいツール追加 */}
-        <h3>新しいツールを追加</h3>
-        <div className="tool-input-area">
-          <div className="tool-input-section">
-            <h4>ツール定義（JSON形式）</h4>
-            <textarea
-              className="tool-input"
-              placeholder={`ツール定義をJSON形式で入力してください。例:
-{
-  "type": "function",
-  "function": {
-    "name": "get_weather",
-    "description": "指定された場所の天気を取得する",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "location": {
-          "type": "string",
-          "description": "都市名"
-        }
-      },
-      "required": ["location"]
-    }
-  }
-}`}
-              value={newToolDefinition}
-              onChange={(e) => setNewToolDefinition(e.target.value)}
-              rows={12}
-            />
-          </div>
+        {/* MCP一覧 */}
+        <h3>登録済み MCP</h3>
+        <ul className="tools-list">
+          {mcpList.map((tool) => {
+            const originalIndex = tools.indexOf(tool);
+            return (
+              <li key={`mcp-${originalIndex}`}>
+                {editingToolIndex === originalIndex ? (
+                  <ToolEditForm
+                    tool={tool}
+                    onSave={(editedDefinition, editedImplementation) =>
+                      handleSaveEditTool(
+                        originalIndex,
+                        editedDefinition,
+                        editedImplementation
+                      )
+                    }
+                    onCancel={() => setEditingToolIndex(null)}
+                    onDelete={() => handleDeleteTool(originalIndex)}
+                  />
+                ) : (
+                  <ToolDisplay
+                    tool={tool}
+                    onCardClick={() => setEditingToolIndex(originalIndex)}
+                    onToggle={(e) => handleToggleTool(originalIndex, e)}
+                  />
+                )}
+              </li>
+            );
+          })}
+        </ul>
 
-          <div className="tool-input-section">
-            <h4>実行コード（JavaScript関数）</h4>
-            <textarea
-              className="tool-input"
-              placeholder={`実行可能なJavaScript関数を入力してください。例:
-function(args) {
-  // args.location には都市名が入る
-  const location = args.location;
-  
-  // 実際のAPI呼び出しや処理をここに記述
-  return {
-    location: location,
-    weather: "晴れ",
-    temperature: "25°C",
-    timestamp: new Date().toISOString()
-  };
-}`}
-              value={newToolImplementation}
-              onChange={(e) => setNewToolImplementation(e.target.value)}
-              rows={8}
-            />
-          </div>
-
-          <button onClick={handleAddTool} className="add-button">
-            ツールを追加
+        {/* 新規追加ボタン群 */}
+        <div className="add-buttons-wrapper">
+          <button
+            className="add-button"
+            onClick={() => {
+              setAddCategory("Tool");
+              setIsAddModalOpen(true);
+            }}
+          >
+            + ツールを追加
+          </button>
+          <button
+            className="add-button"
+            onClick={() => {
+              setAddCategory("MCP");
+              setIsAddModalOpen(true);
+            }}
+          >
+            + MCP を追加
           </button>
         </div>
+
+        {/* 新規追加用二重モーダル */}
+        <AddToolMcpModal
+          isOpen={isAddModalOpen}
+          category={addCategory}
+          onClose={() => setIsAddModalOpen(false)}
+          onAdd={handleAddNewTool}
+        />
       </div>
     </BaseModal>
   );
@@ -301,5 +289,93 @@ function ToolEditForm({ tool, onSave, onCancel, onDelete }: ToolEditFormProps) {
         </button>
       </div>
     </div>
+  );
+}
+
+// 二重モーダル用: ツール/MCP 新規追加モーダル
+interface AddToolMcpModalProps {
+  isOpen: boolean;
+  category: "Tool" | "MCP";
+  onClose: () => void;
+  onAdd: (tool: ExtendedTool) => void;
+}
+
+function AddToolMcpModal({
+  isOpen,
+  category,
+  onClose,
+  onAdd,
+}: AddToolMcpModalProps) {
+  const [definition, setDefinition] = useState<string>("");
+  const [implementation, setImplementation] = useState<string>("");
+
+  const handleAdd = () => {
+    if (!definition.trim()) return;
+
+    try {
+      const toolData = JSON.parse(definition);
+      if (toolData.type && toolData.function) {
+        const newTool: ExtendedTool = {
+          type: toolData.type,
+          function: {
+            name: toolData.function.name,
+            description: toolData.function.description,
+            parameters: toolData.function.parameters,
+          },
+          implementation:
+            category === "Tool"
+              ? implementation.trim() || undefined
+              : undefined,
+          enabled: true,
+          category,
+        };
+        onAdd(newTool);
+        setDefinition("");
+        setImplementation("");
+        onClose();
+      } else {
+        alert("ツール定義が不正です。typeとfunctionが必要です。");
+      }
+    } catch {
+      alert("JSON形式が不正です。");
+    }
+  };
+
+  const title =
+    category === "Tool" ? "新しいツールを追加" : "新しい MCP を追加";
+
+  return (
+    <BaseModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={title}
+      className="add-tool-mcp-modal"
+    >
+      <div className="add-tool-mcp-content">
+        <div className="tool-input-section">
+          <h4>定義（JSON形式）</h4>
+          <textarea
+            className="tool-input"
+            value={definition}
+            onChange={(e) => setDefinition(e.target.value)}
+            rows={12}
+          />
+        </div>
+        {category === "Tool" && (
+          <div className="tool-input-section">
+            <h4>実行コード（JavaScript）</h4>
+            <textarea
+              className="tool-input"
+              value={implementation}
+              onChange={(e) => setImplementation(e.target.value)}
+              rows={8}
+            />
+          </div>
+        )}
+        <button onClick={handleAdd} className="add-button">
+          追加
+        </button>
+      </div>
+    </BaseModal>
   );
 }
