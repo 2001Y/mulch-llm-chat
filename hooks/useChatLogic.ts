@@ -1126,12 +1126,15 @@ export function useChatLogic({
               setApiKeyError(
                 "OpenRouter APIキーが無効、またはアクセス権がありません (401)。設定を確認してください。"
               );
+              accumulatedText =
+                "🔒 認証エラー: OpenRouter APIキーが無効、またはアクセス権がありません (401)。設定画面でキーを確認してください。";
             } else {
               setError(
                 `モデル ${modelIdForApi} でエラーが発生しました: ${
                   err.message || status
                 }`
               );
+              accumulatedText = `⚠️ エラー: ${err.message || status}`;
             }
 
             accumulatedText += `\n(エラー: ${err.message || status})`;
@@ -2493,7 +2496,7 @@ export function useChatLogic({
       } catch (err: any) {
         if (err.name === "AbortError") {
           console.log(`Regeneration aborted for ${assistantMessageId}`);
-          accumulatedText += "\n(再生成がキャンセルされました)";
+          accumulatedText = "(再生成がキャンセルされました)";
         } else {
           console.error(
             `Error during regeneration for ${assistantMessageId}:`,
@@ -2510,16 +2513,19 @@ export function useChatLogic({
             setApiKeyError(
               "OpenRouter APIキーが無効、またはアクセス権がありません (401)。設定を確認してください。"
             );
+            accumulatedText =
+              "🔒 認証エラー: OpenRouter APIキーが無効、またはアクセス権がありません (401)。設定画面でキーを確認してください。";
           } else {
             setError(
               `モデル ${modelIdToRegenerate} での再生成エラー: ${
                 err.message || status
               }`
             );
+            accumulatedText = `⚠️ エラー: ${err.message || status}`;
           }
-
-          accumulatedText += `\n(エラー: ${err.message || status})`;
         }
+
+        accumulatedText += `\n(エラー: ${err.message || status})`;
       } finally {
         setMessages((prevMsgs) =>
           prevMsgs.map((m) =>

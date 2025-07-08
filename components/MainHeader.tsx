@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { navigateWithTransition } from "@/utils/navigation";
 import { useChatLogicContext } from "contexts/ChatLogicContext";
@@ -19,6 +19,15 @@ export default function MainHeader({ onShare }: MainHeaderProps) {
   const { handleOpenModal, openRouterApiKey, getCurrentChatInfo } =
     useChatLogicContext();
 
+  const [chatInfo, setChatInfo] = useState<ReturnType<
+    typeof getCurrentChatInfo
+  > | null>(null);
+
+  useEffect(() => {
+    // マウント後に取得してハイドレーションミスマッチを防ぐ
+    setChatInfo(getCurrentChatInfo());
+  }, [getCurrentChatInfo]);
+
   const handleNavigation = (e: React.MouseEvent, href: string) => {
     e.preventDefault();
     navigateWithTransition(router, href);
@@ -34,7 +43,7 @@ export default function MainHeader({ onShare }: MainHeaderProps) {
   };
 
   const isHomePage = pathname === "/";
-  const currentChatInfo = getCurrentChatInfo();
+  const currentChatInfo = chatInfo;
 
   return (
     <div className="main-header">

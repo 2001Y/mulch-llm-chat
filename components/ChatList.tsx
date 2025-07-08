@@ -2,14 +2,20 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import styles from "@/styles/ChatList.module.scss";
 import { useChats } from "hooks/useLocalStorage";
 import { storage } from "hooks/useLocalStorage";
 import { navigateWithTransition } from "@/utils/navigation";
 import GistConnectionModal from "./GistConnectionModal";
 import ChatItemContent from "./ChatItemContent";
-import { saveToGist } from "@/utils/gistUtils";
+import ShareChatModal from "./ShareChatModal";
+import {
+  getShareStatus,
+  publishChat,
+  updateChatGist,
+} from "@/utils/shareChatUtils";
+import type { ShareStatus } from "@/utils/shareChatUtils";
 
 interface ChatItem {
   id: string;
@@ -18,27 +24,25 @@ interface ChatItem {
   timestamp: number;
 }
 
-export default function ChatList() {
+interface ChatListProps {
+  onRequestShare?: (chatId: string) => void;
+}
+
+export default function ChatList({ onRequestShare }: ChatListProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const pathname = usePathname();
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const { chatIds } = useChats();
   const [showGistModal, setShowGistModal] = useState<boolean>(false);
+  const [shareStatus, setShareStatus] = useState<ShareStatus | null>(null);
+  const [isShareModalOpen, setShareModalOpen] = useState(false);
+  const [currentChatIdForShare, setCurrentChatIdForShare] = useState<
+    string | null
+  >(null);
   const [selectedChatForSharing, setSelectedChatForSharing] = useState<
     string | null
   >(null);
   const [isLoadingChats, setIsLoadingChats] = useState(true);
-
-  const clearUrlQuery = useCallback(() => {
-    const newUrl = pathname;
-    window.history.replaceState(
-      { ...window.history.state, as: newUrl, url: newUrl },
-      "",
-      newUrl
-    );
-  }, [pathname]);
 
   useEffect(() => {
     const handleAuthMessage = (event: MessageEvent) => {
@@ -55,7 +59,7 @@ export default function ChatList() {
           console.log(
             `OAuth成功後、チャット ${selectedChatForSharing} の共有を再試行します。`
           );
-          shareChat(selectedChatForSharing);
+          openShareModal(selectedChatForSharing);
           setSelectedChatForSharing(null);
         }
       } else if (type === "github_oauth_error") {
@@ -146,10 +150,14 @@ export default function ChatList() {
       return;
     }
 
-    await shareChat(chatId);
+    if (onRequestShare) {
+      onRequestShare(chatId);
+    } else {
+      await openShareModal(chatId);
+    }
   };
 
-  const shareChat = async (chatId: string) => {
+  const openShareModal = async (chatId: string) => {
     const key = `chatMessages_${chatId}`;
     const chatData = storage.get(key) || [];
 
@@ -158,27 +166,10 @@ export default function ChatList() {
       return;
     }
 
-    try {
-      const result = await saveToGist(chatId, chatData);
-      if (result.success && result.url) {
-        alert(`チャットを共有しました: ${result.url}`);
-        navigator.clipboard.writeText(result.url).catch(console.error);
-      } else {
-        if (result.reauthRequired) {
-          setSelectedChatForSharing(chatId);
-          setShowGistModal(true);
-          console.warn(
-            "GitHub認証が必要です。モーダルを表示します。",
-            result.message
-          );
-        } else {
-          alert(`共有エラー: ${result.message || "不明なエラー"}`);
-        }
-      }
-    } catch (error) {
-      console.error("共有中に予期せぬエラーが発生しました:", error);
-      alert("共有中に予期せぬエラーが発生しました");
-    }
+    const status = await getShareStatus(chatId, chatData);
+    setShareStatus(status);
+    setCurrentChatIdForShare(chatId);
+    setShareModalOpen(true);
     setActiveMenu(null);
   };
 
@@ -189,7 +180,44 @@ export default function ChatList() {
         "OAuth成功後、再度共有処理を実行します。",
         selectedChatForSharing
       );
-      shareChat(selectedChatForSharing);
+      openShareModal(selectedChatForSharing);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!currentChatIdForShare) return;
+    const key = `chatMessages_${currentChatIdForShare}`;
+    const chatData = storage.get(key) || [];
+    const result = await publishChat(currentChatIdForShare, chatData);
+    if (result.success) {
+      setShareStatus({
+        isPublished: true,
+        gistId: result.gistId,
+        shareUrl: result.shareUrl,
+        needsUpdate: false,
+      });
+    } else {
+      alert(result.message || "共有エラー");
+    }
+  };
+
+  const handleUpdate = async () => {
+    if (!currentChatIdForShare || !shareStatus?.gistId) return;
+    const key = `chatMessages_${currentChatIdForShare}`;
+    const chatData = storage.get(key) || [];
+    const result = await updateChatGist(
+      currentChatIdForShare,
+      chatData,
+      shareStatus.gistId!
+    );
+    if (result.success) {
+      setShareStatus({
+        ...shareStatus,
+        shareUrl: result.shareUrl,
+        needsUpdate: false,
+      });
+    } else {
+      alert(result.message || "更新エラー");
     }
   };
 
@@ -276,6 +304,19 @@ export default function ChatList() {
         <GistConnectionModal
           closeModal={() => setShowGistModal(false)}
           onSuccess={handleGistConnectSuccess}
+        />
+      )}
+
+      {/* シェアモーダル */}
+      {isShareModalOpen && shareStatus && (
+        <ShareChatModal
+          isOpen={isShareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          isPublished={shareStatus.isPublished}
+          shareUrl={shareStatus.shareUrl}
+          needsUpdate={shareStatus.needsUpdate}
+          onPublish={handlePublish}
+          onUpdate={handleUpdate}
         />
       )}
     </>

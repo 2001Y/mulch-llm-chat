@@ -2,7 +2,6 @@
 
 import React, { useEffect, Suspense } from "react";
 import "@/styles/chat.scss";
-import { useParams } from "next/navigation";
 import MainHeader from "./MainHeader";
 import ChatResponses from "./ChatResponses";
 import InputSection from "./InputSection";
@@ -10,10 +9,19 @@ import SettingsModal from "./SettingsModal";
 import ModelModal from "./ModelModal";
 import ModelSelectorSlideout from "./ModelSelectorSlideout";
 import ToolsModal from "./ToolsModal";
+import ShareChatModal from "./ShareChatModal";
+import GistConnectionModal from "./GistConnectionModal";
+import {
+  getShareStatus,
+  publishChat,
+  updateChatGist,
+} from "@/utils/shareChatUtils";
+import type { ShareStatus } from "@/utils/shareChatUtils";
 import BentoFeatures from "./BentoFeatures";
 import ChatList from "./ChatList";
 import { useChatLogicContext } from "contexts/ChatLogicContext";
 import { logger } from "@/utils/logger";
+import { storage } from "hooks/useLocalStorage";
 
 interface ChatPageProps {
   isSharedView?: boolean;
@@ -41,6 +49,95 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
     handleCloseToolsModal,
     handleOpenModal,
   } = useChatLogicContext();
+
+  // --- シェア機能用 state ---
+  const [shareStatus, setShareStatus] = React.useState<ShareStatus | null>(
+    null
+  );
+  const [isShareModalOpen, setShareModalOpen] = React.useState(false);
+  const [showGistModal, setShowGistModal] = React.useState(false);
+
+  const openShareModal = async (targetChatId?: string) => {
+    const chatId = targetChatId || roomId || "default";
+    const key = `chatMessages_${chatId}`;
+    const chatData = storage.get(key) || [];
+
+    if (chatData.length === 0) {
+      alert("シェアするチャットデータがありません");
+      return;
+    }
+
+    const status = await getShareStatus(chatId, chatData);
+    setShareStatus(status);
+    setShareModalOpen(true);
+  };
+
+  // GitHub OAuth メッセージ監視
+  useEffect(() => {
+    const handleAuthMessage = (event: MessageEvent) => {
+      const { type, token, error } = event.data;
+
+      if (type === "github_oauth_success" && token) {
+        storage.set("gistToken", token);
+        storage.set("gistOAuthSuccess", "true");
+        setShowGistModal(false);
+        alert(
+          "GitHubアカウントとの連携に成功しました。再度シェアを実行してください。"
+        );
+      } else if (type === "github_oauth_error") {
+        console.error("GitHub OAuthエラー (postMessage):", error);
+        alert(`GitHub連携エラー: ${error || "不明なエラー"}`);
+        setShowGistModal(false);
+      }
+    };
+
+    window.addEventListener("message", handleAuthMessage);
+    return () => window.removeEventListener("message", handleAuthMessage);
+  }, []);
+
+  // MainHeader から渡される onShare 用
+  const handleShare = () => {
+    const gistToken = storage.getGistToken();
+    if (!gistToken) {
+      setShowGistModal(true);
+      return;
+    }
+    openShareModal();
+  };
+
+  const handlePublish = async () => {
+    const chatId = roomId || "default";
+    const key = `chatMessages_${chatId}`;
+    const chatData = storage.get(key) || [];
+    const result = await publishChat(chatId, chatData);
+    if (result.success) {
+      setShareStatus({
+        isPublished: true,
+        gistId: result.gistId,
+        shareUrl: result.shareUrl,
+        needsUpdate: false,
+      });
+    } else {
+      alert(result.message || "共有エラー");
+    }
+  };
+
+  const handleUpdate = async () => {
+    if (!shareStatus?.gistId) return;
+    const chatId = roomId || "default";
+    const key = `chatMessages_${chatId}`;
+    const chatData = storage.get(key) || [];
+    const result = await updateChatGist(chatId, chatData, shareStatus.gistId);
+    if (result.success) {
+      setShareStatus({
+        ...shareStatus,
+        shareUrl: result.shareUrl,
+        needsUpdate: false,
+      });
+    } else {
+      alert(result.message || "更新エラー");
+    }
+  };
 
   // チャットリストの有無をbodyクラスで管理
   useEffect(() => {
@@ -133,12 +230,6 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
     messages?.length || 0
   );
 
-  const handleShare = () => {
-    // 共有機能の実装
-    logger.log("Share functionality will be implemented here");
-    // TODO: 共有機能を実装
-  };
-
   if (isInitialScreen) {
     logger.debug("[DEBUG ChatPage] Rendering initial screen");
     return (
@@ -147,7 +238,7 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
         <BentoFeatures />
         <div className="chat-list-container">
           <Suspense fallback={<div>Loading chats...</div>}>
-            <ChatList />
+            <ChatList onRequestShare={openShareModal} />
           </Suspense>
         </div>
         <InputSection
@@ -178,6 +269,27 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
           onClose={handleCloseModelSelectorSlideout}
         />
         <ToolsModal isOpen={isToolsModalOpen} onClose={handleCloseToolsModal} />
+        {showGistModal && (
+          <GistConnectionModal
+            closeModal={() => setShowGistModal(false)}
+            onSuccess={() => {
+              setShowGistModal(false);
+              openShareModal();
+            }}
+          />
+        )}
+        {/* シェアモーダル */}
+        {isShareModalOpen && shareStatus && (
+          <ShareChatModal
+            isOpen={isShareModalOpen}
+            onClose={() => setShareModalOpen(false)}
+            isPublished={shareStatus.isPublished}
+            shareUrl={shareStatus.shareUrl}
+            needsUpdate={shareStatus.needsUpdate}
+            onPublish={handlePublish}
+            onUpdate={handleUpdate}
+          />
+        )}
       </>
     );
   }
@@ -241,6 +353,27 @@ export default function ChatPage({ isSharedView = false }: ChatPageProps) {
           onClose={handleCloseModelSelectorSlideout}
         />
         <ToolsModal isOpen={isToolsModalOpen} onClose={handleCloseToolsModal} />
+        {showGistModal && (
+          <GistConnectionModal
+            closeModal={() => setShowGistModal(false)}
+            onSuccess={() => {
+              setShowGistModal(false);
+              openShareModal();
+            }}
+          />
+        )}
+        {/* シェアモーダル */}
+        {isShareModalOpen && shareStatus && (
+          <ShareChatModal
+            isOpen={isShareModalOpen}
+            onClose={() => setShareModalOpen(false)}
+            isPublished={shareStatus.isPublished}
+            shareUrl={shareStatus.shareUrl}
+            needsUpdate={shareStatus.needsUpdate}
+            onPublish={handlePublish}
+            onUpdate={handleUpdate}
+          />
+        )}
       </>
     );
   }
