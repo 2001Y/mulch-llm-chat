@@ -24,6 +24,19 @@
 }
 
 .modal-content {
+  // Vaul Drawer 用のポジショニング
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  // narrow devices: full width, desktop: max 500px など
+  width: 100%;
+  max-width: 500px;
+
+  // Drawer の transform(Y) アニメーションを上書きしないよう
+  // translateX, scale 等は指定しない
+
   background: rgba(color.mix(#fff, #000, 8%), 0.95);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -33,12 +46,12 @@
   max-width: 90vw;
   max-height: 90vh;
   overflow: hidden;
+  z-index: 1;
   // positioning handled inline in React; remove hard overrides
 
   @media (max-width: 768px) {
-    max-width: calc(100vw - 2rem);
-    max-height: calc(var(--actual-100dvh) - 2rem);
-    border-radius: 12px;
+    max-width: 100vw;
+    border-radius: 12px 12px 0 0;
   }
 }
 

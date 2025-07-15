@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import BaseModal from "./BaseModal";
 import { useChatLogicContext } from "contexts/ChatLogicContext";

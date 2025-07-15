@@ -251,20 +251,28 @@ export default function InputSection({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
 
+  // iOSキーボード対策: ライブラリのフックを使用
+  const { keyboardHeight, isKeyboardVisible } = useKeyboardHeight();
+
   // ------------------------------------------------
   // 添付ボタン押下時にキーボードフォーカスを維持するハンドラー
   // ------------------------------------------------
   const handleAttachmentButtonClick = useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
-      // button クリックによるフォーカス喪失を防ぐ
+      // ボタン自身へのフォーカスでエディタが blur しないよう防止
       e.preventDefault();
-      // エディタフォーカスを維持
-      tiptapEditorRef.current?.focus();
-      if (!fileInputRef.current) return;
+
       // ネイティブファイルダイアログを開く
-      fileInputRef.current.click();
+      if (fileInputRef.current) {
+        fileInputRef.current.click();
+      }
+
+      // すでにキーボードが表示されている場合のみ、エディタを再フォーカスして維持
+      if (isKeyboardVisible) {
+        tiptapEditorRef.current?.focus();
+      }
     },
-    []
+    [isKeyboardVisible]
   );
 
   // ----------------------------------------------------------------------------
@@ -297,9 +305,6 @@ export default function InputSection({
       removeBodyClass();
     };
   }, [mainInput]);
-
-  // iOSキーボード対策: ライブラリのフックを使用
-  const { keyboardHeight, isKeyboardVisible } = useKeyboardHeight();
 
   // 選択されているモデルの数を取得
   const selectedModelsCount =

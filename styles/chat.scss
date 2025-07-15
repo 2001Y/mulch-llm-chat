@@ -1105,7 +1105,6 @@ html:has(body[data-software-keyboard="true"]) {
   $border-radius: $border-radius * 1.5;
   max-height: 95vh;
   overflow-y: auto;
-  position: relative;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
 
   h2 {
@@ -2281,7 +2280,6 @@ textarea[data-fieldsizing="content"] {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    position: relative;
 
     @media (max-width: 768px) {
       max-width: 100%;
