@@ -1148,7 +1148,7 @@ export function useChatLogic({
                   null,
                   2
                 );
-                accumulatedText += `\n\n**🔧 tool-call**\n\`\`\`json\n${jsonStr}\n\`\`\`\n`;
+                accumulatedText += `\n\n**🔧 tool-call**\n\`\`\`tooljson\n${jsonStr}\n\`\`\`\n`;
 
                 const payload: AppMessage & { role: "assistant"; id: string } =
                   {
@@ -1181,7 +1181,7 @@ export function useChatLogic({
                   null,
                   2
                 );
-                accumulatedText += `\n\n**✅ tool-result**\n\`\`\`json\n${jsonStr}\n\`\`\`\n`;
+                accumulatedText += `\n\n**✅ tool-result**\n\`\`\`tooljson\n${jsonStr}\n\`\`\`\n`;
 
                 const payload: AppMessage & { role: "assistant"; id: string } =
                   {
@@ -1486,6 +1486,13 @@ export function useChatLogic({
         newContent,
       });
 
+      if (DEBUG_LOGS.GENERAL) {
+        console.log(
+          "[useChatLogic] updateAssistantMessageContent id=%s len=%d",
+          messageId,
+          newContent.length
+        );
+      }
       setMessages((prevMessages) =>
         prevMessages.map((msg) =>
           msg.id === messageId && msg.role === "assistant"
@@ -2564,7 +2571,7 @@ export function useChatLogic({
               null,
               2
             );
-            accumulatedText += `\n\n**🔧 tool-call**\n\`\`\`json\n${jsonStr}\n\`\`\`\n`;
+            accumulatedText += `\n\n**🔧 tool-call**\n\`\`\`tooljson\n${jsonStr}\n\`\`\`\n`;
 
             const payload: AppMessage & { role: "assistant"; id: string } = {
               id: assistantMessageId,
@@ -2594,7 +2601,7 @@ export function useChatLogic({
               null,
               2
             );
-            accumulatedText += `\n\n**✅ tool-result**\n\`\`\`json\n${jsonStr}\n\`\`\`\n`;
+            accumulatedText += `\n\n**✅ tool-result**\n\`\`\`tooljson\n${jsonStr}\n\`\`\`\n`;
 
             const payload: AppMessage & { role: "assistant"; id: string } = {
               id: assistantMessageId,

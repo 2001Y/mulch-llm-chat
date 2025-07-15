@@ -41,6 +41,10 @@ const lowlight = createLowlight(common);
 // @ts-ignore
 const CodeBlock = (CodeBlockLowlight as any).extend({ name: "codeBlock" });
 
+// 追跡用ユーティリティ（ログが見やすいように色付け）
+const logMTE = (...args: any[]) =>
+  console.log("%c[MarkdownTipTapEditor]", "color:#bb86fc", ...args);
+
 interface ModelMentionItemForSuggestion {
   id: string; // モデルのフルID (例: openai/gpt-4o)
   label: string; // 表示名 (例: GPT-4o)
@@ -279,6 +283,7 @@ export const MarkdownTipTapEditor = forwardRef<
       onSelectionUpdate,
       onUpdate: ({ editor }) => {
         const currentMarkdown = editor.storage.markdown.getMarkdown();
+        logMTE("onUpdate ▶ len =", currentMarkdown.length);
         console.log(
           "[MarkdownTipTapEditor] onUpdate triggered. Current markdown:",
           currentMarkdown,
@@ -330,8 +335,21 @@ export const MarkdownTipTapEditor = forwardRef<
     useEffect(() => {
       if (editor) {
         editor.setEditable(editable);
+        logMTE("setEditable called →", editable);
       }
     }, [editable, editor]);
+
+    useEffect(() => {
+      if (!editor) return;
+      const onFocus = () => logMTE("focus");
+      const onBlur = () => logMTE("blur");
+      editor.on("focus", onFocus);
+      editor.on("blur", onBlur);
+      return () => {
+        editor.off("focus", onFocus);
+        editor.off("blur", onBlur);
+      };
+    }, [editor]);
 
     useImperativeHandle(ref, () => ({
       focus: () => {

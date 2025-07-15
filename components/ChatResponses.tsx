@@ -295,6 +295,13 @@ export default function Responses({
                             }
                           }}
                           editable={!isLlmGenerating && !readOnly}
+                          onSelectionUpdate={({ editor }) => {
+                            console.debug(
+                              "[ChatResponses] selectionUpdate id=%s editable=%s",
+                              response.id,
+                              editor.isEditable
+                            );
+                          }}
                           editorProps={{
                             attributes: {
                               class: "prose prose-sm focus:outline-none",

@@ -43,14 +43,35 @@ const ToolJsonBlock = CodeBlock.extend({
     return {
       markdown: {
         serialize: ({ node }: any) => {
-          if (!node || !node.attrs || node.attrs.json === undefined) {
+          if (!node) {
             return "```tooljson\n{}\n```";
           }
-          return `\`\`\`tooljson\n${JSON.stringify(
-            node.attrs.json,
-            null,
-            2
-          )}\n\`\`\``;
+          // attrs.json 優先
+          if (node.attrs && node.attrs.json !== undefined) {
+            return `\`\`\`tooljson\n${JSON.stringify(
+              node.attrs.json,
+              null,
+              2
+            )}\n\`\`\``;
+          }
+          // fallback: 子テキストをそのまま
+          const raw = node.textContent || "{}";
+          return `\`\`\`tooljson\n${raw}\n\`\`\``;
+        },
+        parse: ({ content }: { content: string }) => {
+          try {
+            const parsed = JSON.parse(content);
+            return {
+              type: "toolJson",
+              attrs: { json: parsed },
+            } as any;
+          } catch (e) {
+            // JSON パース失敗 → 空オブジェクトで保持
+            return {
+              type: "toolJson",
+              attrs: { json: {} },
+            } as any;
+          }
         },
       },
     };
