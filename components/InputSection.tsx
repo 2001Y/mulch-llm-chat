@@ -251,6 +251,53 @@ export default function InputSection({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
 
+  // ------------------------------------------------
+  // 添付ボタン押下時にキーボードフォーカスを維持するハンドラー
+  // ------------------------------------------------
+  const handleAttachmentButtonClick = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      // button クリックによるフォーカス喪失を防ぐ
+      e.preventDefault();
+      // エディタフォーカスを維持
+      tiptapEditorRef.current?.focus();
+      if (!fileInputRef.current) return;
+      // ネイティブファイルダイアログを開く
+      fileInputRef.current.click();
+    },
+    []
+  );
+
+  // ----------------------------------------------------------------------------
+  // 既存メッセージ編集中は画面下部のメイン input-section-form を非表示にする
+  // ----------------------------------------------------------------------------
+  useEffect(() => {
+    if (mainInput) return; // メイン入力では何もしない
+    const currentSection = sectionRef.current;
+    if (!currentSection) return;
+
+    const addBodyClass = () =>
+      document.body.classList.add("editing-message-active");
+    const removeBodyClass = () =>
+      document.body.classList.remove("editing-message-active");
+
+    // focusin/out を監視して Body にフラグ用クラスを付与/削除
+    currentSection.addEventListener("focusin", addBodyClass);
+    currentSection.addEventListener("focusout", (e) => {
+      const related = e.relatedTarget as Node | null;
+      if (!currentSection.contains(related)) {
+        // セクション外にフォーカスが移動した場合のみ解除
+        removeBodyClass();
+      }
+    });
+
+    return () => {
+      currentSection.removeEventListener("focusin", addBodyClass);
+      // focusout はリスナー生成時と同一の関数を参照する必要があるため
+      // 無名関数では remove できない。ここではクラス除去だけ確実に行う
+      removeBodyClass();
+    };
+  }, [mainInput]);
+
   // iOSキーボード対策: ライブラリのフックを使用
   const { keyboardHeight, isKeyboardVisible } = useKeyboardHeight();
 
@@ -650,7 +697,8 @@ export default function InputSection({
           <div className="input-actions">
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={handleAttachmentButtonClick}
               className="action-button add-files-button icon-button"
             >
               <svg

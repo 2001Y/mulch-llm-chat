@@ -2940,3 +2940,12 @@ textarea,
   .ProseMirror:focus {
   }
 }
+
+// =============================================================
+// 既存メッセージ編集中は画面下部のメイン入力フォームを非表示
+// =============================================================
+body.editing-message-active {
+  .input-section-form > .input-section.full-input.fixed {
+    display: none !important;
+  }
+}

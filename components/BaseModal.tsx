@@ -27,12 +27,9 @@ export default function BaseModal({
       }}
     >
       <Drawer.Portal>
-        {/* Overlay */}
-        <Drawer.Overlay className={`modal-backdrop ${className}`} />
-
         {/* Content */}
         <Drawer.Content
-          className="modal-content"
+          className={`modal-content ${className}`}
           // モーダル中央固定にするため、既存スタイルを流用
           // Vaul は bottom からの Drawer 表示がデフォルトだが、モーダルとして中央表示する
           style={{
@@ -46,7 +43,7 @@ export default function BaseModal({
           }}
         >
           <div className="modal-header">
-            <h2 className="modal-title">{title}</h2>
+            <Drawer.Title className="modal-title">{title}</Drawer.Title>
             <Drawer.Close asChild>
               <button
                 type="button"
@@ -59,6 +56,9 @@ export default function BaseModal({
           </div>
           <div className="modal-body">{children}</div>
         </Drawer.Content>
+
+        {/* Overlay - placed after Content as per Vaul documentation */}
+        <Drawer.Overlay />
       </Drawer.Portal>
     </Drawer.Root>
   );

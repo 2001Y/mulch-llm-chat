@@ -33,8 +33,7 @@
   max-width: 90vw;
   max-height: 90vh;
   overflow: hidden;
-  transform: none !important;
-  animation: none !important;
+  // positioning handled inline in React; remove hard overrides
 
   @media (max-width: 768px) {
     max-width: calc(100vw - 2rem);
